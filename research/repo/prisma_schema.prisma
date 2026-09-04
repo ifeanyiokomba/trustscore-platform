@@ -1,0 +1,303 @@
+// TrustScore domain model — evidence graph, NOT a single User table.
+// Person ≠ Phone ≠ BankAccount. Relationships are time-bound.
+// SQLite stores enums as TEXT. Arrays use Json fields.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Entities (the trust graph nodes)
+// ---------------------------------------------------------------------------
+
+model Person {
+  id          String   @id @default(cuid())
+  handle      String   @unique // @username for public profile
+  displayName String
+  avatarColor String   @default("emerald")
+  bio         String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([handle])
+}
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  rcNumber  String?  // CAC RC number (masked/reference only)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Phone {
+  id            String   @id @default(cuid())
+  numberE164    String   @unique // normalized E.164
+  displayNumber String   // masked for display
+  carrier       String?
+  status        String   @default("UNKNOWN") // ACTIVE | INACTIVE | UNKNOWN | RECYCLED
+  firstSeenAt   DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([numberE164])
+}
+
+model BankAccount {
+  id              String   @id @default(cuid())
+  bankCode        String
+  bankName        String
+  accountNumber   String   @unique
+  maskedNumber    String
+  accountNameMatch String? // normalized name match result
+  accountType     String   @default("UNKNOWN") // INDIVIDUAL | JOINT | COMPANY | UNKNOWN
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([bankCode, accountNumber])
+}
+
+model IdentityReference {
+  id              String   @id @default(cuid())
+  provider        String   // NIMC | NIBSS | DOJAH | SMILE_ID | YOUVERIFY
+  type            String   // NIN | BVN | DRIVERS | VOTERS | PASSPORT
+  referenceHash   String   @unique // never store raw identifier centrally
+  maskedReference String   // e.g. ******123
+  verifiedAt      DateTime?
+  expiresAt       DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([type])
+}
+
+// ---------------------------------------------------------------------------
+// Verification + Evidence (the heart of the engine)
+// ---------------------------------------------------------------------------
+
+model Verification {
+  id              String   @id @default(cuid())
+  requestId       String   @unique
+  idempotencyKey  String?
+  subjectType     String   // PHONE | BANK_ACCOUNT | PERSON | IDENTITY
+  subjectId       String
+  kind            String   // PHONE | ACCOUNT | FACE | IDENTITY
+  provider        String   // NIBSS | NIMC | DOJAH | SMILE_ID | YOUVERIFY | MOCK
+  providerMode    String   @default("MOCK") // MOCK | LIVE (demo only ever MOCK)
+  status          String   // VERIFIED | FAILED | PROVIDER_ERROR | TIMEOUT | PARTIAL | LOW_CONFIDENCE
+  confidence      Float    @default(0) // 0..1
+  latencyMs       Int      @default(0)
+  raw             String?  // sanitized JSON; never raw PII
+  createdAt       DateTime @default(now())
+
+  evidence        Evidence[]
+
+  @@index([subjectType, subjectId])
+  @@index([provider, status])
+}
+
+model Evidence {
+  id              String   @id @default(cuid())
+  verificationId  String
+  subjectType     String
+  subjectId       String
+  kind            String   // IDENTITY_VERIFIED | ACCOUNT_NAME_VERIFIED | PHONE_ACTIVE | FACE_MATCH | BVN_EXISTS | ...
+  value           String   // stringified value
+  confidence      Float    @default(0)
+  provider        String
+  observedAt      DateTime @default(now())
+  expiresAt       DateTime?
+  createdAt       DateTime @default(now())
+
+  verification    Verification @relation(fields: [verificationId], references: [id], onDelete: Cascade)
+
+  @@index([subjectType, subjectId])
+  @@index([kind])
+}
+
+// ---------------------------------------------------------------------------
+// Trust engine
+// ---------------------------------------------------------------------------
+
+model TrustPolicy {
+  id        String   @id @default(cuid())
+  version   String   @unique
+  weights   String   // JSON: dimension weights
+  bands     String   // JSON: risk band ranges
+  active    Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model TrustScore {
+  id            String   @id @default(cuid())
+  subjectType   String
+  subjectId     String
+  score         Int      // constrained 300..1000, or -1 for UNKNOWN
+  riskBand      String   // VERY_LOW | LOW | MODERATE | ELEVATED | HIGH | CRITICAL | UNKNOWN
+  decision      String   // APPROVE | REVIEW | DECLINE | INSUFFICIENT
+  signals       String   // JSON array of explainable signals
+  dimensions    String   // JSON: per-dimension breakdown
+  policyVersion String
+  calculatedAt  DateTime @default(now())
+
+  @@unique([subjectType, subjectId])
+  @@index([riskBand])
+}
+
+// ---------------------------------------------------------------------------
+// Flags + Resolution (reputation moat)
+// ---------------------------------------------------------------------------
+
+model Flag {
+  id            String   @id @default(cuid())
+  referenceCode String   @unique // human-friendly TS-FLG-XXXX
+  reporterLabel String   // masked reporter identity
+  subjectType   String
+  subjectId     String
+  category      String   // ACCOUNT_TAKEOVER | IMPERSONATION | PAYMENT_FRAUD | ...
+  description   String
+  amount        Float?
+  evidenceUrl   String?
+  status        String   @default("PRIVATE") // PRIVATE|UNDER_REVIEW|RESPONDED|RESOLVED|CONFIRMED|DISMISSED|APPEALED
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  resolutions   Resolution[]
+
+  @@index([subjectType, subjectId])
+  @@index([status])
+}
+
+model Resolution {
+  id        String   @id @default(cuid())
+  flagId    String
+  decision  String   // CONFIRMED | DISMISSED | PARTIALLY_CONFIRMED | ESCALATED
+  decidedBy String
+  notes     String?
+  createdAt DateTime @default(now())
+
+  flag      Flag @relation(fields: [flagId], references: [id], onDelete: Cascade)
+
+  @@index([flagId])
+}
+
+// ---------------------------------------------------------------------------
+// FraudNet — risk-signal network (NOT a public blacklist)
+// ---------------------------------------------------------------------------
+
+model FraudSignal {
+  id         String   @id @default(cuid())
+  entityType String   // PERSON | PHONE | BANK_ACCOUNT
+  entityId   String
+  category   String   // ACCOUNT_TAKEOVER | IMPERSONATION | PAYMENT_FRAUD | ...
+  confidence Float   @default(0)
+  source     String   // FLAG | PROVIDER | COMMUNITY | PARTNER
+  summary    String
+  expiresAt  DateTime?
+  reviewAt   DateTime?
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([category])
+}
+
+// ---------------------------------------------------------------------------
+// B2B platform
+// ---------------------------------------------------------------------------
+
+model ApiClient {
+  id          String   @id @default(cuid())
+  name        String
+  keyPrefix   String   // ts_live_********
+  keyHash     String   @unique // sha256
+  plainKeyHint String? // only shown once, hint stored
+  permissions String   // JSON array
+  environment String   @default("live") // live | sandbox
+  status      String   @default("active") // active | revoked
+  lastUsedAt  DateTime?
+  createdAt   DateTime @default(now())
+
+  webhooks    Webhook[]
+}
+
+model Webhook {
+  id         String   @id @default(cuid())
+  apiClientId String
+  url        String
+  events     String   // JSON array
+  secret     String
+  status     String   @default("active")
+  createdAt  DateTime @default(now())
+
+  apiClient   ApiClient @relation(fields: [apiClientId], references: [id], onDelete: Cascade)
+  deliveries  WebhookDelivery[]
+
+  @@index([apiClientId])
+}
+
+model WebhookDelivery {
+  id           String   @id @default(cuid())
+  webhookId    String
+  event        String
+  payload      String   // JSON
+  status       String   @default("PENDING") // PENDING | DELIVERED | FAILED
+  responseCode Int?
+  attempt      Int      @default(0)
+  createdAt    DateTime @default(now())
+
+  webhook      Webhook @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+
+  @@index([webhookId])
+}
+
+// ---------------------------------------------------------------------------
+// Safety checks (consumer + B2B history)
+// ---------------------------------------------------------------------------
+
+model SafetyCheck {
+  id             String   @id @default(cuid())
+  requesterLabel String
+  subjectType    String   // PHONE | BANK_ACCOUNT
+  subjectId      String
+  subjectDisplay String
+  score          Int
+  riskBand      String
+  decision       String
+  signals        String   // JSON
+  createdAt      DateTime @default(now())
+
+  @@index([subjectType, subjectId])
+}
+
+// ---------------------------------------------------------------------------
+// Compliance / consent / audit
+// ---------------------------------------------------------------------------
+
+model Consent {
+  id          String   @id @default(cuid())
+  personId    String?
+  purpose     String   // IDENTITY_VERIFY | PHONE_VERIFY | FRAUD_REPORT | ...
+  grantedAt   DateTime @default(now())
+  withdrawnAt DateTime?
+  createdAt    DateTime @default(now())
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  actor       String
+  action      String
+  subjectType String?
+  subjectId   String?
+  requestId   String?
+  metadata    String?  // JSON
+  redacted    Boolean  @default(true) // never log raw PII
+  createdAt   DateTime @default(now())
+
+  @@index([action])
+  @@index([subjectType, subjectId])
+}

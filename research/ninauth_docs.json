@@ -1,0 +1,65 @@
+[
+  {
+    "url": "https://nimc.gov.ng/press-releases/nimc-launches-nin-authentication-service-(ninauth)-for-secure-and-seamless-identity-authentication-&-verification-for-all-government-services",
+    "name": "NIMC Launches NIN Authentication Service (NINAuth) for",
+    "snippet": "It is designed to facilitate real-time authentication of NIN records, thereby promoting eﬀective service delivery, database harmonization, and compliance with ...",
+    "host_name": "nimc.gov.ng",
+    "rank": 0,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.facebook.com/nimc.ng/posts/one-tap-total-trustsecure-identity-verification-with-ninauth/1215411304106584",
+    "name": "One tap. Total trust Secure identity verification with NINAuth.",
+    "snippet": "NINAuth was developed by NIMC under the Nigerian Federal Government to support secure authentication and verification of one's identity tied to ...",
+    "host_name": "www.facebook.com",
+    "rank": 1,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://ninauth.nimc.gov.ng/developers-guide",
+    "name": "Developers Guide for NINAuth Integration",
+    "snippet": "What is the NINAuth flow? The NINAuth flow enables identity verification through user-driven, consent-based interactions, with no need to expose the raw NIN.",
+    "host_name": "ninauth.nimc.gov.ng",
+    "rank": 2,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.buildstudio.com.ng/features/ninauth-oauth-based-authentication",
+    "name": "1 Best APIs for NINAuth OAuth-based Authentication in Nigeria",
+    "snippet": "Compare the top 1 APIs supporting NINAuth OAuth-based Authentication for Nigerian developers. We've reviewed pricing, reliability, ...",
+    "host_name": "www.buildstudio.com.ng",
+    "rank": 3,
+    "date": "Jul 26, 2026",
+    "favicon": ""
+  },
+  {
+    "url": "https://ninauth.nimc.gov.ng/news-room/nigeria-ushers-new-era-secure",
+    "name": "Nigeria Ushers in Secure Digital Identity Verification - NINAuth",
+    "snippet": "NINAuth is Nigeria's official digital ID authentication service for secure NIN verification, identity sharing, digital ID cards, ...",
+    "host_name": "ninauth.nimc.gov.ng",
+    "rank": 4,
+    "date": "May 1, 2025",
+    "favicon": ""
+  },
+  {
+    "url": "https://idtechwire.com/nigeria-launches-ninauth-platform-for-digital-identity-verification",
+    "name": "Nigeria Launches NINAuth Platform for Digital Identity",
+    "snippet": "The platform supports identity authentication for key services including SIM registration, passport issuance, tax filings, and driver's license ...",
+    "host_name": "idtechwire.com",
+    "rank": 5,
+    "date": "May 15, 2025",
+    "favicon": ""
+  },
+  {
+    "url": "https://docs.id.me/guides/o-auth-2-0/pkce",
+    "name": "PKCE",
+    "snippet": "This guide covers OAuth 2.0 Authorization Code with PKCE. The flow issues an ... Check your library's documentation before implementing the steps below manually.",
+    "host_name": "docs.id.me",
+    "rank": 6,
+    "date": "",
+    "favicon": ""
+  }
+]

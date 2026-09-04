@@ -1,0 +1,89 @@
+// TrustScore — NIN-First rebuild
+// Stage 1: Platform Foundation schema ONLY (per docs/STAGE0_AUDIT.md §4.3)
+//
+// Principle: UserAccount ≠ TrustIdentity ≠ NIN ≠ Phone (directive §29).
+// The Trust Identity spine (trust_identities, identity_identifiers,
+// verification_sessions, consents, evidence, ...) arrives Stage 2–3.
+// Raw identity numbers (NIN, BVN, raw phone) are NEVER stored here.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Stage 1 — Accounts (authentication subjects)
+// ---------------------------------------------------------------------------
+
+model UserAccount {
+  id              String    @id @default(cuid())
+  email           String    @unique
+  passwordHash    String // scrypt output (never plaintext, never reversible)
+  passwordSalt    String // per-user random salt
+  displayName     String
+  handle          String    @unique // reserved for future trustscore.ng/@handle Trust Link (Stage 5)
+  status          String    @default("ACTIVE") // ACTIVE | SUSPENDED | PENDING_DELETION
+  acceptedTermsAt DateTime  @default(now())
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  sessions      Session[]
+  notifications Notification[]
+
+  @@index([email])
+  @@index([status])
+}
+
+model Session {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique // sha256(token); the raw token exists only in the user's httpOnly cookie
+  expiresAt DateTime
+  userAgent String?
+  ipHash    String? // salted hash of client IP — never raw IP
+  createdAt DateTime  @default(now())
+  revokedAt DateTime?
+
+  user UserAccount @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+// ---------------------------------------------------------------------------
+// Stage 1 — Audit + notification plumbing (Security Center arrives Stage 5)
+// ---------------------------------------------------------------------------
+
+model AuditEvent {
+  id          String   @id @default(cuid())
+  actorType   String // USER | SYSTEM | ANONYMOUS
+  actorId     String?
+  action      String // AUTH_REGISTER | AUTH_LOGIN | AUTH_LOGIN_FAILED | AUTH_LOGOUT | ...
+  subjectType String?
+  subjectId   String?
+  requestId   String?
+  metadata    String? // JSON, redacted — no PII, no raw identifiers (directive §38)
+  createdAt   DateTime @default(now())
+
+  @@index([action])
+  @@index([actorId])
+  @@index([createdAt])
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  type      String // SECURITY | VERIFICATION | SYSTEM
+  title     String
+  body      String
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user UserAccount @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt])
+}

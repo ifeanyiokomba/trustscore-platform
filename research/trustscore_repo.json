@@ -1,0 +1,92 @@
+[
+  {
+    "url": "https://github.com/Wezylnia/repo-trust-doctor",
+    "name": "Wezylnia/repo-trust-doctor: Evidence-based static repository trust",
+    "snippet": "Repository Trust Doctor is a modular repository analysis platform for deciding whether an open-source repository is healthy, maintainable, and trustworthy ...",
+    "host_name": "github.com",
+    "rank": 0,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://github.com/google/TrustScore/blob/master/TrustScore.ipynb",
+    "name": "TrustScore/TrustScore.ipynb at master · google/TrustScore - GitHub",
+    "snippet": "A measure of uncertainty for any trained (possibly black-box) classifier. This repository was archived by the owner on May 27, 2024.",
+    "host_name": "github.com",
+    "rank": 1,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.reddit.com/r/github/comments/1bltj8m/how_can_i_know_if_a_code_can_be_trusted",
+    "name": "How can I know if a code can be trusted? : r/github - Reddit",
+    "snippet": "No, the code in GitHub should be considered insecure and cannot be trusted. tool to scan github repos for bad code or stuff like that?",
+    "host_name": "www.reddit.com",
+    "rank": 2,
+    "date": "Mar 23, 2024",
+    "favicon": ""
+  },
+  {
+    "url": "https://github.com/trustpilot",
+    "name": "Trustpilot - GitHub",
+    "snippet": "Trustpilot has 32 repositories available. Follow their code on GitHub. retrieval experiments implementing and evaluating the TPCBS architecture.",
+    "host_name": "github.com",
+    "rank": 3,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.quora.com/Can-you-trust-everything-on-GitHub-not-to-be-malicious",
+    "name": "Can you trust everything on GitHub not to be malicious? - Quora",
+    "snippet": "No, you cannot. However, you can trust other people to report malicious code on Github. Github also runs security audits on all repositories,",
+    "host_name": "www.quora.com",
+    "rank": 4,
+    "date": "Apr 3, 2021",
+    "favicon": ""
+  },
+  {
+    "url": "https://mattorb.com/fuzzy-find-github-repository",
+    "name": "Fuzzy Find a Github Repository - mattorb",
+    "snippet": "Building a Go and FZF command-line workflow to quickly search, select, browse, and clone GitHub repositories.",
+    "host_name": "mattorb.com",
+    "rank": 5,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://stackoverflow.com/questions/22527438/how-can-i-tell-a-github-repositorys-quality",
+    "name": "How can I tell a github repository's quality? [closed] - Stack Overflow",
+    "snippet": "It automatically rates Stackoverflow questions and Github repositories before accessing them, by showing a small colored icon next to the link.",
+    "host_name": "stackoverflow.com",
+    "rank": 6,
+    "date": "Mar 20, 2014",
+    "favicon": ""
+  },
+  {
+    "url": "https://github.com/security",
+    "name": "GitHub Security",
+    "snippet": "Access a security vulnerability database inclusive of CVEs and GitHub originated security advisories from the world of open source software. Visit the GitHub ...",
+    "host_name": "github.com",
+    "rank": 7,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.nxcode.io/tools/github-repo-health-checker",
+    "name": "Free GitHub Repo Health Checker 2026 | Analyze Code - NxCode",
+    "snippet": "Analyze any GitHub repository instantly! Get health score, code quality metrics, documentation review, and AI-powered improvement recommendations.",
+    "host_name": "www.nxcode.io",
+    "rank": 8,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.trustpilot.com/review/github.com",
+    "name": "Read Customer Service Reviews of github.com - Trustpilot",
+    "snippet": "How is the TrustScore calculated? No history of asking for reviews. This company hasn't invited their customers, so reviews may not be representative.",
+    "host_name": "www.trustpilot.com",
+    "rank": 9,
+    "date": "",
+    "favicon": ""
+  }
+]
