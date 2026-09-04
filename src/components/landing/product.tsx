@@ -161,7 +161,8 @@ TrustScore: 782 · LOW RISK`}
           <ArrowRight className="ml-2 h-4 w-4" />
         </Button>
         <p className="mt-3 text-xs text-muted-foreground">
-          Stage 1 — accounts are live now; verification arrives with NINAuth integration in Stage 2.
+          Stage 2 — accounts and NINAuth verification sessions (mock provider) are live
+          now; the live partner transport activates with commercial NINAuth access.
         </p>
       </motion.div>
     </section>

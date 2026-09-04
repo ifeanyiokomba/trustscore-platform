@@ -66,3 +66,29 @@ Stage Summary:
 - Key decisions: custom session auth instead of NextAuth v4 (cleaner FastAPI contract parity + Next 16 compat); email+password for Stage 1 with NINAuth sign-in arriving Stage 2; strict foundation-only schema.
 - **Stage gate: STOPPED. Stage 2 (NINAuth identity sessions) intentionally NOT started** — blocked on partner scope catalog anyway (audit §2.2 open items).
 - Next agent instructions: read docs/STAGE0_AUDIT.md §4.2 Stage 2 spec. Do NOT begin Stage 2 without an explicit user go-ahead per the stage-by-stage directive. Keep test gate + re-audit discipline.
+
+---
+
+Task ID: 2
+Agent: orchestrator (main)
+Task: Stage 2 — NINAuth Identity: verification sessions behind a contract-first MOCK provider (OAuth 2.0 + PKCE + OIDC-style ID tokens + consent records), per audit §4.2. Includes QA regression, full test matrix, browser E2E, styling detail pass.
+
+Work Log:
+- Regression QA first (agent-browser): landing, auth, login all pass — Stage 1 stable.
+- Prisma schema: added `TrustIdentity` (status/assuranceLevel/providerIdentityRef MASKED/verifiedAt/expiresAt 90d freshness), `VerificationSession` (state, PKCE verifier+challenge server-side, one-time authorizationCodeHash, scopes, purpose, policyVersion, shareCode, authorizationUrl, 10min TTL), `VerificationEvent` (redacted timeline), `Consent` (requester/purpose/scopes/policyVersion per directive §31). db:push + generate OK.
+- Provider adapter `src/lib/providers/ninauth.ts` (CONTRACT-FIRST, MOCK transport): real PKCE S256 generation; one-time authorization codes (sha256-hashed, 60s TTL, timing-safe compare); mock OIDC-style ID tokens (HMAC-SHA256 signature, header.payload.signature) with full validation (signature, iss, aud, exp, iat, nonce); token exchange verifying code hash + PKCE verifier; stable masked subject per user (`NINAUTH-****-XXXX`); consent-screen contract (requester/fields/purpose/policyVersion); authorize-URL shape. NINAUTH_CLIENT_SECRET backend-only. Mode honestly labeled MOCK everywhere.
+- IdentityService (`src/lib/services/identity-service.ts`): create session, lazy expiry, consent decision (GRANT issues code; DENY terminal; grant-after-deny → 409 NOT_PENDING — fixed after matrix caught idempotency hole), callback (state match → code hash match → PKCE exchange → token validation → consent record → TrustIdentity upsert → events/audit/notification), read model for /identity/me.
+- Routes: POST /api/v1/identity/sessions (rate-limited 5/min), GET /api/v1/identity/sessions/:id (owner-only, timeline), POST .../:id/consent (mock NINAuth app side; retired in LIVE), POST .../:id/callback (the OAuth callback contract), GET /api/v1/identity/me. Audit actions extended (IDENTITY_*). /api index + /api/health updated to Stage 2.
+- Frontend: `identity-card.tsx` (three states: none w/ CTA, verified w/ gradient shimmer panel, pulse freshness dot, masked ref, consent records, event timeline w/ animated connector, re-verify w/ error display), `consent-modal.tsx` (NINAuth-style consent screen: requester, scoped fields w/ descriptions, purpose, policy version, live mm:ss countdown, TS-XXXX share code w/ copy button, deterministic decorative MOCK QR, Approve/Deny; sonner toasts on success/deny). Dashboard: Stage 2 badge, ACTION_LABELS extended with identity events. Landing: roadmap statuses updated (1 done, 2 active), nav/footer badges "Stage 2 · NINAuth Identity", copy updates.
+- Verification:
+  - tsc 0 errors; ESLint 0 errors.
+  - `tests/stage2_matrix.py` — 36/36 PASS: unauth 401; create 201 (AWAITING_CONSENT, MOCK labels, share code, consent contract, S256 in URL, verifier never leaked); timeline; cross-user 404; GRANT → code+state; wrong-state → 400 BAD_STATE (session FAILED); happy path → VERIFIED L1, masked ref, 90d expiry, ID token NOT leaked to client; code replay → 409 CODE_REUSED; /identity/me verified+consents+full timeline; DENY path (no identity, CONSENT_DENIED); grant-on-denied → 409; forged code → EXCHANGE_FAILED; short input → 422; rate limit → 429.
+  - Browser E2E (`tests/stage2_e2e.sh`, `tests/stage2_e2e_deny.sh`): ada login → Continue with NINAuth → consent modal (countdown, share code, PKCE URL, fields, policy) → Approve → dev.log shows sessions 201 → consent 200 → callback 200 → identity/me 200; dashboard shows "Level 1 · NINAuth", "Government identity verified", masked ref, "Verified just now", "Valid 90 more days", consent records, toast. NGOZI fresh-register → Deny → modal closes, no identity. Mobile 390px modal clean. 0 console errors. VLM visual checks pass.
+  - dev.log: 0 errors after fixes.
+
+Stage Summary:
+- Stage 2 complete + fully tested. The identity spine exists: OAuth 2.0 + PKCE + consent + ID-token-validation contracts all real; only the transport is MOCK (honestly labeled) until partner credentials arrive (audit §2.2 open items).
+- Key security properties verified: PKCE verifier never leaves the server; client secrets backend-only; ID tokens validated (never merely decoded); codes one-time + 60s TTL; state/nonce binding; masked subject references only; audit trail + consent records for NDPA §31 compliance.
+- Dev-server quirk IMPORTANT for next agents: manually started `bun run dev` DIES between bash tool calls AND occasionally mid-call. Pattern that works: restart server + do ALL testing within ONE bash call (see tests/stage2_e2e.sh). The system auto-restarts it eventually.
+- Stage gate: STOPPED after Stage 2. Stage 3 (Trust Identity management: L1-L4, hashed identifiers, consent-scoped attributes) is next per audit §4.2 — await user go-ahead.
+- Files: src/lib/providers/ninauth.ts, src/lib/services/identity-service.ts, src/app/api/v1/identity/**, src/components/dashboard/identity-card.tsx, src/components/auth/consent-modal.tsx, tests/stage2_matrix.py, tests/stage2_e2e*.sh.

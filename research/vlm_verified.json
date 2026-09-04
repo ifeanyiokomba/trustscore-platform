@@ -1,0 +1,28 @@
+{
+  "choices": [
+    {
+      "finish_reason": "stop",
+      "index": 0,
+      "message": {
+        "content": "The image displays a TrustScore dashboard for a user named \"Ada,\" showing two main cards: \"Your account\" with basic profile details and an active status, and \"Trust Identity\" indicating a verified government identity via NINAuth with 90 days validity. The design is clean, modern, and professional, utilizing a green color scheme that conveys security and trust, with clear typography and well-organized information hierarchy. A minor visual defect appears to be an overlapping tooltip or popup in the bottom-right corner of the \"Trust Identity\" card that partially obscures the content beneath it. Overall, the interface effectively communicates the user's verified status while maintaining a user-friendly layout.",
+        "role": "assistant"
+      }
+    }
+  ],
+  "created": 1788556168,
+  "id": "20260905050926611373b883b34b3b",
+  "model": "glm-5v-turbo",
+  "object": "chat.completion",
+  "request_id": "20260905050926611373b883b34b3b",
+  "usage": {
+    "completion_tokens": 136,
+    "completion_tokens_details": {
+      "reasoning_tokens": 0
+    },
+    "prompt_tokens": 919,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    },
+    "total_tokens": 1055
+  }
+}

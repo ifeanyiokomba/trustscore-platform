@@ -233,3 +233,24 @@ Later stages append: `trust_identities`, `identity_identifiers`, `identity_attri
 **Deviations (accepted):** custom scrypt session auth instead of NextAuth v4 (deliberate: FastAPI contract parity, Next 16 compatibility); single-route SPA constraint per sandbox; Flutter/FastAPI as blueprint-only per §4.1.
 
 **Verdict:** Stage 1 is complete, tested, and re-audited. Proceed to Stage 2 **only** on explicit user go-ahead (and ideally after NINAuth partner scope items in §2.2 have answers; Stage 2 may be built behind a contract-first mock adapter meanwhile).
+
+---
+
+## Appendix B — Stage 2 Re-Audit Verdict (post-implementation)
+
+**Result: PASS — stage gate closed. Stage 3 not started.**
+
+| Gate criterion (§4.2 Stage 2) | Evidence |
+|---|---|
+| `POST /v1/identity/sessions` | 201; PKCE S256 generated server-side; consent-screen contract returned; 10-min TTL; rate-limited 5/min |
+| `GET /v1/identity/sessions/:id` | Owner-only (cross-user → 404); redacted event timeline; lazy expiry |
+| `GET /v1/identity/me` | TrustIdentity + consent history + latest session timeline; masked references only |
+| OAuth/OIDC + PKCE, backend-only secrets | Verifier never sent to any client (verified in matrix); mock client secret backend-only; ID tokens HMAC-signed and VALIDATED (signature/iss/aud/exp/iat/nonce) — never merely decoded |
+| Consent callback | state/nonce binding (wrong state → 400, session FAILED); one-time 60s codes (timing-safe hash compare); code replay → 409; forged code → EXCHANGE_FAILED |
+| Consent recording (§31) | requester/purpose/scopes/policyVersion/grantedAt persisted; consent-screen UX matches NINAuth's published contract (org, fields, purpose) |
+| MOCK provider honesty | `providerMode: "MOCK"` in every response; MOCK badges in UI; consent endpoint documented as retired-in-LIVE |
+| Test gate | tsc 0 · eslint 0 · 36/36 contract matrix · browser E2E approve + deny + mobile + toasts · dev.log clean · VLM visual QA pass |
+
+**Deviations (accepted):** the mock "NINAuth app" consent decision is an authenticated API endpoint (in LIVE mode this becomes NINAuth's real redirect); sandbox FastAPI/Flutter remain blueprint-only per §4.1.
+
+**Verdict:** Stage 2 complete. Next: Stage 3 (Trust Identity management — assurance levels L1–L4, hashed identifiers, consent-scoped attributes) only on explicit go-ahead.

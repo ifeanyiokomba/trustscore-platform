@@ -9,17 +9,15 @@ import {
   CalendarDays,
   User,
   BadgeCheck,
-  Hourglass,
-  KeyRound,
-  History,
   Loader2,
   LogOut,
   Bell,
-  Fingerprint,
+  History,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { IdentityCard } from "@/components/dashboard/identity-card";
 import { useTrustStore } from "@/lib/store";
 import type { ActivityEvent } from "@/lib/types";
 
@@ -28,6 +26,11 @@ const ACTION_LABELS: Record<string, string> = {
   AUTH_LOGIN: "Signed in",
   AUTH_LOGIN_FAILED: "Failed sign-in attempt",
   AUTH_LOGOUT: "Signed out",
+  IDENTITY_SESSION_CREATED: "Verification session started",
+  IDENTITY_CONSENT_GRANTED: "Identity consent granted",
+  IDENTITY_CONSENT_DENIED: "Identity consent denied",
+  IDENTITY_VERIFIED: "Trust Identity established",
+  IDENTITY_SESSION_FAILED: "Verification failed",
 };
 
 function timeAgo(iso: string): string {
@@ -80,7 +83,7 @@ export function DashboardView() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.2em] text-primary">
-            Stage 1 · Platform Foundation
+            Stage 2 · NINAuth Identity
           </p>
           <h1 id="dash-heading" className="mt-1 text-3xl font-bold tracking-tight">
             Welcome back, {user.displayName.split(" ")[0]}
@@ -100,7 +103,7 @@ export function DashboardView() {
             </span>
             <div>
               <CardTitle className="text-base">Your account</CardTitle>
-              <CardDescription>Stage 1 foundation</CardDescription>
+              <CardDescription>Platform foundation account</CardDescription>
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -151,58 +154,10 @@ export function DashboardView() {
           </CardContent>
         </Card>
 
-        {/* Trust Identity (Stage 2 preview) */}
-        <Card className="border-dashed lg:col-span-2">
-          <CardHeader className="flex-row items-center gap-3 space-y-0">
-            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-muted text-muted-foreground">
-              <Fingerprint className="h-5 w-5" />
-            </span>
-            <div>
-              <CardTitle className="text-base">Trust Identity</CardTitle>
-              <CardDescription>Your verified identity spine</CardDescription>
-            </div>
-            <Badge variant="outline" className="ml-auto text-xs text-muted-foreground">
-              <Hourglass className="mr-1 h-3 w-3" />
-              Arrives Stage 2
-            </Badge>
-          </CardHeader>
-          <CardContent>
-            <div className="rounded-xl border border-border bg-muted/40 p-5 text-center">
-              <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
-                <KeyRound className="h-6 w-6" />
-              </span>
-              <p className="mt-4 text-sm font-semibold">No Trust Identity established yet</p>
-              <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
-                When NINAuth verification ships (Stage 2), you&apos;ll verify through
-                Nigeria&apos;s official identity consent gateway — QR or share code, with
-                explicit consent — and your Trust Identity will unlock the Trust Passport,
-                Safety Check and Trust Link.
-              </p>
-              <Button className="mt-5" disabled aria-disabled="true">
-                Continue with NINAuth
-                <Badge variant="secondary" className="ml-2 text-[10px]">Stage 2</Badge>
-              </Button>
-            </div>
-            <ul className="mt-4 grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
-              <li className="flex items-center gap-2">
-                <ShieldCheck className="h-3.5 w-3.5 text-primary/60" aria-hidden="true" />
-                Government identity verification
-              </li>
-              <li className="flex items-center gap-2">
-                <ShieldCheck className="h-3.5 w-3.5 text-primary/60" aria-hidden="true" />
-                Consent-scoped attributes only
-              </li>
-              <li className="flex items-center gap-2">
-                <ShieldCheck className="h-3.5 w-3.5 text-primary/60" aria-hidden="true" />
-                No raw NIN ever stored
-              </li>
-              <li className="flex items-center gap-2">
-                <ShieldCheck className="h-3.5 w-3.5 text-primary/60" aria-hidden="true" />
-                Freshness tracked from day one
-              </li>
-            </ul>
-          </CardContent>
-        </Card>
+        {/* Trust Identity — Stage 2 live (contract-first MOCK NINAuth provider) */}
+        <div className="lg:col-span-2">
+          <IdentityCard />
+        </div>
 
         {/* Security center preview */}
         <Card className="lg:col-span-3">

@@ -31,11 +31,100 @@ model UserAccount {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
-  sessions      Session[]
-  notifications Notification[]
+  sessions             Session[]
+  notifications        Notification[]
+  trustIdentity        TrustIdentity?
+  verificationSessions VerificationSession[]
+  consents             Consent[]
 
   @@index([email])
   @@index([status])
+}
+
+// ---------------------------------------------------------------------------
+// Stage 2 — NINAuth identity spine (contract-first, MOCK provider)
+// Raw NIN / raw identifiers are NEVER stored. The provider returns only a
+// masked subject reference (providerIdentityRef) + verification outcome.
+// ---------------------------------------------------------------------------
+
+model TrustIdentity {
+  id                  String    @id @default(cuid())
+  userId              String    @unique
+  status              String    @default("PENDING") // PENDING | VERIFIED | EXPIRED | REVOKED
+  assuranceLevel      Int       @default(0) // 0 = none; 1 = government-verified via NINAuth (Stage 2); L2–L4 arrive Stage 3–4
+  provider            String    @default("NINAUTH_MOCK")
+  providerMode        String    @default("MOCK") // MOCK until partner sandbox creds exist (audit §2.2)
+  providerIdentityRef String? // masked subject from provider — never a raw NIN
+  verifiedAt          DateTime?
+  expiresAt           DateTime? // verification freshness horizon (90 days)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  user UserAccount @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+}
+
+model VerificationSession {
+  id                    String    @id @default(cuid())
+  userId                String
+  provider              String    @default("NINAUTH_MOCK")
+  providerMode          String    @default("MOCK")
+  flow                  String    @default("QR") // QR | SHARE_CODE
+  status                String    @default("AWAITING_CONSENT") // AWAITING_CONSENT | CONSENT_GRANTED | CONSENT_DENIED | COMPLETED | FAILED | EXPIRED
+  state                 String    @unique // OAuth state / anti-CSRF (also used as nonce)
+  codeVerifier          String // PKCE verifier — SERVER-SIDE ONLY, never sent to any client
+  codeChallenge         String // S256(verifier)
+  authorizationCodeHash String? // one-time code issued by the provider (mock NINAuth app)
+  authorizationCodeExp  DateTime?
+  scopes                String // JSON array requested/granted
+  purpose               String
+  policyVersion         String
+  shareCode             String    @unique // NINAuth-style share code for the user to present
+  authorizationUrl      String // provider authorize URL (mock endpoint shape in sandbox)
+  errorReason           String?
+  consentId             String?
+  expiresAt             DateTime // session TTL (10 min, like an authorize flow)
+  completedAt           DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  events VerificationEvent[]
+  user  UserAccount @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+}
+
+model VerificationEvent {
+  id        String   @id @default(cuid())
+  sessionId String
+  eventType String // SESSION_CREATED | CONSENT_SCREEN_PRESENTED | CONSENT_GRANTED | CONSENT_DENIED | CODE_ISSUED | CODE_EXCHANGED | TOKEN_VALIDATED | IDENTITY_VERIFIED | SESSION_FAILED | SESSION_EXPIRED
+  detail    String? // redacted JSON — no PII (directive §38)
+  createdAt DateTime @default(now())
+
+  session VerificationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, createdAt])
+}
+
+// Consent record per directive §31: who requested, why, what scopes were
+// requested/granted, when, which provider, policy version.
+model Consent {
+  id           String    @id @default(cuid())
+  userId       String
+  sessionId    String?   @unique
+  requester    String // who requested the identity access
+  purpose      String
+  scopes       String // JSON array granted
+  policyVersion String
+  grantedAt    DateTime  @default(now())
+  withdrawnAt  DateTime?
+  createdAt    DateTime  @default(now())
+
+  user UserAccount @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model Session {

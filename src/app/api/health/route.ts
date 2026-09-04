@@ -3,8 +3,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 
-const STAGE = "1 — Platform Foundation";
-const VERSION = "1.0.0";
+const STAGE = "2 — NINAuth Identity (contract-first MOCK provider)";
+const VERSION = "1.1.0";
 const startedAt = Date.now();
 
 export async function GET(_req: NextRequest) {

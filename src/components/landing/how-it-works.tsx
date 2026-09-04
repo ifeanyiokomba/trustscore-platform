@@ -119,8 +119,9 @@ export function HowItWorks() {
           className="mt-8 text-center text-xs text-muted-foreground"
         >
           <ArrowRight className="mr-1 inline h-3 w-3" />
-          Verification sessions (Stage 2) are built behind a provider adapter while
-          commercial NINAuth partner access is finalized.
+          Stage 2 is live: verification sessions run the full OAuth + PKCE + consent
+          contract against a mock NINAuth provider adapter while commercial partner
+          access is finalized.
         </motion.p>
       </div>
     </section>

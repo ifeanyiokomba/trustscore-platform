@@ -23,14 +23,14 @@ const STAGES: { id: string; title: string; status: StageStatus; detail: string }
   {
     id: "1",
     title: "Platform foundation",
-    status: "active",
-    detail: "Accounts, sessions, auth APIs, design system, audit logging — what you're using right now.",
+    status: "done",
+    detail: "Accounts, sessions, auth APIs, design system, audit logging — shipped and re-audited.",
   },
   {
     id: "2",
     title: "NINAuth identity",
-    status: "planned",
-    detail: "Verification sessions, OAuth/PKCE, consent recording, partner adapter (contract-first).",
+    status: "active",
+    detail: "Verification sessions, OAuth/PKCE, consent recording — live behind a contract-first MOCK provider adapter.",
   },
   {
     id: "3",

@@ -134,7 +134,7 @@ export function AuthView() {
             </CardTitle>
             <CardDescription>
               {tab === "signup"
-                ? "Reserve your @handle today — identity verification arrives with NINAuth in Stage 2."
+                ? "Reserve your @handle today — then verify your Trust Identity with NINAuth (mock provider) in the dashboard."
                 : "Sign in to your TrustScore account."}
             </CardDescription>
           </CardHeader>
@@ -350,7 +350,7 @@ export function AuthView() {
 
             <p className="mt-4 text-center text-[11px] leading-relaxed text-muted-foreground">
               Stage 1 accounts use email &amp; password with hardened sessions. NINAuth
-              sign-in arrives with identity verification in Stage 2.
+              identity verification is live in your dashboard (mock provider).
             </p>
           </CardContent>
         </Card>

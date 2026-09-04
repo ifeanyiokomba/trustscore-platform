@@ -1,0 +1,28 @@
+{
+  "choices": [
+    {
+      "finish_reason": "stop",
+      "index": 0,
+      "message": {
+        "content": "The layout is well-optimized for mobile, with clear visual hierarchy and appropriate spacing that makes the content easily scannable on a 390px screen. There is no visible overflow or cut-off text—all elements including the heading, description, QR code, and data sharing details are fully contained within the dialog. The design appears clean and professional, using a consistent color scheme (green for branding/security), clear typography, and logical grouping of information. The inclusion of a session timer, scannable QR code, and explicit data sharing disclosure enhances both usability and trustworthiness for an identity verification flow.",
+        "role": "assistant"
+      }
+    }
+  ],
+  "created": 1788556166,
+  "id": "2026090505092345c671cb4bf44fc5",
+  "model": "glm-5v-turbo",
+  "object": "chat.completion",
+  "request_id": "2026090505092345c671cb4bf44fc5",
+  "usage": {
+    "completion_tokens": 122,
+    "completion_tokens_details": {
+      "reasoning_tokens": 0
+    },
+    "prompt_tokens": 436,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    },
+    "total_tokens": 558
+  }
+}

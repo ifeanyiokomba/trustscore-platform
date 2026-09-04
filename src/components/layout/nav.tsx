@@ -154,7 +154,7 @@ export function Nav() {
 
         <div className="flex items-center gap-1.5">
           <span className="mr-1 hidden rounded-full border border-primary/30 bg-primary/10 px-2.5 py-0.5 text-[11px] font-semibold text-primary md:inline-flex">
-            Stage 1 · Foundation
+            Stage 2 · NINAuth Identity
           </span>
           <div className="hidden sm:block">
             <AuthActions />
