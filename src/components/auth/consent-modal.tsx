@@ -24,6 +24,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Checkbox } from "@/components/ui/checkbox";
 import type { ConsentScreenInfo, VerificationSessionInfo } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -75,7 +76,7 @@ export interface ConsentModalProps {
   consent: ConsentScreenInfo | null;
   busy: boolean;
   error: string | null;
-  onDecision: (decision: "GRANT" | "DENY") => void;
+  onDecision: (decision: "GRANT" | "DENY", grantedScopes?: string[]) => void;
   onDismiss: () => void;
 }
 
@@ -90,6 +91,14 @@ export function ConsentModal({
 }: ConsentModalProps) {
   const [msLeft, setMsLeft] = React.useState(0);
   const [copied, setCopied] = React.useState(false);
+  // Stage 3 — granular consent: optional scopes are opt-in (privacy-first
+  // default OFF). Core scopes are required and locked.
+  const [optionalOn, setOptionalOn] = React.useState<Record<string, boolean>>({});
+
+  React.useEffect(() => {
+    if (!open) return;
+    setOptionalOn({}); // reset to privacy-first defaults each time
+  }, [open, session?.id]);
 
   React.useEffect(() => {
     if (!open || !session) return;
@@ -100,6 +109,16 @@ export function ConsentModal({
   }, [open, session]);
 
   const expired = msLeft <= 0;
+
+  const coreFields = (consent?.fields ?? []).filter((f) => f.core);
+  const optionalFields = (consent?.fields ?? []).filter((f) => !f.core);
+  const grantedScopes = [
+    ...coreFields.map((f) => f.scope),
+    ...optionalFields.filter((f) => optionalOn[f.scope]).map((f) => f.scope),
+  ];
+  const attributeCount = optionalFields
+    .filter((f) => optionalOn[f.scope])
+    .reduce((n, f) => n + (f.scope === "profile.name" || f.scope === "profile.demographics" ? 2 : 0), 0);
 
   async function copyShareCode() {
     if (!session) return;
@@ -185,23 +204,63 @@ export function ConsentModal({
               </div>
             </div>
 
-            {/* Consent fields */}
+            {/* Consent fields — core (locked) + optional (opt-in checkboxes) */}
             <div className="space-y-2.5">
               <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Data that will be shared
               </p>
-              {consent.fields.map((f) => (
+              {coreFields.map((f) => (
                 <div
                   key={f.scope}
                   className="flex items-start gap-2.5 rounded-lg border border-border px-3 py-2.5"
                 >
                   <FileCheck2 className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium">{f.label}</p>
                     <p className="text-xs text-muted-foreground">{f.description}</p>
                   </div>
+                  <Badge
+                    variant="outline"
+                    className="shrink-0 border-border bg-muted/60 text-[10px] font-medium text-muted-foreground"
+                  >
+                    Required
+                  </Badge>
                 </div>
               ))}
+              {optionalFields.length > 0 && (
+                <div className="space-y-1.5 pt-1">
+                  <p className="text-[11px] text-muted-foreground">
+                    Optional — opt in to add these verified attributes to your profile:
+                  </p>
+                  {optionalFields.map((f) => {
+                    const on = !!optionalOn[f.scope];
+                    return (
+                      <label
+                        key={f.scope}
+                        className={cn(
+                          "flex cursor-pointer items-start gap-2.5 rounded-lg border px-3 py-2.5 transition-colors",
+                          on
+                            ? "border-primary/40 bg-primary/5"
+                            : "border-border hover:border-primary/25"
+                        )}
+                      >
+                        <Checkbox
+                          checked={on}
+                          onCheckedChange={(c) =>
+                            setOptionalOn((prev) => ({ ...prev, [f.scope]: c === true }))
+                          }
+                          className="mt-0.5"
+                          aria-label={`Share ${f.label}`}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium">{f.label}</p>
+                          <p className="text-xs text-muted-foreground">{f.description}</p>
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             <Separator />
@@ -233,7 +292,7 @@ export function ConsentModal({
             {/* Actions */}
             <div className="flex flex-col gap-2 sm:flex-row-reverse">
               <Button
-                onClick={() => onDecision("GRANT")}
+                onClick={() => onDecision("GRANT", grantedScopes)}
                 disabled={busy || expired}
                 className="flex-1"
               >
@@ -245,7 +304,7 @@ export function ConsentModal({
                 ) : (
                   <>
                     <CheckCircle2 className="mr-2 h-4 w-4" />
-                    Approve
+                    Approve{attributeCount > 0 ? ` · ${attributeCount} attributes` : ""}
                   </>
                 )}
               </Button>

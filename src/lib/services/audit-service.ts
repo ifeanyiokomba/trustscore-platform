@@ -14,7 +14,8 @@ export type AuditAction =
   | "IDENTITY_CONSENT_GRANTED"
   | "IDENTITY_CONSENT_DENIED"
   | "IDENTITY_VERIFIED"
-  | "IDENTITY_SESSION_FAILED";
+  | "IDENTITY_SESSION_FAILED"
+  | "IDENTITY_CONSENT_WITHDRAWN";
 
 interface AuditInput {
   actorType: "USER" | "SYSTEM" | "ANONYMOUS";
@@ -34,6 +35,10 @@ const SAFE_METADATA_KEYS = new Set([
   "outcome",
   "code",
   "view",
+  "scopes",
+  "attributes",
+  "revokedAttributes",
+  "identityRevoked",
 ]);
 
 export async function recordAudit(input: AuditInput): Promise<void> {

@@ -1,10 +1,10 @@
 // TrustScore — NIN-First rebuild
-// Stage 1: Platform Foundation schema ONLY (per docs/STAGE0_AUDIT.md §4.3)
+// Stage 1–3 schema (per docs/STAGE0_AUDIT.md §4.3 / §4.2)
 //
 // Principle: UserAccount ≠ TrustIdentity ≠ NIN ≠ Phone (directive §29).
-// The Trust Identity spine (trust_identities, identity_identifiers,
-// verification_sessions, consents, evidence, ...) arrives Stage 2–3.
 // Raw identity numbers (NIN, BVN, raw phone) are NEVER stored here.
+// Stage 3 adds the Trust Identity management layer: hashed identifiers,
+// consent-scoped attributes, evidence records with provenance + freshness.
 
 generator client {
   provider = "prisma-client-js"
@@ -36,6 +36,7 @@ model UserAccount {
   trustIdentity        TrustIdentity?
   verificationSessions VerificationSession[]
   consents             Consent[]
+  evidence             Evidence[]
 
   @@index([email])
   @@index([status])
@@ -51,17 +52,102 @@ model TrustIdentity {
   id                  String    @id @default(cuid())
   userId              String    @unique
   status              String    @default("PENDING") // PENDING | VERIFIED | EXPIRED | REVOKED
-  assuranceLevel      Int       @default(0) // 0 = none; 1 = government-verified via NINAuth (Stage 2); L2–L4 arrive Stage 3–4
+  assuranceLevel      Int       @default(0) // 0 = none; 1 = government-verified via NINAuth; L2 phone/L3 biometric arrive Stage 4; L4 cross-signal
   provider            String    @default("NINAUTH_MOCK")
   providerMode        String    @default("MOCK") // MOCK until partner sandbox creds exist (audit §2.2)
   providerIdentityRef String? // masked subject from provider — never a raw NIN
+  establishingConsentId String? // the consent that established this identity (withdrawal semantics, Stage 3)
   verifiedAt          DateTime?
   expiresAt           DateTime? // verification freshness horizon (90 days)
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
 
-  user UserAccount @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user        UserAccount          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  identifiers IdentityIdentifier[]
+  attributes  IdentityAttribute[]
+  evidence    Evidence[]
 
+  @@index([status])
+}
+
+// ---------------------------------------------------------------------------
+// Stage 3 — Identity identifiers (HASHED — directive §29 identity_identifiers)
+// We store only peppered sha256 fingerprints for future match lookops
+// (Stage 6 Safety Check) — never raw NIN/phone values.
+// ---------------------------------------------------------------------------
+
+model IdentityIdentifier {
+  id              String    @id @default(cuid())
+  trustIdentityId String
+  type            String // NIN_FINGERPRINT | PHONE | EMAIL — signal family
+  hash            String // sha256(pepper + provider subject / normalized value) — NEVER raw
+  hint            String // masked display hint, e.g. "Government ID · NINAuth ref"
+  status          String    @default("ACTIVE") // ACTIVE | REVOKED | SUPERSEDED
+  verifiedAt      DateTime
+  expiresAt       DateTime? // identifier freshness horizon
+  consentId       String? // provenance
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  trustIdentity TrustIdentity @relation(fields: [trustIdentityId], references: [id], onDelete: Cascade)
+
+  @@unique([trustIdentityId, type])
+  @@index([hash])
+}
+
+// ---------------------------------------------------------------------------
+// Stage 3 — Identity attributes (CONSENT-SCOPED — directive §29/§31)
+// An attribute exists only while the consent that produced it stands.
+// Withdrawing the consent revokes the attribute (NDPA data-subject right).
+// ---------------------------------------------------------------------------
+
+model IdentityAttribute {
+  id              String    @id @default(cuid())
+  trustIdentityId String
+  key             String // given_name | family_name | birth_year | state_of_origin | ...
+  value           String // consent-scoped display value
+  scope           String // the consent scope that produced this attribute
+  consentId       String // provenance — withdraw the consent, revoke the attribute
+  status          String    @default("ACTIVE") // ACTIVE | REVOKED
+  source          String // provider that asserted the value
+  assertedAt      DateTime // when the provider asserted it
+  expiresAt       DateTime? // attribute freshness (follows identity horizon)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  trustIdentity TrustIdentity @relation(fields: [trustIdentityId], references: [id], onDelete: Cascade)
+
+  @@unique([trustIdentityId, key])
+  @@index([status])
+}
+
+// ---------------------------------------------------------------------------
+// Stage 3 — Evidence records (provenance + freshness — directive §29 evidence)
+// Verified evidence with chain: which session produced it, under which consent,
+// from which provider, with what confidence, valid until when.
+// ---------------------------------------------------------------------------
+
+model Evidence {
+  id              String    @id @default(cuid())
+  userId          String
+  trustIdentityId String?
+  sessionId       String? // verification session provenance
+  consentId       String? // consent provenance
+  type            String // NINAUTH_ID_TOKEN | PHONE_OTP | LIVENESS (Stage 4) | ...
+  provider        String
+  providerMode    String
+  summary         String // redacted human summary — no PII (directive §38)
+  confidence      Int       @default(100) // 0–100 provider confidence
+  status          String    @default("ACTIVE") // ACTIVE | REVOKED
+  collectedAt     DateTime
+  expiresAt       DateTime? // evidence freshness
+  createdAt       DateTime  @default(now())
+
+  user          UserAccount @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trustIdentity TrustIdentity? @relation(fields: [trustIdentityId], references: [id], onDelete: SetNull)
+
+  @@index([userId, collectedAt])
+  @@index([trustIdentityId])
   @@index([status])
 }
 

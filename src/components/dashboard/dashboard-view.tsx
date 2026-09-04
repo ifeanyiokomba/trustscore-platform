@@ -16,10 +16,12 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { IdentityCard } from "@/components/dashboard/identity-card";
+import { AssuranceLadder } from "@/components/dashboard/assurance-ladder";
+import { AttributesCard } from "@/components/dashboard/attributes-card";
+import { EvidenceCard } from "@/components/dashboard/evidence-card";
 import { useTrustStore } from "@/lib/store";
-import type { ActivityEvent } from "@/lib/types";
+import type { ActivityEvent, IdentityMe } from "@/lib/types";
 
 const ACTION_LABELS: Record<string, string> = {
   AUTH_REGISTER: "Account created",
@@ -31,6 +33,7 @@ const ACTION_LABELS: Record<string, string> = {
   IDENTITY_CONSENT_DENIED: "Identity consent denied",
   IDENTITY_VERIFIED: "Trust Identity established",
   IDENTITY_SESSION_FAILED: "Verification failed",
+  IDENTITY_CONSENT_WITHDRAWN: "Consent withdrawn (NDPA right)",
 };
 
 function timeAgo(iso: string): string {
@@ -48,6 +51,29 @@ export function DashboardView() {
   const { user, setView, signOut, pending } = useTrustStore();
   const [activity, setActivity] = React.useState<ActivityEvent[] | null>(null);
   const [activityLoading, setActivityLoading] = React.useState(true);
+  const [identityData, setIdentityData] = React.useState<IdentityMe | null>(null);
+  const [identityLoading, setIdentityLoading] = React.useState(true);
+
+  const refreshIdentity = React.useCallback(async () => {
+    setIdentityLoading(true);
+    try {
+      const res = await fetch("/api/v1/identity/me", { cache: "no-store" });
+      if (res.ok) {
+        setIdentityData(await res.json());
+      } else {
+        setIdentityData(null);
+      }
+    } catch {
+      setIdentityData(null);
+    } finally {
+      setIdentityLoading(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    if (!user) return;
+    void refreshIdentity();
+  }, [user, refreshIdentity]);
 
   React.useEffect(() => {
     if (!user) return;
@@ -68,9 +94,11 @@ export function DashboardView() {
     return () => {
       cancelled = true;
     };
-  }, [user]);
+  }, [user, identityData]);
 
   if (!user) return null;
+
+  const hasIdentity = identityData?.identity.status === "VERIFIED";
 
   return (
     <motion.section
@@ -83,7 +111,7 @@ export function DashboardView() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.2em] text-primary">
-            Stage 2 · NINAuth Identity
+            Stage 3 · Trust Identity
           </p>
           <h1 id="dash-heading" className="mt-1 text-3xl font-bold tracking-tight">
             Welcome back, {user.displayName.split(" ")[0]}
@@ -94,125 +122,156 @@ export function DashboardView() {
         </Button>
       </div>
 
-      <div className="mt-8 grid gap-6 lg:grid-cols-3">
-        {/* Account card */}
-        <Card className="lg:col-span-1">
-          <CardHeader className="flex-row items-center gap-3 space-y-0">
-            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-              <ShieldCheck className="h-5 w-5" />
-            </span>
-            <div>
-              <CardTitle className="text-base">Your account</CardTitle>
-              <CardDescription>Platform foundation account</CardDescription>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <dl className="space-y-3 text-sm">
-              <div className="flex items-center gap-3">
-                <User className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-                <dt className="sr-only">Name</dt>
-                <dd className="font-medium">{user.displayName}</dd>
-              </div>
-              <div className="flex items-center gap-3">
-                <Mail className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-                <dt className="sr-only">Email</dt>
-                <dd className="truncate text-muted-foreground">{user.email}</dd>
-              </div>
-              <div className="flex items-center gap-3">
-                <AtSign className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-                <dt className="sr-only">Handle</dt>
-                <dd className="font-mono text-primary">trustscore.ng/@{user.handle}</dd>
-              </div>
-              <div className="flex items-center gap-3">
-                <CalendarDays className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-                <dt className="sr-only">Member since</dt>
-                <dd className="text-muted-foreground">
-                  {new Date(user.createdAt).toLocaleDateString("en-NG", {
-                    day: "numeric",
-                    month: "short",
-                    year: "numeric",
-                  })}
-                </dd>
-              </div>
-            </dl>
-            <div className="flex items-center gap-2 rounded-lg border border-primary/25 bg-primary/5 px-3 py-2.5">
-              <BadgeCheck className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
-              <p className="text-xs font-medium">
-                Status: <span className="text-primary">{user.status}</span> — handle reserved
-                for your future Trust Link.
-              </p>
-            </div>
-            <Button
-              variant="outline"
-              className="w-full text-destructive hover:bg-destructive/10 hover:text-destructive"
-              onClick={() => signOut()}
-              disabled={pending}
-            >
-              {pending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LogOut className="mr-2 h-4 w-4" />}
-              Sign out
-            </Button>
-          </CardContent>
-        </Card>
-
-        {/* Trust Identity — Stage 2 live (contract-first MOCK NINAuth provider) */}
-        <div className="lg:col-span-2">
-          <IdentityCard />
+      {identityLoading ? (
+        <div className="mt-8 flex items-center justify-center rounded-xl border border-dashed border-border py-16 text-muted-foreground" role="status">
+          <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+          Loading your Trust Identity…
         </div>
-
-        {/* Security center preview */}
-        <Card className="lg:col-span-3">
-          <CardHeader className="flex-row items-center gap-3 space-y-0">
-            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
-              <History className="h-5 w-5" />
-            </span>
-            <div>
-              <CardTitle className="text-base">Account activity</CardTitle>
-              <CardDescription>
-                Security Center preview — every action on your account is audited
-              </CardDescription>
-            </div>
-            <Bell className="ml-auto h-4 w-4 text-muted-foreground" aria-hidden="true" />
-          </CardHeader>
-          <CardContent>
-            {activityLoading ? (
-              <div className="flex items-center justify-center py-8 text-muted-foreground" role="status">
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Loading activity…
+      ) : (
+        <div className="mt-8 grid min-w-0 gap-6 lg:grid-cols-3">
+          {/* Account card */}
+          <Card className="ts-card-hover min-w-0 lg:col-span-1">
+            <CardHeader className="flex-row items-center gap-3 space-y-0">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground">
+                <ShieldCheck className="h-5 w-5" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <CardTitle className="text-base">Your account</CardTitle>
+                <CardDescription className="truncate">Platform foundation account</CardDescription>
               </div>
-            ) : activity && activity.length > 0 ? (
-              <ul className="max-h-72 space-y-1.5 overflow-y-auto pr-1" aria-label="Recent account activity">
-                {activity.map((ev) => (
-                  <li
-                    key={ev.id}
-                    className="flex items-center justify-between gap-3 rounded-lg border border-border/70 bg-muted/30 px-4 py-3 text-sm"
-                  >
-                    <span className="flex items-center gap-2.5">
-                      <span
-                        className={`h-2 w-2 rounded-full ${
-                          ev.action === "AUTH_LOGIN_FAILED" ? "bg-amber-500" : "bg-primary"
-                        }`}
-                        aria-hidden="true"
-                      />
-                      {ACTION_LABELS[ev.action] ?? ev.action}
-                    </span>
-                    <time className="shrink-0 text-xs text-muted-foreground" dateTime={ev.createdAt}>
-                      {timeAgo(ev.createdAt)}
-                    </time>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="py-6 text-center text-sm text-muted-foreground">
-                No activity recorded yet.
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <dl className="space-y-3 text-sm">
+                <div className="flex items-center gap-3">
+                  <User className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                  <dt className="sr-only">Name</dt>
+                  <dd className="font-medium">{user.displayName}</dd>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Mail className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                  <dt className="sr-only">Email</dt>
+                  <dd className="min-w-0 truncate text-muted-foreground">{user.email}</dd>
+                </div>
+                <div className="flex items-center gap-3">
+                  <AtSign className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                  <dt className="sr-only">Handle</dt>
+                  <dd className="font-mono text-primary">trustscore.ng/@{user.handle}</dd>
+                </div>
+                <div className="flex items-center gap-3">
+                  <CalendarDays className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                  <dt className="sr-only">Member since</dt>
+                  <dd className="text-muted-foreground">
+                    {new Date(user.createdAt).toLocaleDateString("en-NG", {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                    })}
+                  </dd>
+                </div>
+              </dl>
+              <div className="flex min-w-0 items-center gap-2 rounded-lg border border-primary/25 bg-primary/5 px-3 py-2.5">
+                <BadgeCheck className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+                <p className="min-w-0 text-xs font-medium">
+                  Status: <span className="text-primary">{user.status}</span> — handle reserved
+                  for your future Trust Link.
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                className="w-full text-destructive hover:bg-destructive/10 hover:text-destructive"
+                onClick={() => signOut()}
+                disabled={pending}
+              >
+                {pending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LogOut className="mr-2 h-4 w-4" />}
+                Sign out
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* Trust Identity — spine with fingerprints + consent withdrawal */}
+          <div className="min-w-0 lg:col-span-2">
+            <IdentityCard data={identityData} onChanged={refreshIdentity} />
+          </div>
+
+          {/* Stage 3 — Assurance ladder */}
+          <div className="min-w-0 lg:col-span-1">
+            <AssuranceLadder ladder={identityData?.ladder ?? []} />
+          </div>
+
+          {/* Stage 3 — Consent-scoped attributes */}
+          <div className="min-w-0 lg:col-span-2">
+            <AttributesCard
+              attributes={identityData?.attributes ?? []}
+              consents={identityData?.consents ?? []}
+              hasIdentity={hasIdentity}
+              onChanged={refreshIdentity}
+            />
+          </div>
+
+          {/* Stage 3 — Evidence records */}
+          <div className="min-w-0 lg:col-span-1">
+            <EvidenceCard evidence={identityData?.evidence ?? []} />
+          </div>
+
+          {/* Security center preview */}
+          <Card className="ts-card-hover min-w-0 lg:col-span-2">
+            <CardHeader className="flex-row items-center gap-3 space-y-0">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <History className="h-5 w-5" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <CardTitle className="text-base">Account activity</CardTitle>
+                <CardDescription className="truncate">
+                  Security Center preview — every action on your account is audited
+                </CardDescription>
+              </div>
+              <Bell className="ml-auto h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+            </CardHeader>
+            <CardContent>
+              {activityLoading ? (
+                <div className="flex items-center justify-center py-8 text-muted-foreground" role="status">
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Loading activity…
+                </div>
+              ) : activity && activity.length > 0 ? (
+                <ul className="max-h-72 space-y-1.5 overflow-y-auto pr-1" aria-label="Recent account activity">
+                  {activity.map((ev) => (
+                    <li
+                      key={ev.id}
+                      className="flex items-center justify-between gap-3 rounded-lg border border-border/70 bg-muted/30 px-4 py-3 text-sm"
+                    >
+                      <span className="flex min-w-0 items-center gap-2.5">
+                        <span
+                          className={`h-2 w-2 shrink-0 rounded-full ${
+                            ev.action === "AUTH_LOGIN_FAILED"
+                              ? "bg-amber-500"
+                              : ev.action === "IDENTITY_CONSENT_WITHDRAWN"
+                                ? "bg-amber-500"
+                                : "bg-primary"
+                          }`}
+                          aria-hidden="true"
+                        />
+                        <span className="min-w-0 truncate">{ACTION_LABELS[ev.action] ?? ev.action}</span>
+                      </span>
+                      <time className="shrink-0 text-xs text-muted-foreground" dateTime={ev.createdAt}>
+                        {timeAgo(ev.createdAt)}
+                      </time>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="py-6 text-center text-sm text-muted-foreground">
+                  No activity recorded yet.
+                </p>
+              )}
+              <p className="mt-3 text-[11px] text-muted-foreground">
+                Full Identity Security Center (change alerts, active sessions, notifications)
+                arrives in Stage 5. Audit data is redacted — no PII in event metadata.
               </p>
-            )}
-            <p className="mt-3 text-[11px] text-muted-foreground">
-              Full Identity Security Center (change alerts, active sessions, notifications)
-              arrives in Stage 5. Audit data is redacted — no PII in event metadata.
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </motion.section>
   );
 }

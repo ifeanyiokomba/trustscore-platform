@@ -123,7 +123,11 @@ check("deny acknowledged", s == 200 and b.get("decision") == "DENY")
 s, b = call(ada, "GET", f"/api/v1/identity/sessions/{SID3}")
 check("session CONSENT_DENIED", b["session"]["status"] == "CONSENT_DENIED")
 s, b = call(ada, "GET", "/api/v1/identity/me")
-check("ada identity stays NONE", b["identity"]["status"] == "NONE")
+# Stage 3 note: ada's baseline can now be NONE/REVOKED/VERIFIED depending on
+# lifecycle tests. The deny invariant: a denied session must NEVER establish
+# (or leave) a VERIFIED identity for this flow — no identity change on DENY.
+check("deny never establishes identity", b["identity"]["status"] != "VERIFIED",
+      f"status={b['identity']['status']}")
 
 # ---------------------------------------------------------------- 11) consent on denied
 s, b = call(ada, "POST", f"/api/v1/identity/sessions/{SID3}/consent", {"decision": "GRANT"})

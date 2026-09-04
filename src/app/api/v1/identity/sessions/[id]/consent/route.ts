@@ -13,6 +13,9 @@ import { applyConsentDecision } from "@/lib/services/identity-service";
 
 const ConsentSchema = z.object({
   decision: z.enum(["GRANT", "DENY"]),
+  // Stage 3 — granular consent: subset of the session's requested scopes.
+  // Core scopes are enforced server-side; optional scopes are the user's call.
+  scopes: z.array(z.string().trim().max(64)).max(8).optional(),
 });
 
 export async function POST(
@@ -44,7 +47,13 @@ export async function POST(
     return jsonError(422, "VALIDATION_ERROR", "decision must be GRANT or DENY.", requestId);
   }
 
-  const result = await applyConsentDecision(user.id, id, parsed.data.decision, requestId);
+  const result = await applyConsentDecision(
+    user.id,
+    id,
+    parsed.data.decision,
+    requestId,
+    parsed.data.scopes
+  );
 
   if (!result.ok) {
     switch (result.code) {
@@ -56,8 +65,21 @@ export async function POST(
         return jsonError(410, "EXPIRED", "This verification session has expired. Start a new one.", requestId);
       case "DENIED":
         return jsonOk({ ok: true, decision: "DENY" });
+      case "SCOPE_INVALID":
+        return jsonError(
+          422,
+          "SCOPE_INVALID",
+          "Granted scopes must be a subset of the requested scopes and include the core verification scopes.",
+          requestId
+        );
     }
   }
 
-  return jsonOk({ ok: true, decision: "GRANT", code: result.code, state: result.state });
+  return jsonOk({
+    ok: true,
+    decision: "GRANT",
+    code: result.code,
+    state: result.state,
+    grantedScopes: result.grantedScopes,
+  });
 }

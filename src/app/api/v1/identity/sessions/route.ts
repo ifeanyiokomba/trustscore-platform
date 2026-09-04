@@ -8,6 +8,7 @@ import { getSessionUser } from "@/lib/platform/session";
 import {
   createVerificationSession,
   consentScreen,
+  ScopeValidationError,
 } from "@/lib/services/identity-service";
 import { recordAudit } from "@/lib/services/audit-service";
 import { NINAUTH_MODE, SESSION_TTL_MS } from "@/lib/providers/ninauth";
@@ -50,7 +51,20 @@ export async function POST(req: NextRequest) {
     return jsonError(422, "VALIDATION_ERROR", first?.message ?? "Invalid input.", requestId);
   }
 
-  const session = await createVerificationSession(user.id, parsed.data, requestId);
+  let session;
+  try {
+    session = await createVerificationSession(user.id, parsed.data, requestId);
+  } catch (err) {
+    if (err instanceof ScopeValidationError) {
+      return jsonError(
+        422,
+        "SCOPE_INVALID",
+        `Unknown scope(s): ${err.rejected.join(", ")}.`,
+        requestId
+      );
+    }
+    throw err;
+  }
   const scopes = JSON.parse(session.scopes) as string[];
 
   return jsonOk(

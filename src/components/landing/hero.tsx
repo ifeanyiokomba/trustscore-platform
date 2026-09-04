@@ -107,9 +107,9 @@ export function Hero() {
               className="mt-10 grid grid-cols-3 gap-4 border-t border-border pt-6"
             >
               {HERO_STATS.map((s) => (
-                <div key={s.label}>
+                <div key={s.label} className="group rounded-lg px-2 py-1.5 transition-colors hover:bg-accent/50">
                   <dt className="sr-only">{s.label}</dt>
-                  <dd className="text-2xl font-bold text-primary">{s.value}</dd>
+                  <dd className="text-2xl font-bold text-primary transition-transform group-hover:scale-105">{s.value}</dd>
                   <dd className="mt-1 text-xs text-muted-foreground">{s.label}</dd>
                 </div>
               ))}
@@ -169,7 +169,7 @@ export function Hero() {
                     <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
                       TrustScore
                     </p>
-                    <p className="text-5xl font-extrabold tabular-nums text-primary">782</p>
+                    <p className="ts-grad-text text-5xl font-extrabold tabular-nums">782</p>
                   </div>
                   <div className="text-right">
                     <p className="text-sm font-semibold text-primary">LOW RISK</p>

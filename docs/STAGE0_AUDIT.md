@@ -254,3 +254,27 @@ Later stages append: `trust_identities`, `identity_identifiers`, `identity_attri
 **Deviations (accepted):** the mock "NINAuth app" consent decision is an authenticated API endpoint (in LIVE mode this becomes NINAuth's real redirect); sandbox FastAPI/Flutter remain blueprint-only per §4.1.
 
 **Verdict:** Stage 2 complete. Next: Stage 3 (Trust Identity management — assurance levels L1–L4, hashed identifiers, consent-scoped attributes) only on explicit go-ahead.
+
+---
+
+## Appendix C — Stage 3 Re-Audit Verdict (post-implementation)
+
+**Re-audit date:** audit cycle 3 (this session). **Result: PASS — stage gate closed. Stage 4 not started.**
+
+| Gate criterion (§4.2 Stage 3) | Evidence |
+|---|---|
+| `trust_identities` assurance levels L1–L4 | Ladder defined server-side (`ASSURANCE_LADDER`), computed from identity status + ACTIVE identifier types; L2 phone / L3 biometric / L4 cross-signal locked and labeled "Stage 4" (honest, no premature claims); L1 achieved only for VERIFIED + fresh identities |
+| `identity_identifiers` (hashed) | `IdentityIdentifier` model — peppered sha256 fingerprints only (`identifierFingerprint`), type NIN_FINGERPRINT upserted per verification; hash NEVER exposed (display shows 8-char prefix only); indexed for future Stage 6 Safety-Check matching; hint strings carry no raw values |
+| `identity_attributes` (consent-scoped) | `IdentityAttribute` model — created ONLY for granted profile scopes (`attributeKeysForScopes`); each row carries scope + consentId provenance; `@@unique([trustIdentityId, key])`; upsert on re-verify; purpose limitation verified by test (demographics not granted → no birth_year/state_of_origin) |
+| Evidence records with provenance + freshness | `Evidence` model — session + consent + provider + providerMode + redacted summary + confidence + 90-day expiry; NINAUTH_ID_TOKEN record created on every successful callback; no PII in summaries (§38) |
+| Consent-scoped claim contract | Mock provider ID tokens carry `profile` claims filtered by GRANTED scopes; deterministic per-user mock data (honestly labeled MOCK); scope catalog extended with `profile.name` / `profile.demographics` (core vs optional) |
+| Granular consent (§31) | Consent modal offers optional scopes as opt-in checkboxes (privacy-first default OFF); GRANT submits a scope subset; server validates subset ⊆ requested ∧ core ⊆ granted → session binds the granted set; token + attributes follow exactly it |
+| NDPA §31 withdrawal | `POST /api/v1/identity/consents/:id/withdraw`: withdraw → consent timestamped, sourced attributes REVOKED (values hidden, audit history retained); establishing consent withdrawn → TrustIdentity REVOKED (L0) + identifiers REVOKED + evidence REVOKED; re-verify path restores; audit + notification emitted |
+| Read model (`GET /api/v1/identity/me`) | identity + ladder + identifiers (prefix-only hashes) + attributes (values hidden when revoked) + evidence + consents + timeline; lazy freshness (VERIFIED past horizon reads EXPIRED, L1 lost until re-verify) |
+| MOCK/live honesty | `providerMode: "MOCK"` everywhere; MOCK badges in consent modal + dashboard; LIVE partner scope catalog still an open business item (§2.2) |
+| Test gate | tsc 0 · eslint 0 · Stage 3 matrix **51/51** (scope validation, granular grants, invalid-subset rejection, cross-user 404/404, code replay 409, withdrawal semantics incl. establishing/non-establishing, re-verify, rate limits) · Stage 2 regression matrix **36/36** · browser E2E: revoked→re-verify w/ 4 attributes→fingerprints/ladder/evidence visible→confirmed withdrawal→revoked again; mobile 390px no overflow; dark mode; console + dev.log clean · VLM visual QA pass (dark-mode destructive contrast fixed as a result) |
+| Stage 1/2 regressions fixed this cycle | (a) mobile 390px horizontal overflow in dashboard grid (grid `min-w-0` + card-header shrink/wrap) — scrollWidth now == viewport; (b) mobile Sheet auth actions now close the Sheet; (c) activity feed now includes IDENTITY_* audit events (was AUTH_-only — Stage 2 gap); (d) withdraw confirm dialog added to identity card (destructive action was unconfirmed) |
+
+**Deviations (accepted):** attribute values stored plaintext-in-DB but consent-gated (sandbox; production plan: envelope encryption before Stage 6 exposure); identifiers hashed from the masked provider subject (in LIVE mode the partner's stable subject id is hashed the same way); `hashPrefix` display field added for transparency (8 hex chars, non-reversible).
+
+**Verdict:** Stage 3 complete and re-audited. Next: Stage 4 (phone + biometric signals, L2–L3 assurance escalation, cross-signal consistency) only on explicit go-ahead.

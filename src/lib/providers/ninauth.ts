@@ -45,17 +45,31 @@ export const IDENTITY_FRESHNESS_DAYS = 90; // re-verification horizon
 
 // Proposed scope catalog (contract-first). The real partner scope strings will
 // replace these identifiers; the consent UX contract stays the same.
+// CORE scopes are always required for verification; OPTIONAL scopes unlock
+// consent-scoped identity attributes (Stage 3) — the user opts in per field.
 export const SCOPE_CATALOG: Record<
   string,
-  { label: string; description: string }
+  { label: string; description: string; core?: boolean; attributeKeys?: string[] }
 > = {
   "identity.basic": {
     label: "Basic identity",
     description: "Verification status and masked identity reference only",
+    core: true,
   },
   "identity.nin_status": {
     label: "NIN verification status",
     description: "Whether your government identity record is verified — never the NIN itself",
+    core: true,
+  },
+  "profile.name": {
+    label: "Name details",
+    description: "Given name and family name as held on your NIN record",
+    attributeKeys: ["given_name", "family_name"],
+  },
+  "profile.demographics": {
+    label: "Demographics",
+    description: "Birth year and state of origin as held on your NIN record",
+    attributeKeys: ["birth_year", "state_of_origin"],
   },
   "identity.phone_status": {
     label: "Phone binding status",
@@ -63,10 +77,17 @@ export const SCOPE_CATALOG: Record<
   },
 };
 
-export const DEFAULT_SCOPES = ["identity.basic", "identity.nin_status"];
+export const CORE_SCOPES = ["identity.basic", "identity.nin_status"];
+export const OPTIONAL_SCOPES = ["profile.name", "profile.demographics"];
+export const DEFAULT_SCOPES = [...CORE_SCOPES];
 export const PURPOSE = "SELF_IDENTITY_VERIFICATION";
 export const REQUESTER = "TrustScore";
 export const CONSENT_POLICY_VERSION = "consent-policy-2026.09";
+
+// Attributes a scope produces (used by the Stage 3 attribute writer).
+export function attributeKeysForScopes(scopes: string[]): string[] {
+  return scopes.flatMap((s) => SCOPE_CATALOG[s]?.attributeKeys ?? []);
+}
 
 // ---------------------------------------------------------------------------
 // PKCE (real mechanics — S256)
@@ -133,6 +154,13 @@ export function codeMatches(storedHash: string, code: string): boolean {
 // for the LIVE partner JWKS-based validation.
 // ---------------------------------------------------------------------------
 
+export interface ProfileClaims {
+  given_name?: string;
+  family_name?: string;
+  birth_year?: string;
+  state_of_origin?: string;
+}
+
 export interface IdTokenClaims {
   iss: string;
   aud: string;
@@ -140,6 +168,7 @@ export interface IdTokenClaims {
   scopes: string[];
   nonce: string;
   verified: boolean;
+  profile?: ProfileClaims; // consent-scoped claims — only keys the scopes allow
   iat: number;
   exp: number;
 }
@@ -232,6 +261,7 @@ export interface MockTokenExchangeInput {
   nonce: string;
   maskedSubject: string;
   scopes: string[];
+  profile: ProfileClaims; // filtered by granted scopes inside
 }
 
 export function mockTokenExchange(input: MockTokenExchangeInput): TokenResponse {
@@ -247,6 +277,16 @@ export function mockTokenExchange(input: MockTokenExchangeInput): TokenResponse 
     throw new TokenValidationError("pkce_mismatch");
   }
 
+  const profile: ProfileClaims = {};
+  if (input.scopes.includes("profile.name")) {
+    profile.given_name = input.profile.given_name;
+    profile.family_name = input.profile.family_name;
+  }
+  if (input.scopes.includes("profile.demographics")) {
+    profile.birth_year = input.profile.birth_year;
+    profile.state_of_origin = input.profile.state_of_origin;
+  }
+
   const id_token = issueMockIdToken({
     iss: MOCK_ISSUER,
     aud: NINAUTH_CLIENT_ID,
@@ -254,6 +294,7 @@ export function mockTokenExchange(input: MockTokenExchangeInput): TokenResponse 
     scopes: input.scopes,
     nonce: input.nonce,
     verified: true,
+    profile,
   });
 
   return {
@@ -275,6 +316,48 @@ export function maskedSubjectFor(userId: string): string {
 }
 
 // ---------------------------------------------------------------------------
+// Stage 3 — hashed identifier fingerprint (directive §29 identity_identifiers).
+// The identifier hash lets future Safety Checks (Stage 6) match a presented
+// identifier against identities WITHOUT storing any raw value.
+export function identifierFingerprint(providerSubject: string): string {
+  return createHash("sha256")
+    .update(`${NINAUTH_CLIENT_SECRET}:identifier:${providerSubject}`)
+    .digest("hex");
+}
+
+// ---------------------------------------------------------------------------
+// Stage 3 — deterministic MOCK profile claims per user (contract-first: the
+// LIVE partner returns these fields from the NIN record for granted scopes).
+// ---------------------------------------------------------------------------
+
+const GIVEN_NAMES = [
+  "Adaeze", "Chidi", "Ngozi", "Emeka", "Funke", "Tunde",
+  "Amina", "Ibrahim", "Yemi", "Chioma", "Bala", "Halima",
+];
+const FAMILY_NAMES = [
+  "Okafor", "Eze", "Adeyemi", "Bello", "Okonkwo", "Lawal",
+  "Uche", "Danladi", "Oliseh", "Abubakar", "Nwosu", "Afolayan",
+];
+const STATES = [
+  "Anambra", "Enugu", "Lagos", "Kano", "Rivers", "Oyo",
+  "Kaduna", "Delta", "Imo", "Sokoto", "Edo", "Plateau",
+];
+
+function seededFrom(seed: string, modulo: number): number {
+  const h = createHash("sha256").update(`${NINAUTH_CLIENT_SECRET}:seed:${seed}`).digest();
+  return h.readUInt32BE(0) % modulo;
+}
+
+export function mockProfileFor(userId: string): ProfileClaims {
+  return {
+    given_name: GIVEN_NAMES[seededFrom(`gn:${userId}`, GIVEN_NAMES.length)],
+    family_name: FAMILY_NAMES[seededFrom(`fn:${userId}`, FAMILY_NAMES.length)],
+    birth_year: String(1972 + seededFrom(`by:${userId}`, 28)),
+    state_of_origin: STATES[seededFrom(`st:${userId}`, STATES.length)],
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Consent screen contract (what NINAuth shows the user: requester, fields, purpose)
 // ---------------------------------------------------------------------------
 
@@ -282,6 +365,7 @@ export interface ConsentField {
   scope: string;
   label: string;
   description: string;
+  core?: boolean;
 }
 
 export interface ConsentScreen {
@@ -300,11 +384,21 @@ export function consentScreenFor(scopes: string[]): ConsentScreen {
       scope: s,
       label: SCOPE_CATALOG[s].label,
       description: SCOPE_CATALOG[s].description,
+      core: SCOPE_CATALOG[s].core ?? false,
     }));
   return {
     requester: REQUESTER,
     purpose: PURPOSE,
-    fields: fields.length ? fields : [{ scope: "identity.basic", label: SCOPE_CATALOG["identity.basic"].label, description: SCOPE_CATALOG["identity.basic"].description }],
+    fields: fields.length
+      ? fields
+      : [
+          {
+            scope: "identity.basic",
+            label: SCOPE_CATALOG["identity.basic"].label,
+            description: SCOPE_CATALOG["identity.basic"].description,
+            core: true,
+          },
+        ],
     policyVersion: CONSENT_POLICY_VERSION,
     provider: NINAUTH_PROVIDER_NAME,
     mode: NINAUTH_MODE,

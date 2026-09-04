@@ -53,7 +53,8 @@ function ThemeToggle() {
 }
 
 // Proper top-level component (never created during render).
-function AuthActions({ compact = false }: { compact?: boolean }) {
+// `onNavigate` closes the parent mobile Sheet after any auth action.
+function AuthActions({ compact = false, onNavigate }: { compact?: boolean; onNavigate?: () => void }) {
   const { authLoading, user, setView, signOut, pending } = useTrustStore();
 
   if (authLoading) {
@@ -70,7 +71,10 @@ function AuthActions({ compact = false }: { compact?: boolean }) {
           variant={compact ? "default" : "outline"}
           size={compact ? "default" : "sm"}
           className={compact ? "w-full" : ""}
-          onClick={() => setView("dashboard")}
+          onClick={() => {
+            onNavigate?.();
+            setView("dashboard");
+          }}
         >
           <LayoutDashboard className="mr-1.5 h-4 w-4" />
           Dashboard
@@ -79,7 +83,10 @@ function AuthActions({ compact = false }: { compact?: boolean }) {
           variant="ghost"
           size={compact ? "default" : "sm"}
           className={compact ? "w-full" : ""}
-          onClick={() => signOut()}
+          onClick={() => {
+            onNavigate?.();
+            void signOut();
+          }}
           disabled={pending}
         >
           <LogOut className="mr-1.5 h-4 w-4" />
@@ -94,14 +101,20 @@ function AuthActions({ compact = false }: { compact?: boolean }) {
         variant={compact ? "outline" : "ghost"}
         size={compact ? "default" : "sm"}
         className={compact ? "w-full" : ""}
-        onClick={() => setView("auth")}
+        onClick={() => {
+          onNavigate?.();
+          setView("auth");
+        }}
       >
         Sign in
       </Button>
       <Button
         size={compact ? "default" : "sm"}
         className={compact ? "w-full" : ""}
-        onClick={() => setView("auth")}
+        onClick={() => {
+          onNavigate?.();
+          setView("auth");
+        }}
       >
         Get started
       </Button>
@@ -154,7 +167,7 @@ export function Nav() {
 
         <div className="flex items-center gap-1.5">
           <span className="mr-1 hidden rounded-full border border-primary/30 bg-primary/10 px-2.5 py-0.5 text-[11px] font-semibold text-primary md:inline-flex">
-            Stage 2 · NINAuth Identity
+            Stage 3 · Trust Identity
           </span>
           <div className="hidden sm:block">
             <AuthActions />
@@ -193,7 +206,7 @@ export function Nav() {
               )}
               <div className="mt-6 border-t border-border pt-4">
                 <div className="sm:hidden">
-                  <AuthActions compact />
+                  <AuthActions compact onNavigate={() => setOpen(false)} />
                 </div>
               </div>
             </SheetContent>

@@ -29,14 +29,14 @@ const STAGES: { id: string; title: string; status: StageStatus; detail: string }
   {
     id: "2",
     title: "NINAuth identity",
-    status: "active",
-    detail: "Verification sessions, OAuth/PKCE, consent recording — live behind a contract-first MOCK provider adapter.",
+    status: "done",
+    detail: "Verification sessions, OAuth/PKCE, consent recording — shipped behind a contract-first MOCK provider adapter.",
   },
   {
     id: "3",
     title: "Trust Identity",
-    status: "planned",
-    detail: "Assurance levels, hashed identifiers, consent-scoped attributes, evidence provenance.",
+    status: "active",
+    detail: "Assurance ladder L1–L4, hashed identifiers, consent-scoped attributes, evidence provenance + NDPA withdrawal.",
   },
   {
     id: "4",

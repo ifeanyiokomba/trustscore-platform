@@ -15,14 +15,26 @@ import {
   XCircle,
   Hourglass,
   Lock,
-  FileCheck2,
+  Ban,
+  Hash,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { ConsentModal } from "@/components/auth/consent-modal";
 import { toast } from "sonner";
 import type {
+  ConsentRecord,
   ConsentScreenInfo,
   IdentityMe,
   VerificationSessionInfo,
@@ -32,7 +44,7 @@ import { cn } from "@/lib/utils";
 
 const EVENT_META: Record<string, { label: string; icon: React.ElementType; tone: "ok" | "info" | "warn" }> = {
   SESSION_CREATED: { label: "Session created", icon: CircleDot, tone: "info" },
-  CONSENT_SCREEN_PRESENTED: { label: "Consent screen shown", icon: FileCheck2, tone: "info" },
+  CONSENT_SCREEN_PRESENTED: { label: "Consent screen shown", icon: CircleDot, tone: "info" },
   CONSENT_GRANTED: { label: "Consent granted in NINAuth app", icon: BadgeCheck, tone: "ok" },
   CONSENT_DENIED: { label: "Consent denied", icon: XCircle, tone: "warn" },
   CODE_ISSUED: { label: "One-time code issued (60s)", icon: KeyRound, tone: "info" },
@@ -108,35 +120,24 @@ function Timeline({ events }: { events: VerificationTimelineEvent[] }) {
   );
 }
 
-export function IdentityCard() {
-  const [data, setData] = React.useState<IdentityMe | null>(null);
-  const [loading, setLoading] = React.useState(true);
+export function IdentityCard({
+  data,
+  onChanged,
+}: {
+  data: IdentityMe | null;
+  onChanged: () => void;
+}) {
   const [starting, setStarting] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
   const [modalOpen, setModalOpen] = React.useState(false);
   const [session, setSession] = React.useState<VerificationSessionInfo | null>(null);
   const [consent, setConsent] = React.useState<ConsentScreenInfo | null>(null);
   const [flowError, setFlowError] = React.useState<string | null>(null);
+  const [withdrawingId, setWithdrawingId] = React.useState<string | null>(null);
+  const [confirmWithdraw, setConfirmWithdraw] = React.useState<ConsentRecord | null>(null);
 
-  const refresh = React.useCallback(async () => {
-    try {
-      const res = await fetch("/api/v1/identity/me", { cache: "no-store" });
-      if (res.ok) {
-        setData(await res.json());
-      } else {
-        setData(null);
-      }
-    } catch {
-      setData(null);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  React.useEffect(() => {
-    void refresh();
-  }, [refresh]);
-
+  // Request ALL known scopes (core + optional) so the consent modal can offer
+  // granular opt-ins — the user trims to the granted subset at consent time.
   async function startVerification() {
     setStarting(true);
     setFlowError(null);
@@ -144,7 +145,14 @@ export function IdentityCard() {
       const res = await fetch("/api/v1/identity/sessions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
+        body: JSON.stringify({
+          scopes: [
+            "identity.basic",
+            "identity.nin_status",
+            "profile.name",
+            "profile.demographics",
+          ],
+        }),
       });
       const body = await res.json();
       if (!res.ok) {
@@ -161,7 +169,7 @@ export function IdentityCard() {
     }
   }
 
-  async function handleDecision(decision: "GRANT" | "DENY") {
+  async function handleDecision(decision: "GRANT" | "DENY", grantedScopes?: string[]) {
     if (!session) return;
     setBusy(true);
     setFlowError(null);
@@ -171,7 +179,7 @@ export function IdentityCard() {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ decision }),
+          body: JSON.stringify({ decision, ...(decision === "GRANT" && { scopes: grantedScopes }) }),
         }
       );
       const consentBody = await consentRes.json();
@@ -186,7 +194,7 @@ export function IdentityCard() {
         toast.info("Consent denied", {
           description: "No identity data was shared. You can restart verification anytime.",
         });
-        await refresh();
+        onChanged();
         return;
       }
 
@@ -202,17 +210,23 @@ export function IdentityCard() {
       const cbBody = await cbRes.json();
       if (!cbRes.ok) {
         setFlowError(cbBody?.error?.message ?? "Verification failed.");
-        await refresh();
+        onChanged();
         return;
       }
 
+      const attrs = (consentBody.grantedScopes ?? []).filter((s: string) =>
+        s.startsWith("profile.")
+      ).length;
       setModalOpen(false);
       setSession(null);
       setConsent(null);
       toast.success("Trust Identity established", {
-        description: "Government identity verified via NINAuth (mock) — Assurance Level 1.",
+        description:
+          attrs > 0
+            ? `Government identity verified via NINAuth (mock) — Assurance Level 1 with ${attrs * 2} consent-scoped attributes.`
+            : "Government identity verified via NINAuth (mock) — Assurance Level 1.",
       });
-      await refresh();
+      onChanged();
     } catch {
       setFlowError("Network error — please try again.");
     } finally {
@@ -220,34 +234,68 @@ export function IdentityCard() {
     }
   }
 
+  async function withdrawConsentRecord(consentId: string) {
+    setWithdrawingId(consentId);
+    try {
+      const res = await fetch(`/api/v1/identity/consents/${consentId}/withdraw`, {
+        method: "POST",
+      });
+      const body = await res.json();
+      if (!res.ok) {
+        toast.error("Withdrawal failed", {
+          description: body?.error?.message ?? "Please try again.",
+        });
+        return;
+      }
+      toast.success(body.identityRevoked ? "Trust Identity revoked" : "Consent withdrawn", {
+        description: body.identityRevoked
+          ? "Identity, attributes and evidence revoked. Re-verify anytime."
+          : `${body.revokedAttributes} attribute${body.revokedAttributes === 1 ? "" : "s"} revoked.`,
+      });
+      onChanged();
+    } catch {
+      toast.error("Network error", { description: "Please try again." });
+    } finally {
+      setWithdrawingId(null);
+    }
+  }
+
   const identity = data?.identity;
   const isVerified = identity?.status === "VERIFIED";
   const freshness = freshnessLabel(identity?.verifiedAt ?? null);
   const validityDays = daysUntil(identity?.expiresAt ?? null);
+  const activeIdentifiers = (data?.identifiers ?? []).filter((i) => i.status === "ACTIVE");
 
   return (
     <>
-      <Card className={cn("border-dashed", isVerified && "border-primary/30 border-solid")}>
-        <CardHeader className="flex-row items-center gap-3 space-y-0">
+      <Card
+        className={cn(
+          "ts-card-hover min-w-0 border-dashed",
+          isVerified && "border-primary/30 border-solid"
+        )}
+      >
+        <CardHeader className="flex-row flex-wrap items-center gap-3 space-y-0">
           <span
             className={cn(
-              "flex h-11 w-11 items-center justify-center rounded-xl",
+              "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl",
               isVerified ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
             )}
           >
             {isVerified ? <Fingerprint className="h-5 w-5" /> : <KeyRound className="h-5 w-5" />}
           </span>
-          <div>
-            <CardTitle className="text-base">Trust Identity</CardTitle>
-            <CardDescription>Your verified identity spine</CardDescription>
+          <div className="min-w-0 flex-1">
+            <CardTitle className="truncate text-base">Trust Identity</CardTitle>
+            <CardDescription className="truncate">Your verified identity spine</CardDescription>
           </div>
           <Badge
             variant="outline"
             className={cn(
-              "ml-auto text-xs",
+              "ml-auto shrink-0 text-xs",
               isVerified
                 ? "border-primary/40 bg-primary/10 text-primary"
-                : "text-muted-foreground"
+                : identity?.status === "REVOKED"
+                  ? "border-destructive/40 bg-destructive/10 text-destructive"
+                  : "text-muted-foreground"
             )}
           >
             {isVerified ? (
@@ -255,18 +303,17 @@ export function IdentityCard() {
                 <BadgeCheck className="mr-1 h-3 w-3" />
                 Level {identity?.assuranceLevel} · NINAuth
               </>
+            ) : identity?.status === "REVOKED" ? (
+              "Revoked — re-verify"
+            ) : identity?.status === "EXPIRED" ? (
+              "Expired — re-verify"
             ) : (
-              "Stage 2 · MOCK provider"
+              "MOCK provider"
             )}
           </Badge>
         </CardHeader>
         <CardContent>
-          {loading ? (
-            <div className="flex items-center justify-center py-10 text-muted-foreground" role="status">
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Loading identity…
-            </div>
-          ) : isVerified ? (
+          {isVerified ? (
             <motion.div
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
@@ -297,6 +344,36 @@ export function IdentityCard() {
                 </div>
               </div>
 
+              {/* Stage 3 — hashed identifiers panel */}
+              {activeIdentifiers.length > 0 && (
+                <div className="space-y-1.5">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Identity fingerprints
+                  </p>
+                  {activeIdentifiers.map((id) => (
+                    <div
+                      key={id.id}
+                      className="ts-inset flex items-center gap-3 rounded-lg px-3 py-2.5"
+                    >
+                      <Hash className="h-3.5 w-3.5 shrink-0 text-primary/70" aria-hidden="true" />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-xs font-medium">{id.hint}</p>
+                        <p className="truncate font-mono text-[10px] text-muted-foreground">
+                          sha256 · {id.hashPrefix}
+                        </p>
+                      </div>
+                      <span className="shrink-0 text-[10px] text-muted-foreground">
+                        {daysUntil(id.expiresAt) ?? "—"}d
+                      </span>
+                    </div>
+                  ))}
+                  <p className="text-[10px] leading-snug text-muted-foreground">
+                    Stored as one-way hashes — future Safety Checks match without
+                    ever seeing the raw value.
+                  </p>
+                </div>
+              )}
+
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2.5">
                   <Lock className="h-3.5 w-3.5 shrink-0 text-primary/70" aria-hidden="true" />
@@ -306,33 +383,61 @@ export function IdentityCard() {
                 </div>
                 <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2.5">
                   <Clock className="h-3.5 w-3.5 shrink-0 text-primary/70" aria-hidden="true" />
-                  <p className="text-xs text-muted-foreground">
+                  <p className="min-w-0 truncate text-xs text-muted-foreground">
                     Provider: {identity?.provider} ({identity?.providerMode})
                   </p>
                 </div>
               </div>
 
-              {/* Consent record */}
+              {/* Consent records — with Stage 3 withdrawal (NDPA) */}
               {data?.consents && data.consents.length > 0 && (
                 <div className="space-y-1.5">
                   <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                     Consent records
                   </p>
-                  {data.consents.slice(0, 2).map((c) => (
+                  {data.consents.slice(0, 3).map((c) => (
                     <div
                       key={c.id}
-                      className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2 text-xs"
+                      className={cn(
+                        "flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2 text-xs",
+                        c.withdrawnAt ? "border-border/60 bg-muted/20 opacity-70" : "border-border"
+                      )}
                     >
-                      <span className="min-w-0 truncate text-muted-foreground">
-                        {c.requester} · {c.scopes.length} scopes ·{" "}
-                        <span className="font-mono">{c.policyVersion}</span>
+                      <span className="flex min-w-0 items-center gap-1.5">
+                        <span className="min-w-0 truncate text-muted-foreground">
+                          {c.requester} · {c.scopes.length} scopes ·{" "}
+                          <span className="min-w-0 truncate font-mono">{c.policyVersion}</span>
+                        </span>
                       </span>
-                      <time className="shrink-0 text-muted-foreground" dateTime={c.grantedAt}>
-                        {new Date(c.grantedAt).toLocaleDateString("en-NG", {
-                          day: "numeric",
-                          month: "short",
-                        })}
-                      </time>
+                      <span className="flex shrink-0 items-center gap-2">
+                        <time className="text-muted-foreground" dateTime={c.grantedAt}>
+                          {new Date(c.grantedAt).toLocaleDateString("en-NG", {
+                            day: "numeric",
+                            month: "short",
+                          })}
+                        </time>
+                        {c.withdrawnAt ? (
+                          <Badge variant="outline" className="text-[10px] text-muted-foreground">
+                            Withdrawn
+                          </Badge>
+                        ) : (
+                          <button
+                            type="button"
+                            data-consent-id={c.id}
+                            onClick={() => setConfirmWithdraw(c)}
+                            disabled={withdrawingId === c.id}
+                            className="flex items-center gap-1 rounded-md border border-border px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground transition-colors hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
+                            aria-label="Withdraw consent"
+                          >
+                            {withdrawingId === c.id ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <Ban className="h-3 w-3" />
+                            )}
+                            Withdraw
+                          </button>
+                        )}
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -359,7 +464,8 @@ export function IdentityCard() {
                 ) : (
                   <RefreshCw className="mr-2 h-4 w-4" />
                 )}
-                Re-verify (refreshes validity to 90 days)
+                Re-verify
+                <span className="hidden sm:inline">(refreshes validity to 90 days)</span>
               </Button>
               {flowError && (
                 <p
@@ -376,11 +482,17 @@ export function IdentityCard() {
                 <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
                   <KeyRound className="h-6 w-6" />
                 </span>
-                <p className="mt-4 text-sm font-semibold">No Trust Identity established yet</p>
+                <p className="mt-4 text-sm font-semibold">
+                  {identity?.status === "REVOKED"
+                    ? "Trust Identity revoked"
+                    : identity?.status === "EXPIRED"
+                      ? "Verification expired"
+                      : "No Trust Identity established yet"}
+                </p>
                 <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
-                  Verify through Nigeria&apos;s official identity consent gateway — a QR or
-                  share code, one approval in your NINAuth app, and you&apos;re done. No forms,
-                  no document uploads.
+                  {identity?.status === "REVOKED" || identity?.status === "EXPIRED"
+                    ? "Re-verify through Nigeria's official identity consent gateway to restore your Trust Identity."
+                    : "Verify through Nigeria's official identity consent gateway — a QR or share code, one approval in your NINAuth app, and you're done. No forms, no document uploads."}
                 </p>
                 <Button
                   className="mt-5"
@@ -414,19 +526,19 @@ export function IdentityCard() {
               )}
               <ul className="grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
                 <li className="flex items-center gap-2">
-                  <ShieldCheck className="h-3.5 w-3.5 text-primary/60" aria-hidden="true" />
+                  <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-primary/60" aria-hidden="true" />
                   Government identity verification
                 </li>
                 <li className="flex items-center gap-2">
-                  <ShieldCheck className="h-3.5 w-3.5 text-primary/60" aria-hidden="true" />
+                  <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-primary/60" aria-hidden="true" />
                   Consent-scoped attributes only
                 </li>
                 <li className="flex items-center gap-2">
-                  <ShieldCheck className="h-3.5 w-3.5 text-primary/60" aria-hidden="true" />
+                  <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-primary/60" aria-hidden="true" />
                   No raw NIN ever stored
                 </li>
                 <li className="flex items-center gap-2">
-                  <ShieldCheck className="h-3.5 w-3.5 text-primary/60" aria-hidden="true" />
+                  <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-primary/60" aria-hidden="true" />
                   Freshness tracked from day one
                 </li>
               </ul>
@@ -448,11 +560,44 @@ export function IdentityCard() {
               if (busy) return;
               setModalOpen(false);
               setFlowError(null);
-              void refresh();
+              onChanged();
             }}
           />
         )}
       </AnimatePresence>
+
+      {/* NDPA consent withdrawal — destructive, always confirmed */}
+      <AlertDialog
+        open={!!confirmWithdraw}
+        onOpenChange={(o) => {
+          if (!withdrawingId) setConfirmWithdraw(o ? confirmWithdraw : null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Withdraw this consent?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Withdrawing revokes every attribute this consent produced. If it
+              established your Trust Identity, your identity, evidence and
+              fingerprints are revoked too — you can re-verify anytime. This is
+              your NDPA right and it takes effect immediately.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={!!withdrawingId}>Keep consent</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (confirmWithdraw) void withdrawConsentRecord(confirmWithdraw.id);
+              }}
+              disabled={!!withdrawingId}
+            >
+              {withdrawingId ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Withdraw consent
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

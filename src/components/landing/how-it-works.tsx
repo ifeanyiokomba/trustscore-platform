@@ -38,7 +38,7 @@ const FLOW_STEPS = [
   {
     icon: Fingerprint,
     title: "4 · Your Trust Identity is established",
-    body: "We record consent-scoped, time-bound evidence with provenance. Verification freshness is tracked — “verified 11 days ago”, not just “verified”.",
+    body: "We record consent-scoped attributes and time-bound evidence with full provenance. Freshness is tracked — “verified 11 days ago”, not just “verified”.",
   },
 ];
 
@@ -70,10 +70,11 @@ export function HowItWorks() {
               key={step.title}
               {...fadeUp}
               transition={{ duration: 0.45, delay: i * 0.07 }}
+              className="group"
             >
-              <Card className="h-full">
+              <Card className="ts-card-hover h-full border-border/80">
                 <CardContent className="p-5">
-                  <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary transition-transform group-hover:scale-105">
                     <step.icon className="h-5 w-5" />
                   </span>
                   <h3 className="mt-4 text-sm font-semibold leading-snug">{step.title}</h3>
@@ -119,9 +120,9 @@ export function HowItWorks() {
           className="mt-8 text-center text-xs text-muted-foreground"
         >
           <ArrowRight className="mr-1 inline h-3 w-3" />
-          Stage 2 is live: verification sessions run the full OAuth + PKCE + consent
-          contract against a mock NINAuth provider adapter while commercial partner
-          access is finalized.
+          Stages 2–3 are live: the full OAuth + PKCE + consent contract, assurance
+          ladder, hashed identifiers and consent-scoped attributes run against a mock
+          NINAuth provider adapter while commercial partner access is finalized.
         </motion.p>
       </div>
     </section>
