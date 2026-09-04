@@ -285,3 +285,142 @@ export interface LivenessCompleteResponse {
   verdict: LivenessVerdictInfo;
   assuranceLevel: number;
 }
+
+// ---------------------------------------------------------------------------
+// Stage 5 — Trust Passport types (mirror /api/v1/passport/* responses)
+// ---------------------------------------------------------------------------
+
+export interface ScoreComponentInfo {
+  key: string;
+  label: string;
+  value: number;
+  max: number;
+  note: string;
+}
+
+export interface TrustScoreInfo {
+  id: string;
+  version: number;
+  status: "NEW" | "VERIFIED" | "ESTABLISHED" | "CAUTION" | "HIGH_RISK" | "REVIEW_REQUIRED";
+  score: number;
+  confidence: number;
+  riskBand: "LOW" | "MEDIUM" | "HIGH";
+  components: ScoreComponentInfo[];
+  explanation: string[];
+  trigger: string;
+  computedAt: string;
+  expiresAt: string;
+  fresh: boolean;
+}
+
+export interface CredentialInfo {
+  id: string;
+  type: string;
+  label: string;
+  issuer: string;
+  issuerMode: string;
+  claims: Record<string, unknown>;
+  status: string;
+  manualRevoked: boolean;
+  evidenceId: string | null;
+  issuedAt: string;
+  expiresAt: string | null;
+  revokedAt: string | null;
+}
+
+export interface ShareTokenInfo {
+  id: string;
+  scopes: string[];
+  maxViews: number;
+  views: number;
+  viewsLeft: number;
+  status: string;
+  expiresAt: string;
+  revokedAt: string | null;
+  lastViewedAt: string | null;
+  createdAt: string;
+}
+
+export interface ShareTokenCreated {
+  token: string;
+  linkPath: string;
+  id: string;
+  scopes: string[];
+  maxViews: number;
+  expiresAt: string;
+}
+
+export interface TrustReceiptInfo {
+  id: string;
+  viewerLabel: string;
+  channel: string;
+  viewedAt: string;
+  shown: Record<string, unknown>;
+}
+
+export interface SessionInfo {
+  id: string;
+  userAgent: string;
+  createdAt: string;
+  expiresAt: string;
+  ipHashPrefix: string | null;
+  current: boolean;
+}
+
+export interface NotificationInfo {
+  id: string;
+  type: string;
+  title: string;
+  body: string;
+  readAt: string | null;
+  createdAt: string;
+}
+
+export interface DsrRequestInfo {
+  id: string;
+  type: string;
+  status: string;
+  detail: string | null;
+  requestedAt: string;
+  completedAt: string | null;
+  expiresAt: string | null;
+}
+
+export interface PassportMe {
+  profile: {
+    displayName: string;
+    handle: string;
+    email: string;
+    memberSince: string;
+    status: string;
+  } | null;
+  assurance: { level: number };
+  score: TrustScoreInfo;
+  credentials: CredentialInfo[];
+  shareTokens: ShareTokenInfo[];
+  receipts: TrustReceiptInfo[];
+  sessions: SessionInfo[];
+  activeSessionCount: number;
+  notifications: NotificationInfo[];
+  unreadNotifications: number;
+  securityEvents: { id: string; action: string; createdAt: string }[];
+  cardLanguage: { adverse: string; disclaimer: string };
+}
+
+export interface PublicTrustCard {
+  viewerNotice: string;
+  language: { adverse: string; disclaimer: string };
+  freshness: { computedAt: string; expiresAt: string };
+  profile?: { displayName: string; handle: string };
+  score?: {
+    status: string;
+    score: number;
+    confidence: number;
+    riskBand: string;
+    components: ScoreComponentInfo[];
+  };
+  assurance?: { level: number };
+  signals?: { type: string; hint: string; verifiedAt: string; expiresAt: string | null }[];
+  attributes?: { key: string; value: string }[];
+  credentialsCount: number;
+}

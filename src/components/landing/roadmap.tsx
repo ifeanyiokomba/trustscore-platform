@@ -41,14 +41,14 @@ const STAGES: { id: string; title: string; status: StageStatus; detail: string }
   {
     id: "4",
     title: "Phone + biometric",
-    status: "active",
+    status: "done",
     detail: "Phone OTP + liveness signals bound to the identity spine — L2–L4 escalation with cross-signal consistency (mock transports, real contracts).",
   },
   {
     id: "5",
     title: "Trust Passport",
-    status: "planned",
-    detail: "Profile, score, credentials, QR card, share tokens, verification history, receipts.",
+    status: "active",
+    detail: "TrustScore snapshots + NDPA §37 explanations, credentials, QR trust card, scoped share links with receipts, security center, DSR self-service.",
   },
   {
     id: "6",

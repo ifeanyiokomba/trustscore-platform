@@ -5,6 +5,7 @@ import { z } from "zod";
 import { jsonError, jsonOk, newRequestId, rateLimit, clientKey, GENERIC_LOGIN_ERROR } from "@/lib/platform/http";
 import { createSession, setSessionCookie, toPublicUser } from "@/lib/platform/session";
 import { authenticateUser, getUserById } from "@/lib/services/account-service";
+import { notifyUser } from "@/lib/services/notification-service";
 
 const LoginSchema = z.object({
   email: z.string().trim().toLowerCase().email().max(254),
@@ -44,6 +45,14 @@ export async function POST(req: NextRequest) {
   }
 
   const { token, expiresAt } = await createSession(user.id, req);
+  // Stage 5 Security Center: change alert on every sign-in (device + time).
+  const ua = (req.headers.get("user-agent") ?? "unknown device").slice(0, 120);
+  await notifyUser(
+    user.id,
+    "SECURITY",
+    "New sign-in to your account",
+    `A session was opened from "${ua}". If this wasn't you, revoke the session from your Identity Security Center.`
+  );
   const res = jsonOk({ user: toPublicUser(user) });
   return setSessionCookie(res, token, expiresAt);
 }

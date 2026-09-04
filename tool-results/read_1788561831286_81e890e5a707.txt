@@ -1,0 +1,175 @@
+     1→# TrustScore (NIN-First Rebuild) — Worklog
+     2→
+     3→> Shared worklog for all agents. Append sections with the `---` template. Read this before working.
+     4→
+     5→## Project Context
+     6→
+     7→Rebuild of TrustScore per the NIN-First architecture directive (audit → staged implementation).
+     8→- **Stage 0 (audit)** deliverable: `/home/z/my-project/docs/STAGE0_AUDIT.md` — repo gap analysis + NINAuth research + staged blueprint.
+     9→- Existing GitHub repo `ifeanyiokomba/trustscore` is a **reference prototype** (mock-provider demo, no auth, no NIN spine). We rebuild stage-by-stage here.
+    10→- Sandbox constraints: Next.js 16 single user-visible route `/`, Tailwind v4 + shadcn/ui, Prisma/SQLite, API routes (not FastAPI), no Flutter runtime. Blueprint contracts map `/api/v1/*` ↔ production `/v1/*`.
+    11→- **Stage discipline is mandatory: one stage per cycle → test completely → re-audit → stop.**
+    12→
+    13→---
+    14→
+    15→Task ID: 0
+    16→Agent: orchestrator (main)
+    17→Task: Stage 0 — Audit existing repo, research/validate NINAuth access model, produce gap analysis + staged blueprint. No product code.
+    18→
+    19→Work Log:
+    20→- Read local sandbox state (fresh Next.js 16 scaffold; no TrustScore code present locally).
+    21→- Fetched `github.com/ifeanyiokomba/trustscore`: repo metadata (created 2026-08-19, TypeScript, 157 files), README, worklog, prisma schema, core lib files, API route tree.
+    22→- Live-researched official NINAuth/NIMC sources: developers-guide, verification-partner, enterprises, about-nin-auth, get-started, wallet, standards-adopted, privacy-and-security, privacy-policy (retention/custody), approved-partners, sitemap.
+    23→- Researched competitors: Dojah (~$0.04–0.12/call), Smile ID (doc $0.10–0.30, biometric $0.30–1.00), Youverify. Validated commoditization of the KYC layer.
+    24→- Key validated facts: NINAuth access ONLY via approved Verification Partner (partner via Aggregator); NDPA + Nigerian presence + informed consent + purpose limitation + logging/monitoring + compliance reporting + independent audits; OAuth 2.0/OIDC/FIDO/WebAuthn/DID/VC stack; QR + share-code + raw-NIN-match flows; 90-day archive, no permanent deletion, NIMC custody of identity records; pricing NOT public (partner-negotiated); scope catalog/claims/endpoints NOT public (open items).
+    25→- Wrote `/home/z/my-project/docs/STAGE0_AUDIT.md`: 27-row gap analysis, market context, compliance inventory, 10-stage blueprint with test gates, Stage-1 data model + security model.
+    26→
+    27→Stage Summary:
+    28→- Audit verdict: repo = valuable design prototype, NOT the NIN-First product (no auth, no TrustIdentity, no NINAuth integration, stage discipline violated by one-shot build).
+    29→- Blueprint locked: Stage 1 = platform foundation only (design system, landing, real auth, /api/v1 foundation, Prisma foundation schema). STOP after Stage 1 re-audit.
+    30→- Open business items (NINAuth scope catalog, pricing, endpoints) documented in audit §2.2 — must be closed via partner engagement before Stage 2 live integration; Stage 2 builds against a contract-first mock adapter meanwhile.
+    31→
+    32→---
+    33→
+    34→Task ID: 1
+    35→Agent: orchestrator (main)
+    36→Task: Stage 1 — Platform Foundation. Design system, landing experience, real authentication, /api/v1 contract, Prisma foundation schema, audit logging. ONLY Stage 1 — no Stage 2 work.
+    37→
+    38→Work Log:
+    39→- Prisma schema (foundation-only per audit §4.3): `UserAccount`, `Session`, `AuditEvent`, `Notification`. `db:push` + `db:generate` OK. User ≠ TrustIdentity discipline preserved; handle reserved on accounts for future trustscore.ng/@handle Trust Link.
+    40→- Design system (globals.css): emerald/teal trust palette (NO indigo/blue per UI rules), risk-band tokens, custom scrollbar, ts-grid-bg hero grid, glow/shimmer/pulse utilities, reduced-motion support; light default + polished dark mode via next-themes. Layout: TrustScore metadata, ThemeProvider, Sonner + toaster.
+    41→- Frontend (single `/` route, sectioned SPA):
+    42→  - nav.tsx: sticky top nav, grouped anchors, mobile Sheet, theme toggle, auth-aware actions (AuthActions extracted top-level after ESLint static-components fix)
+    43→  - hero.tsx: NIN-First positioning + flagship Trust Passport concept preview card (verified rows, score 782, share/QR disabled with "ships Stage 5" labels — honesty discipline)
+    44→  - product.tsx (3 pillars: Trust Passport / Check Before You Deal / Trust Link+QR), how-it-works.tsx (4-step NINAuth consent flow + security/custody cards), architecture.tsx (Identity/Evidence/Trust layers + Web/Flutter/FastAPI stack cards), roadmap.tsx (Stages 0–10 with statuses), security.tsx (4 compliance pillars, NDPA)
+    45→  - footer.tsx: sticky (mt-auto on min-h-screen flex-col wrapper)
+    46→  - auth-view.tsx: tabs Sign in / Create account, inline validation, handle preview, terms checkbox, error alerts
+    47→  - dashboard-view.tsx: account card, Trust Identity "Arrives Stage 2" preview, account-activity Security Center preview (redacted audit feed), sign out
+    48→  - store.ts (zustand) + api-client.ts + types.ts
+    49→- Backend (platform + services, §28-shaped):
+    50→  - platform/http.ts: requestId, uniform error envelope, in-memory rate limiter
+    51→  - platform/crypto.ts: scrypt (N=16384) + timing-safe verify, 256-bit session tokens (sha256-hashed at rest), salted IP hashing
+    52→  - platform/session.ts: httpOnly/sameSite/secure cookies, 30-day TTL, revocation
+    53→  - services/account-service.ts (register/login/me data), audit-service.ts (SAFE_METADATA_KEYS allowlist — no PII), notification-service.ts (welcome notification)
+    54→  - Routes: /api/health (DB readiness), /api (index), /api/v1/auth/{register,login,logout,me,activity}
+    55→  - db.ts: query logging disabled (PII-in-logs threat model)
+    56→  - tsconfig: excluded research/, examples/, skills/, download/, mini-services/ from compilation
+    57→- Verification (all passed):
+    58→  - `bunx tsc --noEmit`: 0 errors. `bun run lint`: 0 errors.
+    59→  - curl API matrix: health ok/db up; register→201+cookie; me w/session 200; activity 200 (AUTH_REGISTER event); login bad→401 generic INVALID_CREDENTIALS (enumeration-resistant); login good→200; dupe email→409 EMAIL_TAKEN; logout→ok; me after logout→401; login rate limit→429 after 8/min; register validation→422 zod message.
+    60→  - agent-browser E2E: landing renders all sections; hero CTA→auth view; register (Chidi Eze/@chidi)→dashboard "Welcome back, Chidi" with account card (handle trustscore.ng/@chidi) + activity "Account created just now"; sign out→landing; sign-in round-trip works; wrong password→"Invalid email or password." alert; dark mode toggles (html.dark); mobile 390×844: hamburger Sheet opens w/ links + auth actions; footer verified (long pages: pushed naturally; short pages: mt-auto flex stick); a11y Sheet description added (console warning fixed); console + errors clean.
+    61→  - VLM screenshot review: "clean, professional… no overlapping elements or broken styling".
+    62→  - dev.log: only 2 transient hot-reload races (layout.tsx saved before theme-provider.tsx existed); tail is all 200s. No hydration errors.
+    63→
+    64→Stage Summary:
+    65→- Stage 1 shipped + tested completely. Foundation schema, real auth (scrypt + hashed-token sessions + httpOnly cookies), rate limiting, zod validation, audit trail, notifications plumbing, /api/v1 contract, full NIN-First landing + auth + dashboard UX, dark mode, responsive, sticky footer, a11y.
+    66→- Key decisions: custom session auth instead of NextAuth v4 (cleaner FastAPI contract parity + Next 16 compat); email+password for Stage 1 with NINAuth sign-in arriving Stage 2; strict foundation-only schema.
+    67→- **Stage gate: STOPPED. Stage 2 (NINAuth identity sessions) intentionally NOT started** — blocked on partner scope catalog anyway (audit §2.2 open items).
+    68→- Next agent instructions: read docs/STAGE0_AUDIT.md §4.2 Stage 2 spec. Do NOT begin Stage 2 without an explicit user go-ahead per the stage-by-stage directive. Keep test gate + re-audit discipline.
+    69→
+    70→---
+    71→
+    72→Task ID: 2
+    73→Agent: orchestrator (main)
+    74→Task: Stage 2 — NINAuth Identity: verification sessions behind a contract-first MOCK provider (OAuth 2.0 + PKCE + OIDC-style ID tokens + consent records), per audit §4.2. Includes QA regression, full test matrix, browser E2E, styling detail pass.
+    75→
+    76→Work Log:
+    77→- Regression QA first (agent-browser): landing, auth, login all pass — Stage 1 stable.
+    78→- Prisma schema: added `TrustIdentity` (status/assuranceLevel/providerIdentityRef MASKED/verifiedAt/expiresAt 90d freshness), `VerificationSession` (state, PKCE verifier+challenge server-side, one-time authorizationCodeHash, scopes, purpose, policyVersion, shareCode, authorizationUrl, 10min TTL), `VerificationEvent` (redacted timeline), `Consent` (requester/purpose/scopes/policyVersion per directive §31). db:push + generate OK.
+    79→- Provider adapter `src/lib/providers/ninauth.ts` (CONTRACT-FIRST, MOCK transport): real PKCE S256 generation; one-time authorization codes (sha256-hashed, 60s TTL, timing-safe compare); mock OIDC-style ID tokens (HMAC-SHA256 signature, header.payload.signature) with full validation (signature, iss, aud, exp, iat, nonce); token exchange verifying code hash + PKCE verifier; stable masked subject per user (`NINAUTH-****-XXXX`); consent-screen contract (requester/fields/purpose/policyVersion); authorize-URL shape. NINAUTH_CLIENT_SECRET backend-only. Mode honestly labeled MOCK everywhere.
+    80→- IdentityService (`src/lib/services/identity-service.ts`): create session, lazy expiry, consent decision (GRANT issues code; DENY terminal; grant-after-deny → 409 NOT_PENDING — fixed after matrix caught idempotency hole), callback (state match → code hash match → PKCE exchange → token validation → consent record → TrustIdentity upsert → events/audit/notification), read model for /identity/me.
+    81→- Routes: POST /api/v1/identity/sessions (rate-limited 5/min), GET /api/v1/identity/sessions/:id (owner-only, timeline), POST .../:id/consent (mock NINAuth app side; retired in LIVE), POST .../:id/callback (the OAuth callback contract), GET /api/v1/identity/me. Audit actions extended (IDENTITY_*). /api index + /api/health updated to Stage 2.
+    82→- Frontend: `identity-card.tsx` (three states: none w/ CTA, verified w/ gradient shimmer panel, pulse freshness dot, masked ref, consent records, event timeline w/ animated connector, re-verify w/ error display), `consent-modal.tsx` (NINAuth-style consent screen: requester, scoped fields w/ descriptions, purpose, policy version, live mm:ss countdown, TS-XXXX share code w/ copy button, deterministic decorative MOCK QR, Approve/Deny; sonner toasts on success/deny). Dashboard: Stage 2 badge, ACTION_LABELS extended with identity events. Landing: roadmap statuses updated (1 done, 2 active), nav/footer badges "Stage 2 · NINAuth Identity", copy updates.
+    83→- Verification:
+    84→  - tsc 0 errors; ESLint 0 errors.
+    85→  - `tests/stage2_matrix.py` — 36/36 PASS: unauth 401; create 201 (AWAITING_CONSENT, MOCK labels, share code, consent contract, S256 in URL, verifier never leaked); timeline; cross-user 404; GRANT → code+state; wrong-state → 400 BAD_STATE (session FAILED); happy path → VERIFIED L1, masked ref, 90d expiry, ID token NOT leaked to client; code replay → 409 CODE_REUSED; /identity/me verified+consents+full timeline; DENY path (no identity, CONSENT_DENIED); grant-on-denied → 409; forged code → EXCHANGE_FAILED; short input → 422; rate limit → 429.
+    86→  - Browser E2E (`tests/stage2_e2e.sh`, `tests/stage2_e2e_deny.sh`): ada login → Continue with NINAuth → consent modal (countdown, share code, PKCE URL, fields, policy) → Approve → dev.log shows sessions 201 → consent 200 → callback 200 → identity/me 200; dashboard shows "Level 1 · NINAuth", "Government identity verified", masked ref, "Verified just now", "Valid 90 more days", consent records, toast. NGOZI fresh-register → Deny → modal closes, no identity. Mobile 390px modal clean. 0 console errors. VLM visual checks pass.
+    87→  - dev.log: 0 errors after fixes.
+    88→
+    89→Stage Summary:
+    90→- Stage 2 complete + fully tested. The identity spine exists: OAuth 2.0 + PKCE + consent + ID-token-validation contracts all real; only the transport is MOCK (honestly labeled) until partner credentials arrive (audit §2.2 open items).
+    91→- Key security properties verified: PKCE verifier never leaves the server; client secrets backend-only; ID tokens validated (never merely decoded); codes one-time + 60s TTL; state/nonce binding; masked subject references only; audit trail + consent records for NDPA §31 compliance.
+    92→- Dev-server quirk IMPORTANT for next agents: manually started `bun run dev` DIES between bash tool calls AND occasionally mid-call. Pattern that works: restart server + do ALL testing within ONE bash call (see tests/stage2_e2e.sh). The system auto-restarts it eventually.
+    93→- Stage gate: STOPPED after Stage 2. Stage 3 (Trust Identity management: L1-L4, hashed identifiers, consent-scoped attributes) is next per audit §4.2 — await user go-ahead.
+    94→- Files: src/lib/providers/ninauth.ts, src/lib/services/identity-service.ts, src/app/api/v1/identity/**, src/components/dashboard/identity-card.tsx, src/components/auth/consent-modal.tsx, tests/stage2_matrix.py, tests/stage2_e2e*.sh.
+    95→
+    96→---
+    97→
+    98→Task ID: 3
+    99→Agent: orchestrator (main)
+   100→Task: Round QA regression (agent-browser) + bug fixes + Stage 3 — Trust Identity Management per audit §4.2 (assurance ladder L1–L4, hashed identifiers, consent-scoped attributes, evidence with provenance + freshness, NDPA consent withdrawal) + styling detail pass.
+   101→
+   102→Work Log:
+   103→- Read worklog + STAGE0_AUDIT.md; verified Stages 0–2 complete/re-audited; Stage 3 is the sanctioned next stage.
+   104→- QA regression (agent-browser, tests/qa_regression.sh): landing/auth/login/Stage 2 flow/dark mode all pass; console + dev.log clean. TWO bugs found:
+   105→  1. Mobile 390px dashboard horizontal overflow (scrollWidth 428 > 390): grid items lacked min-w-0; identity-card CardHeader (icon + title + nowrap badge) forced intrinsic width. FIXED: min-w-0 on grid items/cards/title blocks, flex-wrap header, shrink-0 badge, truncated descriptions, "Re-verify (refreshes validity to 90 days)" parenthetical hidden on xs. Verified: scrollWidth == 390, no overflow.
+   106→  2. Mobile Sheet: auth action buttons didn't close the Sheet (covered the auth view). FIXED: AuthActions onNavigate callback → setOpen(false).
+   107→- Stage 3 implementation (backend-first):
+   108→  - Prisma: IdentityIdentifier (type/hash/hint/status/verifiedAt/expiresAt/consentId, @@unique([trustIdentityId,type]), hash indexed), IdentityAttribute (key/value/scope/consentId/status/source/assertedAt, @@unique([trustIdentityId,key])), Evidence (userId/trustIdentityId/sessionId/consentId/type/provider/summary/confidence/status/collectedAt/expiresAt), TrustIdentity.establishingConsentId. db:push + generate OK.
+   109→  - Provider (ninauth.ts): scope catalog expanded (core: identity.basic/nin_status; optional: profile.name → given_name+family_name, profile.demographics → birth_year+state_of_origin); ProfileClaims in ID token filtered by GRANTED scopes; deterministic mock profile data per user; identifierFingerprint() sha256-peppered hash; consentScreenFor carries core flags.
+   110→  - IdentityService: resolveRequestedScopes (core always + known optional, unknown rejected → ScopeValidationError → 422 SCOPE_INVALID); applyConsentDecision accepts grantedScopes subset (validated: ⊆ requested ∧ core included → session re-binds); callback now creates Evidence + upserts NIN_FINGERPRINT identifier + upserts attributes per granted scope; ASSURANCE_LADDER + computeAssuranceLadder (L1 = verified+fresh; L2 = +phone identifier; L3/L4 locked Stage 4); withdrawConsent (NDPA §31: revoke sourced attributes; establishing consent → revoke identity+identifiers+evidence, L0; audit IDENTITY_CONSENT_WITHDRAWN + notification); read model extended (ladder, identifiers w/ hashPrefix-only display, attributes w/ revoked values hidden, evidence, lazy freshness EXPIRED).
+   111→  - Routes: POST /api/v1/identity/consents/:id/withdraw (auth, rate-limited 10/min, 404/409 semantics); sessions route scope validation; consent route accepts scopes; /identity/me returns full Stage 3 read model; /api + /api/health → stage 3, v1.2.0.
+   112→  - Activity feed fix (Stage 2 gap): recentAuditForUser now includes IDENTITY_* actions (was AUTH_-only — identity events were invisible in the feed despite ACTION_LABELS existing).
+   113→- Stage 3 frontend:
+   114→  - consent-modal.tsx: core fields locked ("Required" badge); optional scopes as opt-in checkboxes (privacy-first default OFF); "Approve · N attributes" label; resets per session.
+   115→  - assurance-ladder.tsx: L1–L4 vertical ladder, achieved rungs gradient (ts-rung-active) + check icons, locked rungs dashed + lock + stage labels, connector rail, staggered entrance, "single document never pushes past L1" note.
+   116→  - attributes-card.tsx: key/value grid w/ icons, scope chips, provenance (asserted/source), revoke-on-hover ban button, withdraw confirm Dialog, revoked state (line-through, values hidden, audit-history note), empty states for no-identity and core-only consent.
+   117→  - evidence-card.tsx: type icons, confidence meter (ts-conf-fill), Fresh/90d + Stale + Revoked badges, redacted-summary note, empty state.
+   118→  - identity-card.tsx: lifted data props (dashboard owns fetch); fingerprints panel (sha256 prefix, inset styling); consent records w/ Withdraw buttons + AlertDialog confirm (destructive action now confirmed); revoked/expired empty states w/ re-verify CTA; requests all 4 scopes so modal offers opt-ins.
+   119→  - dashboard-view.tsx: new 6-card grid (account, identity, ladder, attributes, evidence, activity), identityLoading skeleton state, Stage 3 badge, IDENTITY_CONSENT_WITHDRAWN activity label.
+   120→- Styling detail pass: globals.css utilities (ts-card-hover lift+glow, ts-grad-text, ts-rung-active, ts-conf-fill, ts-inset); hero stats hover states + gradient score numeral; how-it-works step cards hover + icon scale; dark destructive contrast raised (oklch 0.66→0.74) after VLM QA; roadmap Stage 2→done, 3→active; nav/footer badges "Stage 3 · Trust Identity"; how-it-works copy updated.
+   121→- Verification (all passed):
+   122→  - tsc 0 errors; ESLint 0 errors.
+   123→  - tests/stage3_matrix.py — 51/51 PASS: unauth 401s; fresh read model (NONE, 4-rung ladder all locked, empty collections); unknown scope 422; session w/ all scopes (2 core + 2 optional fields); granular grant (profile.name only → grantedScopes correct); grant missing core → 422; grant non-requested scope → 422; cross-user 404; callbacks 200; read model (VERIFIED L1, L1 achieved, identifier ACTIVE w/ prefix-only, exactly 2 attributes from profile.name — purpose limitation: no demographics attrs, evidence 100 ACTIVE, consent w/ granted scopes); code replay 409; withdrawal matrix (cross-user 404, establishing → identityRevoked + 2 attrs revoked, double → 409, identity REVOKED L0, identifier/attributes(hidden values)/evidence REVOKED, ladder L1 lost, audit recorded, re-verify restores 4 attrs, core-only re-verify → 0 ACTIVE attrs, unknown id 404, rate limit 429).
+   124→  - tests/stage2_matrix.py — 36/36 PASS (deny-path check updated: "deny never establishes identity" — ada fixture now has Stage 3 lifecycle states).
+   125→  - tests/stage3_e2e.sh — full pass: revoked state UI → Continue with NINAuth → modal (Required badges, 2 checkboxes) → toggle both → "Approve · 4 attributes" → dashboard full read model (verified, fingerprints, sha256, ladder aria-current, L1/L4, 4 attrs, 100%, Fresh 90d) → withdraw w/ AlertDialog confirm → revoked + re-verify CTA + revoked-attribute audit note + NDPA activity entry; mobile 390 no overflow; dark mode; console []; dev.log clean.
+   126→  - VLM visual QA (3 screenshots): light/mobile/dark reviewed; dark-mode destructive contrast fixed; remaining notes are transient-toast nitpicks.
+   127→- Dev-server quirk (unchanged, documented in Task 2): manually started `bun run dev` dies between bash calls — restart + run all tests within ONE call.
+   128→
+   129→Stage Summary:
+   130→- Stage 3 complete + fully tested + re-audited (Appendix C: PASS). The Trust Identity spine now has: assurance ladder mechanics, hashed identifiers (never raw), consent-scoped attributes with granular opt-in consent, evidence records with full provenance + freshness, and NDPA consent withdrawal with correct revocation semantics.
+   131→- Key security/privacy properties: identifier hashes never leave the backend (prefix display only); attributes exist only under a standing consent; withdrawal hides values and revokes provenance chains; raw NIN still never stored anywhere; audit metadata allowlist extended (scopes/attributes/revokedAttributes/identityRevoked — all non-PII counters).
+   132→- Stage gate: STOPPED after Stage 3. Stage 4 (phone + biometric signals, L2–L3 escalation, cross-signal consistency) is next per audit §4.2 — await user go-ahead.
+   133→- Files: prisma/schema.prisma, src/lib/providers/ninauth.ts, src/lib/services/identity-service.ts, src/lib/services/account-service.ts, src/lib/services/audit-service.ts, src/app/api/v1/identity/** (incl. consents/[id]/withdraw), src/components/dashboard/{assurance-ladder,attributes-card,evidence-card,identity-card,dashboard-view}.tsx, src/components/auth/consent-modal.tsx, src/components/layout/{nav,footer}.tsx, src/components/landing/{hero,how-it-works,roadmap}.tsx, src/app/globals.css, tests/stage3_matrix.py, tests/stage3_e2e.sh, tests/qa_regression.sh.
+   134→
+   135→---
+   136→
+   137→Task ID: 4
+   138→Agent: orchestrator (main)
+   139→Task: Round QA regression (agent-browser) + Stage 4 — Trust Signals per audit §4.2: phone OTP verification + biometric liveness behind contract-first MOCK providers, L2–L4 assurance escalation, cross-signal consistency, SIM-swap gating, signal-consent withdrawal semantics + styling detail pass.
+   140→
+   141→Work Log:
+   142→- Read worklog + STAGE0_AUDIT.md; verified Stages 0–3 complete/re-audited (Appendix C PASS); Stage 4 is the sanctioned next stage (this round's directive explicitly grants autonomy to continue development).
+   143→- QA regression FIRST (agent-browser): landing/auth/login/Stage 2–3 flows/dark mode/mobile/console all pass. Suspected prisma schema typo `@@index(ash])` was a false alarm (bash output renders `[h` as terminal escape — Read tool + prisma validate confirm `@@index([hash])` is intact). Fixed qa_regression.sh theme button name ("Toggle dark mode" — dark check now asserts true). Stage 2 matrix 36/36, Stage 3 matrix 51/51 (initial stage3 KeyError was rate-window sequencing: IP-keyed limiter shared across matrices — added 65s pause + retry-aware `callr` helper in stage4 matrix).
+   144→- Stage 4 backend (contract-first, MOCK transports — same discipline as Stage 2):
+   145→  - Prisma: `PhoneVerification` (phoneHash peppered sha256 + masked phoneHint + hashed otpHash + attempts/resends + simSwapRisk + consentId + 5-min TTL), `LivenessSession` (jobId, 10-min window, redacted JSON verdict, confidence, consentId). db:push + generate OK.
+   146→  - Providers: `phone-provider.ts` (NG E.164 normalize +234/0/bare, maskPhoneHint, phoneFingerprint, issueOtp/otpMatches timing-safe, simSwapRiskFor deterministic mock w/ override, mockDelivery with honest MOCK label, confidenceForSimSwap) + `liveness-provider.ts` (createLivenessJob, evaluateLiveness w/ thresholds liveness≥70 face-match≥80 + simulate knobs fail_liveness/face_mismatch, biometricFingerprint of masked subject, captureInstructions).
+   147→  - `signal-service.ts`: start/resend/confirmPhoneOtp (L1 gate → consent → OTP → PHONE identifier upsert + PHONE_OTP evidence → recompute level), start/completeLiveness (PASSED → BIOMETRIC identifier + LIVENESS evidence; FAILED → no binding, retryable), computeCrossSignalState (5 checks: gov fresh / phone fresh / SIM-swap ≠ HIGH / biometric fresh / face-match consistent), recomputeAssuranceLevel (escalate + de-escalate, persisted), getSignalsForUser read model.
+   148→  - identity-service: ASSURANCE_LADDER L2–L4 now "Live now" + cumulative computation w/ crossSignalConsistent; withdrawConsent extended — identifiers sourced from a consent are revoked (identifier never outlives its consent) + recompute de-escalation; WithdrawResult gains revokedIdentifiers.
+   149→  - Routes: POST /api/v1/identity/signals/phone/{start,resend,confirm} + /biometrics/{start,complete} (auth + zod + rate limits 5/3/12/3/10 per min); /identity/me composes signals section; withdraw route returns revokedIdentifiers; /api index + /api/health → stage 4, v1.3.0.
+   150→  - Audit: 7 SIGNAL_* actions; SAFE_METADATA_KEYS += attemptsLeft/simSwap/confidence/liveness/faceMatch/level/providerMode; activity feed includes SIGNAL_*.
+   151→- Stage 4 frontend:
+   152→  - `phone-modal.tsx` (3 steps: consent + E.164 entry w/ +234 prefix + privacy copy → InputOTP 6-digit w/ live expiry countdown + attempts left + honestly-labeled "Simulated SMS" panel w/ Use-this-code helper + resend cooldown → success panel w/ level + SIM-swap note if HIGH).
+   153→  - `liveness-modal.tsx` (intro w/ simulated camera frame + instructions + verdict-only privacy copy → scan sweep animation (ts-scanline) + progress bar + status text → processing → verdict w/ ScoreMeter bars + thresholds + pass/fail panels + retry).
+   154→  - `signals-card.tsx` (phone + biometric + cross-signal blocks w/ status chips, masked hints, freshness, SIM-swap chip, score meter, 5 consistency checks, per-signal Withdraw w/ AlertDialog confirm, provider MOCK badges, L1-gate empty state).
+   155→  - dashboard-view: Stage 4 badge, new grid (account+identity / ladder+signals / attributes+evidence / privacy+activity), "How your signals are protected" privacy explainer card, SIGNAL_* activity labels, modals wired w/ refreshIdentity.
+   156→  - assurance-ladder: progress rail fill (ts-rail-fill) up to achieved level, all rungs live, footer copy updated.
+   157→  - Landing: roadmap 3→done 4→active; how-it-works 5th step "Signals stack, assurance climbs"; nav/footer badges "Stage 4 · Trust Signals".
+   158→  - globals.css: ts-scan-sweep keyframes + ts-scanline, ts-signal-success radial, ts-rail-fill glow, focus-visible polish, reduced-motion extended.
+   159→- Bug fixes this cycle: locked-OTP error code OTP_INVALID→LOCKED; phone-start rate limit 3→5/min (typo-friendliness); liveness-modal React-hooks errors fixed (function declaration order → latest-ref pattern in effect); lint clean.
+   160→- Test infrastructure hardened (all scripts): stale-session guard (sign-out first if a cookie survived close/cookies-clear — root cause of flaky logins), robust tab-switch retry loop (agent-browser NATIVE click retried until `tabpanel "Sign in"` active — JS .click() does NOT trigger Radix tabs and filled the wrong form), stage3 CTA polling (hydration race), stage4 deterministic signal-state reset via API, stage2 approve button pattern `Approve[^"]*`, browser-state checks replace broken curl cookie checks.
+   161→- Verification (all passed):
+   162→  - tsc 0 errors; ESLint 0 errors/warnings.
+   163→  - tests/stage4_matrix.py — **83/83 PASS**: unauth 401 ×5; L1 gate 409 ×2; E.164 validation; masked hints (no full number in any response); MOCK delivery w/ code; wrong-OTP 400 + attempts; correct → VERIFIED + L2 + identifier/evidence; lockout after 3 + 409 LOCKED; resend cooldown 429 + no rotation on blocked resend; cross-user 404s; liveness contract (instructions, MOCK label, consent purpose), pass → verdict + L3(→L4 when consistent), re-complete 409, fail_liveness + face_mismatch reasons, retry-after-failure, zod boundary for simulate; SIM-swap HIGH → L3 but NOT L4 (sim_swap check not-ok); withdrawal matrix (phone → L1 drop + REVOKED + biometric intact; double → 409; biometric → L1; identity survives), re-bind → L2; activity feed SIGNAL_* + withdrawal; zod boundaries; rate limit 429.
+   164→  - tests/stage2_matrix.py — **36/36** (deny invariant updated: status UNCHANGED on DENY, ada's lifecycle no longer breaks it). tests/stage3_matrix.py — **51/51** (ladder label check updated: L2–L4 "Live now" per Stage 4).
+   165→  - Browser E2Es all pass: stage4_e2e (login → NINAuth re-verify → phone modal (fill → send → OTP → mock SMS → use code → verify) → L2 + OTP-verified + SIM-swap low + activity → liveness modal (instructions → start → scan → processing) → verdict + scores + consistency → L4 + all checks ok + L4/L4 badge → withdraw phone w/ confirm dialog → Withdrawn + L1/L4 + Re-bind CTA + biometric intact + withdrawal in activity; mobile 390 no overflow; dark; console []; dev.log clean); stage2_e2e + stage3_e2e regressions; qa_regression (dark mode now asserts true).
+   166→  - VLM visual QA: PASS on 5 screenshots (desktop dashboard, OTP modal, liveness intro, dark, mobile) — "fintech-grade visual quality", only note = red sign-out styling (intentional destructive convention).
+   167→  - dev.log: 0 errors.
+   168→
+   169→Stage Summary:
+   170→- Stage 4 complete + fully tested + re-audited (Appendix D: PASS). The signal spine is live behind contract-first MOCK transports: phone OTP (hashed at rest, timing-safe, lockout, cooldown), biometric liveness (verdict-only storage, thresholds, face-match vs government record), L2–L4 escalation + de-escalation, cross-signal consistency w/ SIM-swap gating, NDPA withdrawal for signals (identifier never outlives its consent).
+   171→- Key security/privacy properties: raw phone NEVER stored (peppered fingerprint + masked hint only); no selfie pixels or biometric templates ever stored (verdict + subject-linkage fingerprint only); OTP codes surfaced only in honestly-labeled MOCK delivery (LIVE never echoes); every signal consent-backed; audit metadata allowlist extended (non-PII only).
+   172→- Dev-server quirks documented for next agents (IMPORTANT): (1) manually started `bun run dev` dies between bash calls — restart + test within ONE call; (2) agent-browser sessions can outlive `close --all`/`cookies clear` — E2E scripts now guard with an explicit sign-out check; (3) JS `.click()` does NOT activate Radix tabs — always use `$AB find role tab click` with a retry loop; (4) IP-keyed rate limiter is shared across test users — matrices use `callr` retry + 65s pauses between suites.
+   173→- Stage gate: STOPPED after Stage 4. Stage 5 (Trust Passport: profile, TrustScore snapshot, credentials, QR trust card, share tokens/trust link, verification history, security center, trust receipts, DSR self-service) is next per audit §4.2 — await user go-ahead.
+   174→- Files: prisma/schema.prisma, src/lib/providers/{phone-provider,liveness-provider}.ts, src/lib/services/signal-service.ts, src/lib/services/{identity-service,audit-service,account-service}.ts, src/app/api/v1/identity/signals/**, src/app/api/v1/identity/me/route.ts, src/app/api/v1/identity/consents/[id]/withdraw/route.ts, src/components/auth/{phone-modal,liveness-modal}.tsx, src/components/dashboard/{signals-card,dashboard-view,assurance-ladder}.tsx, src/components/landing/{how-it-works,roadmap}.tsx, src/components/layout/{nav,footer}.tsx, src/app/globals.css, tests/{stage4_matrix.py,stage4_e2e.sh} + hardened stage2_e2e/stage3_e2e/qa_regression, docs/STAGE0_AUDIT.md (Appendix D).
+   175→

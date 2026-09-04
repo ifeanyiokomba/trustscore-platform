@@ -77,7 +77,7 @@ Reputation: Established
 TrustScore: 782 · LOW RISK`}
               </pre>
               <Badge variant="outline" className="text-xs text-muted-foreground">
-                Ships Stage 5
+                Live now (Stage 5)
               </Badge>
             </CardContent>
           </Card>
@@ -147,8 +147,8 @@ TrustScore: 782 · LOW RISK`}
                 <p className="mt-2 text-xs font-medium">✓ Identity Verified · TrustScore 782</p>
                 <p className="text-[11px] text-muted-foreground">Verify me before payment</p>
               </div>
-              <Badge variant="outline" className="text-xs text-muted-foreground">
-                Ships Stage 5
+              <Badge variant="outline" className="border-primary/30 bg-primary/5 text-xs text-primary">
+                Live now (Stage 5)
               </Badge>
             </CardContent>
           </Card>

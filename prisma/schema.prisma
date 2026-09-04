@@ -42,6 +42,11 @@ model UserAccount {
   evidence             Evidence[]
   phoneVerifications   PhoneVerification[]
   livenessSessions     LivenessSession[]
+  scoreSnapshots      TrustScoreSnapshot[]
+  credentials          Credential[]
+  shareTokens          ShareToken[]
+  trustReceipts        TrustReceipt[]
+  dsrRequests          DsrRequest[]
 
   @@index([email])
   @@index([status])
@@ -273,6 +278,128 @@ model LivenessSession {
 
   @@index([userId, createdAt])
   @@index([status])
+}
+
+// ---------------------------------------------------------------------------
+// Stage 5 — TrustScore snapshots (directive §35/§36 score contract).
+// Formula: Identity Assurance + Verified Reputation + Verified Credentials +
+// Resolution History − Confirmed Risk. Output: score, confidence, risk band,
+// human-readable explanation (NDPA §37 automated-decision transparency) and
+// freshness. Snapshots are immutable; a new row is written on material change
+// or TTL expiry (24h), and only the last 20 per user are retained.
+// ---------------------------------------------------------------------------
+
+model TrustScoreSnapshot {
+  id          String   @id @default(cuid())
+  userId      String
+  version     Int      @default(1)
+  status      String // NEW | VERIFIED | ESTABLISHED | CAUTION | HIGH_RISK | REVIEW_REQUIRED
+  score       Int // 0–100
+  confidence  Int // 0–100
+  riskBand    String // LOW | MEDIUM | HIGH
+  components  String // JSON: per-component {value, max, note}
+  explanation String // JSON array of human-readable lines (NDPA §37)
+  inputsHash  String // canonical hash of score inputs (change detection)
+  trigger     String // INITIAL | MATERIAL_CHANGE | PERIODIC
+  computedAt  DateTime @default(now())
+  expiresAt   DateTime // snapshot freshness horizon (24h)
+
+  user UserAccount @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, computedAt])
+}
+
+// ---------------------------------------------------------------------------
+// Stage 5 — Credentials (directive §6, wallet alignment).
+// Platform-issued, evidence-backed assertions ("government identity verified",
+// "phone verified", "liveness passed"). Claims are MASKED ONLY (hints/counts)
+// — never attribute values, never raw identifiers. Credential never outlives
+// its source evidence; user may revoke it manually at any time.
+// ---------------------------------------------------------------------------
+
+model Credential {
+  id              String    @id @default(cuid())
+  userId          String
+  trustIdentityId String?
+  type            String // GOV_ID_VERIFIED | PHONE_VERIFIED | LIVENESS_VERIFIED
+  issuer          String // "TrustScore Platform" (issuer of record)
+  issuerMode      String    @default("MOCK") // honesty: underlying providers are MOCK
+  claims          String // JSON, masked only (hints/counts)
+  status          String    @default("ACTIVE") // ACTIVE | REVOKED | EXPIRED
+  evidenceId      String? // provenance
+  manualRevoked   Boolean   @default(false) // user-initiated revocation sticks
+  issuedAt        DateTime  @default(now())
+  expiresAt       DateTime?
+  revokedAt       DateTime?
+
+  user UserAccount @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, type])
+  @@index([status])
+}
+
+// ---------------------------------------------------------------------------
+// Stage 5 — Share tokens / Trust Link (directive §5 Trust Passport).
+// The RAW token exists only transiently in the owner's UI (shown once at
+// creation). At rest we keep sha256(raw) — lookup key for public views.
+// Views are counted, bounded, expiring and revocable; every public view
+// writes a TrustReceipt (who-checked-you log) for the owner.
+// ---------------------------------------------------------------------------
+
+model ShareToken {
+  id           String    @id @default(cuid())
+  userId       String
+  tokenHash    String    @unique // sha256(raw token) — never the raw token
+  scopes       String // JSON array: PROFILE | SIGNALS | ATTRIBUTES | SCORE
+  maxViews     Int       @default(5)
+  views        Int       @default(0)
+  status       String    @default("ACTIVE") // ACTIVE | REVOKED | EXPIRED
+  expiresAt    DateTime
+  revokedAt    DateTime?
+  lastViewedAt DateTime?
+  createdAt    DateTime  @default(now())
+
+  user UserAccount @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+}
+
+model TrustReceipt {
+  id           String   @id @default(cuid())
+  userId       String
+  shareTokenId String?
+  viewerLabel  String // e.g. "Trust link viewer" — no PII collected
+  channel      String   @default("TRUST_LINK")
+  cardShown    String // JSON: status/level/score shown at view time
+  ipHash       String? // salted hash — abuse dedupe only, never displayed raw
+  viewedAt     DateTime @default(now())
+
+  user UserAccount @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, viewedAt])
+}
+
+// ---------------------------------------------------------------------------
+// Stage 5 — DSR requests (NDPA §36 data-subject rights, self-service).
+// EXPORT: full data payload (hashes included — they ARE the stored data),
+// downloadable for 7 days, then purged. DELETE: identity + account erased
+// with cascade; only a redacted audit tombstone survives (legal basis).
+// ---------------------------------------------------------------------------
+
+model DsrRequest {
+  id          String    @id @default(cuid())
+  userId      String
+  type        String // EXPORT | DELETE
+  status      String    @default("PENDING") // PENDING | COMPLETED | REJECTED
+  detail      String? // redacted summary
+  payload     String? // EXPORT only: JSON payload (7-day retention)
+  requestedAt DateTime  @default(now())
+  completedAt DateTime?
+  expiresAt   DateTime? // export availability window
+
+  user UserAccount @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, requestedAt])
 }
 
 model Session {

@@ -189,7 +189,7 @@ export function Hero() {
                 </div>
                 <p className="mt-3 flex items-center justify-center gap-1.5 text-center text-[11px] text-muted-foreground">
                   <Lock className="h-3 w-3" />
-                  Product preview — Passport sharing ships in Stage 5
+                  Product preview — live in your dashboard now (Stage 5)
                 </p>
               </div>
             </div>

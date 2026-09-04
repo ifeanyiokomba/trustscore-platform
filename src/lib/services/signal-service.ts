@@ -47,6 +47,7 @@ import {
 import { CONSENT_POLICY_VERSION } from "@/lib/providers/ninauth";
 import { recordAudit } from "@/lib/services/audit-service";
 import { notifyUser } from "@/lib/services/notification-service";
+import { markMaterialChange } from "@/lib/services/trustscore-service";
 
 // ---------------------------------------------------------------------------
 // Errors → mapped to HTTP by the routes
@@ -523,6 +524,8 @@ export async function confirmPhoneOtp(
       ? `Your phone ${row.phoneHint} is now bound to your Trust Identity — Assurance Level ${level} (valid 90 days). You can withdraw this consent anytime.`
       : `Your phone ${row.phoneHint} was verified, but the assurance ladder could not escalate yet — check that your government identity is still fresh.`
   );
+  // Stage 5: material change — a new signal moved the read model.
+  await markMaterialChange(userId, "PHONE_VERIFIED");
 
   return {
     verification: { id: row.id, status: "VERIFIED" as const, phoneHint: row.phoneHint },
@@ -743,6 +746,8 @@ export async function completeLiveness(
       ? `Liveness passed and all your signals agree — Assurance Level ${level} (cross-signal consistency). Valid 90 days.`
       : `Liveness passed and matched your government record — Assurance Level ${level} (valid 90 days). You can withdraw this consent anytime.`
   );
+  // Stage 5: material change — a new signal moved the read model.
+  await markMaterialChange(userId, "LIVENESS_PASSED");
 
   return {
     session: { id: row.id, status: "PASSED" as const },

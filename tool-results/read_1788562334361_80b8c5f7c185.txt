@@ -1,0 +1,861 @@
+     1→// TrustScore Stage 2 — IdentityService (directive §28 service separation).
+     2→// Verification session lifecycle: create → consent (mock NINAuth app) →
+     3→// callback (code + PKCE exchange + ID token validation) → TrustIdentity.
+     4→// Everything consent-scoped, redacted, audited. No raw identifiers anywhere.
+     5→
+     6→import { db } from "@/lib/db";
+     7→import {
+     8→  NINAUTH_MODE,
+     9→  NINAUTH_PROVIDER_NAME,
+    10→  SESSION_TTL_MS,
+    11→  IDENTITY_FRESHNESS_DAYS,
+    12→  CORE_SCOPES,
+    13→  DEFAULT_SCOPES,
+    14→  SCOPE_CATALOG,
+    15→  attributeKeysForScopes,
+    16→  PURPOSE,
+    17→  REQUESTER,
+    18→  CONSENT_POLICY_VERSION,
+    19→  generatePkce,
+    20→  generateState,
+    21→  generateShareCode,
+    22→  authorizationUrlFor,
+    23→  issueAuthorizationCode,
+    24→  codeMatches,
+    25→  mockTokenExchange,
+    26→  validateIdToken,
+    27→  TokenValidationError,
+    28→  maskedSubjectFor,
+    29→  mockProfileFor,
+    30→  identifierFingerprint,
+    31→  consentScreenFor,
+    32→  type ConsentScreen,
+    33→  type ProfileClaims,
+    34→} from "@/lib/providers/ninauth";
+    35→import { recordAudit } from "@/lib/services/audit-service";
+    36→import { notifyUser } from "@/lib/services/notification-service";
+    37→
+    38→const TERMINAL_STATUSES = new Set(["COMPLETED", "FAILED", "CONSENT_DENIED", "EXPIRED"]);
+    39→
+    40→// Assurance ladder (directive §30): L1 government (NINAuth, Stage 2–3),
+    41→// L2 phone, L3 biometric, L4 cross-signal consistency — L2–L4 live in Stage 4.
+    42→// Cumulative by design: a signal never skips a rung, and L4 requires ALL
+    43→// signals to agree (including no SIM-swap flags and a consistent face match).
+    44→export const ASSURANCE_LADDER = [
+    45→  {
+    46→    level: 1,
+    47→    key: "government",
+    48→    title: "Government identity",
+    49→    detail: "NINAuth-verified record with masked reference and 90-day freshness",
+    50→    stage: "Live now",
+    51→  },
+    52→  {
+    53→    level: 2,
+    54→    key: "phone",
+    55→    title: "Verified phone",
+    56→    detail: "Phone number bound via OTP to the same identity — stored as a fingerprint only",
+    57→    stage: "Live now",
+    58→  },
+    59→  {
+    60→    level: 3,
+    61→    key: "biometric",
+    62→    title: "Biometric liveness",
+    63→    detail: "Selfie liveness check consistent with the government record",
+    64→    stage: "Live now",
+    65→  },
+    66→  {
+    67→    level: 4,
+    68→    key: "cross_signal",
+    69→    title: "Cross-signal consistency",
+    70→    detail: "All verified signals agree — no SIM-swap flags, face match holds, freshness intact",
+    71→    stage: "Live now",
+    72→  },
+    73→] as const;
+    74→
+    75→export function computeAssuranceLadder(input: {
+    76→  identityVerified: boolean;
+    77→  activeIdentifierTypes: string[];
+    78→  crossSignalConsistent?: boolean;
+    79→}): Array<{
+    80→  level: number;
+    81→  key: string;
+    82→  title: string;
+    83→  detail: string;
+    84→  stage: string;
+    85→  achieved: boolean;
+    86→}> {
+    87→  const hasPhone = input.activeIdentifierTypes.includes("PHONE");
+    88→  const hasBiometric = input.activeIdentifierTypes.includes("BIOMETRIC");
+    89→  const l2 = input.identityVerified && hasPhone;
+    90→  const l3 = l2 && hasBiometric;
+    91→  const l4 = l3 && (input.crossSignalConsistent ?? false);
+    92→  return ASSURANCE_LADDER.map((r) => ({
+    93→    ...r,
+    94→    achieved:
+    95→      r.level === 1
+    96→        ? input.identityVerified
+    97→        : r.level === 2
+    98→          ? l2
+    99→          : r.level === 3
+   100→            ? l3
+   101→            : l4,
+   102→  }));
+   103→}
+   104→
+   105→export interface CreateSessionInput {
+   106→  purpose?: string;
+   107→  scopes?: string[];
+   108→  flow?: "QR" | "SHARE_CODE";
+   109→}
+   110→
+   111→// Resolve requested scopes: CORE always included (verification requires it),
+   112→// known optional scopes opt-in, unknown scopes rejected (purpose limitation).
+   113→export function resolveRequestedScopes(requested?: string[]): {
+   114→  scopes: string[];
+   115→  rejected: string[];
+   116→} {
+   117→  if (!requested?.length) return { scopes: [...DEFAULT_SCOPES], rejected: [] };
+   118→  const set = new Set<string>(CORE_SCOPES);
+   119→  const rejected: string[] = [];
+   120→  for (const s of requested) {
+   121→    if (SCOPE_CATALOG[s] && !CORE_SCOPES.includes(s)) set.add(s);
+   122→    else if (!SCOPE_CATALOG[s]) rejected.push(s);
+   123→  }
+   124→  return { scopes: [...set], rejected };
+   125→}
+   126→
+   127→// ---------------------------------------------------------------------------
+   128→// Create a verification session (PKCE generated server-side)
+   129→// ---------------------------------------------------------------------------
+   130→
+   131→export async function createVerificationSession(
+   132→  userId: string,
+   133→  input: CreateSessionInput,
+   134→  requestId: string
+   135→) {
+   136→  const { scopes, rejected } = resolveRequestedScopes(input.scopes);
+   137→  if (rejected.length > 0) {
+   138→    throw new ScopeValidationError(rejected);
+   139→  }
+   140→  const purpose = input.purpose ?? PURPOSE;
+   141→  const { verifier, challenge } = generatePkce();
+   142→  const state = generateState();
+   143→  const shareCode = generateShareCode();
+   144→
+   145→  const session = await db.verificationSession.create({
+   146→    data: {
+   147→      userId,
+   148→      provider: NINAUTH_PROVIDER_NAME,
+   149→      providerMode: NINAUTH_MODE,
+   150→      flow: input.flow === "SHARE_CODE" ? "SHARE_CODE" : "QR",
+   151→      status: "AWAITING_CONSENT",
+   152→      state,
+   153→      codeVerifier: verifier,
+   154→      codeChallenge: challenge,
+   155→      scopes: JSON.stringify(scopes),
+   156→      purpose,
+   157→      policyVersion: CONSENT_POLICY_VERSION,
+   158→      shareCode,
+   159→      authorizationUrl: authorizationUrlFor(state, challenge),
+   160→      expiresAt: new Date(Date.now() + SESSION_TTL_MS),
+   161→    },
+   162→  });
+   163→
+   164→  await recordEvent(session.id, "SESSION_CREATED", {
+   165→    flow: session.flow,
+   166→    scope: scopes.join(" "),
+   167→  });
+   168→  await recordAudit({
+   169→    actorType: "USER",
+   170→    actorId: userId,
+   171→    action: "IDENTITY_SESSION_CREATED",
+   172→    subjectType: "VerificationSession",
+   173→    subjectId: session.id,
+   174→    requestId,
+   175→    metadata: { scope: "ninauth_mock", outcome: "created" },
+   176→  });
+   177→
+   178→  return session;
+   179→}
+   180→
+   181→export class ScopeValidationError extends Error {
+   182→  constructor(public rejected: string[]) {
+   183→    super("scope_invalid");
+   184→    this.name = "ScopeValidationError";
+   185→  }
+   186→}
+   187→
+   188→// ---------------------------------------------------------------------------
+   189→// Read a session (with lazy expiry)
+   190→// ---------------------------------------------------------------------------
+   191→
+   192→export async function getSessionForUser(userId: string, sessionId: string) {
+   193→  const session = await db.verificationSession.findUnique({
+   194→    where: { id: sessionId },
+   195→    include: { events: { orderBy: { createdAt: "asc" } } },
+   196→  });
+   197→  if (!session || session.userId !== userId) return null;
+   198→
+   199→  // Lazy expiry: a non-terminal session past its TTL becomes EXPIRED.
+   200→  if (
+   201→    !TERMINAL_STATUSES.has(session.status) &&
+   202→    session.expiresAt.getTime() < Date.now()
+   203→  ) {
+   204→    await db.verificationSession.update({
+   205→      where: { id: session.id },
+   206→      data: { status: "EXPIRED", errorReason: "session_ttl" },
+   207→    });
+   208→    await recordEvent(session.id, "SESSION_EXPIRED", { reason: "ttl" });
+   209→    session.status = "EXPIRED";
+   210→    session.errorReason = "session_ttl";
+   211→  }
+   212→
+   213→  return session;
+   214→}
+   215→
+   216→// ---------------------------------------------------------------------------
+   217→// Consent decision — simulates the user acting inside the NINAuth app.
+   218→// In LIVE mode this endpoint disappears; the user consents in the real NINAuth
+   219→// app and NINAuth redirects to our callback with the authorization code.
+   220→// ---------------------------------------------------------------------------
+   221→
+   222→export type ConsentResult =
+   223→  | { ok: true; code: string; state: string; grantedScopes: string[] }
+   224→  | { ok: false; code: "SESSION_NOT_FOUND" | "NOT_PENDING" | "EXPIRED" | "DENIED" | "SCOPE_INVALID" };
+   225→
+   226→export async function applyConsentDecision(
+   227→  userId: string,
+   228→  sessionId: string,
+   229→  decision: "GRANT" | "DENY",
+   230→  requestId: string,
+   231→  grantedScopes?: string[]
+   232→): Promise<ConsentResult> {
+   233→  const session = await db.verificationSession.findUnique({
+   234→    where: { id: sessionId },
+   235→  });
+   236→  if (!session || session.userId !== userId) {
+   237→    return { ok: false, code: "SESSION_NOT_FOUND" };
+   238→  }
+   239→  // Idempotent re-deny on an already-denied session is acknowledged…
+   240→  if (session.status === "CONSENT_DENIED" && decision === "DENY") {
+   241→    return { ok: false, code: "DENIED" };
+   242→  }
+   243→  // …but a GRANT on a terminal session is never allowed.
+   244→  if (session.status !== "AWAITING_CONSENT") {
+   245→    return { ok: false, code: "NOT_PENDING" };
+   246→  }
+   247→  if (session.expiresAt.getTime() < Date.now()) {
+   248→    await db.verificationSession.update({
+   249→      where: { id: session.id },
+   250→      data: { status: "EXPIRED", errorReason: "session_ttl" },
+   251→    });
+   252→    await recordEvent(session.id, "SESSION_EXPIRED", { reason: "ttl" });
+   253→    return { ok: false, code: "EXPIRED" };
+   254→  }
+   255→
+   256→  if (decision === "DENY") {
+   257→    await db.verificationSession.update({
+   258→      where: { id: session.id },
+   259→      data: { status: "CONSENT_DENIED", completedAt: new Date() },
+   260→    });
+   261→    await recordEvent(session.id, "CONSENT_DENIED", { reason: "user_denied" });
+   262→    await recordAudit({
+   263→      actorType: "USER",
+   264→      actorId: userId,
+   265→      action: "IDENTITY_CONSENT_DENIED",
+   266→      subjectType: "VerificationSession",
+   267→      subjectId: session.id,
+   268→      requestId,
+   269→      metadata: { outcome: "denied" },
+   270→    });
+   271→    return { ok: false, code: "DENIED" };
+   272→  }
+   273→
+   274→  // Stage 3 — granular consent: the user approves a SUBSET of the requested
+   275→  // scopes. Core scopes are mandatory; optional scopes are opt-in. The
+   276→  // session binds the granted set; token + attributes follow exactly it.
+   277→  const requested = JSON.parse(session.scopes) as string[];
+   278→  let finalScopes = requested;
+   279→  if (grantedScopes) {
+   280→    const valid =
+   281→      grantedScopes.every((s) => requested.includes(s)) &&
+   282→      CORE_SCOPES.every((c) => grantedScopes.includes(c));
+   283→    if (!valid) {
+   284→      return { ok: false, code: "SCOPE_INVALID" };
+   285→    }
+   286→    finalScopes = grantedScopes;
+   287→  }
+   288→
+   289→  // GRANT: the mock NINAuth app issues a one-time authorization code (60s TTL).
+   290→  const { code, codeHash, expiresAt } = issueAuthorizationCode();
+   291→  await db.verificationSession.update({
+   292→    where: { id: session.id },
+   293→    data: {
+   294→      status: "CONSENT_GRANTED",
+   295→      scopes: JSON.stringify(finalScopes),
+   296→      authorizationCodeHash: codeHash,
+   297→      authorizationCodeExp: expiresAt,
+   298→    },
+   299→  });
+   300→  await recordEvent(session.id, "CONSENT_GRANTED", {
+   301→    scope: finalScopes.join(" "),
+   302→    policyVersion: session.policyVersion,
+   303→  });
+   304→  await recordEvent(session.id, "CODE_ISSUED", { reason: "one_time_60s" });
+   305→  await recordAudit({
+   306→    actorType: "USER",
+   307→    actorId: userId,
+   308→    action: "IDENTITY_CONSENT_GRANTED",
+   309→    subjectType: "VerificationSession",
+   310→    subjectId: session.id,
+   311→    requestId,
+   312→    metadata: { outcome: "granted", scope: "ninauth_mock", scopes: finalScopes.length },
+   313→  });
+   314→
+   315→  return { ok: true, code, state: session.state, grantedScopes: finalScopes };
+   316→}
+   317→
+   318→// ---------------------------------------------------------------------------
+   319→// Callback — the OAuth contract: validate state, exchange code (PKCE),
+   320→// validate ID token, establish the TrustIdentity + consent record.
+   321→// ---------------------------------------------------------------------------
+   322→
+   323→export type CallbackResult =
+   324→  | {
+   325→      ok: true;
+   326→      identity: TrustIdentityInfo;
+   327→    }
+   328→  | {
+   329→      ok: false;
+   330→      code:
+   331→        | "SESSION_NOT_FOUND"
+   332→        | "BAD_STATE"
+   333→        | "NOT_GRANTED"
+   334→        | "CODE_REUSED"
+   335→        | "EXCHANGE_FAILED"
+   336→        | "TOKEN_INVALID";
+   337→      reason?: string;
+   338→    };
+   339→
+   340→export async function completeCallback(
+   341→  userId: string,
+   342→  sessionId: string,
+   343→  input: { code: string; state: string },
+   344→  requestId: string
+   345→): Promise<CallbackResult> {
+   346→  const session = await db.verificationSession.findUnique({
+   347→    where: { id: sessionId },
+   348→  });
+   349→  if (!session || session.userId !== userId) {
+   350→    return { ok: false, code: "SESSION_NOT_FOUND" };
+   351→  }
+   352→
+   353→  // State must match exactly (anti-CSRF). Also rejects replayed callbacks on
+   354→  // completed sessions because the stored state row is already terminal.
+   355→  if (session.state !== input.state) {
+   356→    await failSession(session.id, "state_mismatch", userId, requestId);
+   357→    return { ok: false, code: "BAD_STATE" };
+   358→  }
+   359→  if (session.status === "COMPLETED") {
+   360→    return { ok: false, code: "CODE_REUSED" };
+   361→  }
+   362→  if (session.status !== "CONSENT_GRANTED" || !session.authorizationCodeHash) {
+   363→    return { ok: false, code: "NOT_GRANTED" };
+   364→  }
+   365→
+   366→  // Code must match the stored hash (timing-safe).
+   367→  if (!codeMatches(session.authorizationCodeHash, input.code)) {
+   368→    await failSession(session.id, "code_mismatch", userId, requestId);
+   369→    return { ok: false, code: "EXCHANGE_FAILED", reason: "code" };
+   370→  }
+   371→
+   372→  // Token exchange (PKCE verified inside) + ID token validation.
+   373→  const scopes = JSON.parse(session.scopes) as string[];
+   374→  const profileClaims: ProfileClaims = mockProfileFor(userId);
+   375→  let idToken: string;
+   376→  try {
+   377→    const tokens = mockTokenExchange({
+   378→      code: input.code,
+   379→      storedCodeHash: session.authorizationCodeHash,
+   380→      codeExpiresAt: session.authorizationCodeExp ?? new Date(0),
+   381→      codeVerifier: session.codeVerifier,
+   382→      codeChallenge: session.codeChallenge,
+   383→      nonce: session.state,
+   384→      maskedSubject: maskedSubjectFor(userId),
+   385→      scopes,
+   386→      profile: profileClaims,
+   387→    });
+   388→    idToken = tokens.id_token;
+   389→  } catch (err) {
+   390→    const reason = err instanceof TokenValidationError ? err.code : "exchange_error";
+   391→    await failSession(session.id, reason, userId, requestId);
+   392→    return { ok: false, code: "EXCHANGE_FAILED", reason };
+   393→  }
+   394→
+   395→  await recordEvent(session.id, "CODE_EXCHANGED", { reason: "pkce_ok" });
+   396→
+   397→  let claims;
+   398→  try {
+   399→    claims = validateIdToken(idToken, session.state);
+   400→  } catch (err) {
+   401→    const reason = err instanceof TokenValidationError ? err.code : "validation_error";
+   402→    await failSession(session.id, `token_${reason}`, userId, requestId);
+   403→    return { ok: false, code: "TOKEN_INVALID", reason };
+   404→  }
+   405→
+   406→  await recordEvent(session.id, "TOKEN_VALIDATED", { reason: "signature_iss_aud_exp_nonce" });
+   407→
+   408→  // Consent record (directive §31): who / why / what / when / provider / policy.
+   409→  const consent = await db.consent.create({
+   410→    data: {
+   411→      userId,
+   412→      sessionId: session.id,
+   413→      requester: REQUESTER,
+   414→      purpose: session.purpose,
+   415→      scopes: session.scopes,
+   416→      policyVersion: session.policyVersion,
+   417→    },
+   418→  });
+   419→
+   420→  // TrustIdentity: evidence + masked reference only, with a freshness horizon.
+   421→  const now = new Date();
+   422→  const expiresAt = new Date(
+   423→    now.getTime() + IDENTITY_FRESHNESS_DAYS * 24 * 60 * 60 * 1000
+   424→  );
+   425→  const identity = await db.trustIdentity.upsert({
+   426→    where: { userId },
+   427→    create: {
+   428→      userId,
+   429→      status: "VERIFIED",
+   430→      assuranceLevel: 1,
+   431→      provider: NINAUTH_PROVIDER_NAME,
+   432→      providerMode: NINAUTH_MODE,
+   433→      providerIdentityRef: claims.sub,
+   434→      establishingConsentId: consent.id,
+   435→      verifiedAt: now,
+   436→      expiresAt,
+   437→    },
+   438→    update: {
+   439→      status: "VERIFIED",
+   440→      assuranceLevel: 1,
+   441→      provider: NINAUTH_PROVIDER_NAME,
+   442→      providerMode: NINAUTH_MODE,
+   443→      providerIdentityRef: claims.sub,
+   444→      establishingConsentId: consent.id,
+   445→      verifiedAt: now,
+   446→      expiresAt,
+   447→    },
+   448→  });
+   449→
+   450→  // Stage 3 — Evidence record: provenance chain (session + consent + provider)
+   451→  // with confidence and freshness. Redacted summary — no PII (directive §38).
+   452→  await db.evidence.create({
+   453→    data: {
+   454→      userId,
+   455→      trustIdentityId: identity.id,
+   456→      sessionId: session.id,
+   457→      consentId: consent.id,
+   458→      type: "NINAUTH_ID_TOKEN",
+   459→      provider: NINAUTH_PROVIDER_NAME,
+   460→      providerMode: NINAUTH_MODE,
+   461→      summary: "Government identity verified via NINAuth ID token (signature, issuer, audience, nonce validated).",
+   462→      confidence: 100,
+   463→      status: "ACTIVE",
+   464→      collectedAt: now,
+   465→      expiresAt,
+   466→    },
+   467→  });
+   468→
+   469→  // Stage 3 — Hashed identifier fingerprint (never a raw identifier).
+   470→  await db.identityIdentifier.upsert({
+   471→    where: { trustIdentityId_type: { trustIdentityId: identity.id, type: "NIN_FINGERPRINT" } },
+   472→    create: {
+   473→      trustIdentityId: identity.id,
+   474→      type: "NIN_FINGERPRINT",
+   475→      hash: identifierFingerprint(claims.sub),
+   476→      hint: "Government ID · NINAuth subject (masked)",
+   477→      status: "ACTIVE",
+   478→      verifiedAt: now,
+   479→      expiresAt,
+   480→      consentId: consent.id,
+   481→    },
+   482→    update: {
+   483→      hash: identifierFingerprint(claims.sub),
+   484→      status: "ACTIVE",
+   485→      verifiedAt: now,
+   486→      expiresAt,
+   487→      consentId: consent.id,
+   488→    },
+   489→  });
+   490→
+   491→  // Stage 3 — Consent-scoped identity attributes: only for granted profile
+   492→  // scopes; each carries the consent as provenance so withdrawal revokes it.
+   493→  const attributeKeys = attributeKeysForScopes(scopes);
+   494→  for (const key of attributeKeys) {
+   495→    const value = claims.profile?.[key as keyof ProfileClaims];
+   496→    if (!value) continue;
+   497→    await db.identityAttribute.upsert({
+   498→      where: { trustIdentityId_key: { trustIdentityId: identity.id, key } },
+   499→      create: {
+   500→        trustIdentityId: identity.id,
+   501→        key,
+   502→        value,
+   503→        scope: key === "given_name" || key === "family_name" ? "profile.name" : "profile.demographics",
+   504→        consentId: consent.id,
+   505→        status: "ACTIVE",
+   506→        source: NINAUTH_PROVIDER_NAME,
+   507→        assertedAt: now,
+   508→        expiresAt,
+   509→      },
+   510→      update: {
+   511→        value,
+   512→        scope: key === "given_name" || key === "family_name" ? "profile.name" : "profile.demographics",
+   513→        consentId: consent.id,
+   514→        status: "ACTIVE",
+   515→        assertedAt: now,
+   516→        expiresAt,
+   517→      },
+   518→    });
+   519→  }
+   520→
+   521→  await db.verificationSession.update({
+   522→    where: { id: session.id },
+   523→    data: { status: "COMPLETED", completedAt: now, consentId: consent.id },
+   524→  });
+   525→
+   526→  const attributeCount = attributeKeys.length;
+   527→  await recordEvent(session.id, "IDENTITY_VERIFIED", {
+   528→    scope: "level_1_government",
+   529→    policyVersion: session.policyVersion,
+   530→    attributes: attributeCount,
+   531→  });
+   532→  await recordAudit({
+   533→    actorType: "USER",
+   534→    actorId: userId,
+   535→    action: "IDENTITY_VERIFIED",
+   536→    subjectType: "TrustIdentity",
+   537→    subjectId: identity.id,
+   538→    requestId,
+   539→    metadata: { outcome: "level_1", scope: "ninauth_mock", attributes: attributeCount },
+   540→  });
+   541→  await notifyUser(
+   542→    userId,
+   543→    "VERIFICATION",
+   544→    "Trust Identity established",
+   545→    attributeCount > 0
+   546→      ? `Your government identity was verified through NINAuth (mock provider). Assurance Level 1, valid for 90 days — ${attributeCount} consent-scoped attributes added to your profile.`
+   547→      : "Your government identity was verified through NINAuth (mock provider). Assurance Level 1, valid for 90 days. A consent record has been added to your history."
+   548→  );
+   549→
+   550→  return { ok: true, identity: shapeIdentity(identity) };
+   551→}
+   552→
+   553→async function failSession(
+   554→  sessionId: string,
+   555→  reason: string,
+   556→  userId: string,
+   557→  requestId: string
+   558→) {
+   559→  await db.verificationSession.update({
+   560→    where: { id: sessionId },
+   561→    data: { status: "FAILED", errorReason: reason, completedAt: new Date() },
+   562→  });
+   563→  await recordEvent(sessionId, "SESSION_FAILED", { reason });
+   564→  await recordAudit({
+   565→    actorType: "USER",
+   566→    actorId: userId,
+   567→    action: "IDENTITY_SESSION_FAILED",
+   568→    subjectType: "VerificationSession",
+   569→    subjectId: sessionId,
+   570→    requestId,
+   571→    metadata: { reason },
+   572→  });
+   573→}
+   574→
+   575→// ---------------------------------------------------------------------------
+   576→// Stage 3 — Consent withdrawal (NDPA §31 data-subject right).
+   577→// Withdrawing a consent revokes every attribute it produced. Withdrawing the
+   578→// consent that ESTABLISHED the TrustIdentity revokes the identity, its
+   579→// identifier fingerprints and its evidence (re-verify to re-establish).
+   580→// ---------------------------------------------------------------------------
+   581→
+   582→export type WithdrawResult =
+   583→  | { ok: true; revokedAttributes: number; revokedIdentifiers: number; identityRevoked: boolean }
+   584→  | { ok: false; code: "NOT_FOUND" | "ALREADY_WITHDRAWN" };
+   585→
+   586→export async function withdrawConsent(
+   587→  userId: string,
+   588→  consentId: string,
+   589→  requestId: string
+   590→): Promise<WithdrawResult> {
+   591→  const consent = await db.consent.findUnique({ where: { id: consentId } });
+   592→  if (!consent || consent.userId !== userId) {
+   593→    return { ok: false, code: "NOT_FOUND" };
+   594→  }
+   595→  if (consent.withdrawnAt) {
+   596→    return { ok: false, code: "ALREADY_WITHDRAWN" };
+   597→  }
+   598→
+   599→  const now = new Date();
+   600→  await db.consent.update({
+   601→    where: { id: consent.id },
+   602→    data: { withdrawnAt: now },
+   603→  });
+   604→
+   605→  // Revoke attributes sourced from this consent.
+   606→  const revokedAttrs = await db.identityAttribute.updateMany({
+   607→    where: { consentId: consent.id, status: "ACTIVE" },
+   608→    data: { status: "REVOKED" },
+   609→  });
+   610→
+   611→  // Stage 4 — revoke identifiers SOURCED from this consent (phone / biometric
+   612→  // signal bindings). Withdrawing the signal consent unbinds the signal and
+   613→  // de-escalates the ladder — the identifier never outlives its consent.
+   614→  const revokedIdentifiers = await db.identityIdentifier.updateMany({
+   615→    where: { consentId: consent.id, status: "ACTIVE" },
+   616→    data: { status: "REVOKED" },
+   617→  });
+   618→
+   619→  // If this consent established the current TrustIdentity, revoke the spine.
+   620→  const identity = await db.trustIdentity.findUnique({ where: { userId } });
+   621→  let identityRevoked = false;
+   622→  if (identity && identity.establishingConsentId === consent.id && identity.status !== "REVOKED") {
+   623→    await db.trustIdentity.update({
+   624→      where: { id: identity.id },
+   625→      data: { status: "REVOKED", assuranceLevel: 0, updatedAt: now },
+   626→    });
+   627→    await db.identityIdentifier.updateMany({
+   628→      where: { trustIdentityId: identity.id, status: "ACTIVE" },
+   629→      data: { status: "REVOKED" },
+   630→    });
+   631→    await db.evidence.updateMany({
+   632→      where: { trustIdentityId: identity.id, status: "ACTIVE" },
+   633→      data: { status: "REVOKED" },
+   634→    });
+   635→    identityRevoked = true;
+   636→  } else {
+   637→    // Non-establishing consent: revoke its own evidence records.
+   638→    await db.evidence.updateMany({
+   639→      where: { consentId: consent.id, status: "ACTIVE" },
+   640→      data: { status: "REVOKED" },
+   641→    });
+   642→    // De-escalate the ladder for the surviving identity (Stage 4).
+   643→    if (identity && identity.status !== "REVOKED") {
+   644→      const { recomputeAssuranceLevel } = await import("@/lib/services/signal-service");
+   645→      await recomputeAssuranceLevel(userId);
+   646→    }
+   647→  }
+   648→
+   649→  await recordAudit({
+   650→    actorType: "USER",
+   651→    actorId: userId,
+   652→    action: "IDENTITY_CONSENT_WITHDRAWN",
+   653→    subjectType: "Consent",
+   654→    subjectId: consent.id,
+   655→    requestId,
+   656→    metadata: {
+   657→      outcome: "withdrawn",
+   658→      revokedAttributes: revokedAttrs.count,
+   659→      revokedIdentifiers: revokedIdentifiers.count,
+   660→      identityRevoked,
+   661→    },
+   662→  });
+   663→  await notifyUser(
+   664→    userId,
+   665→    "SECURITY",
+   666→    "Consent withdrawn",
+   667→    identityRevoked
+   668→      ? `You withdrew the consent that established your Trust Identity. Your identity, its identifiers, attributes and evidence have been revoked. You can re-verify anytime.`
+   669→      : `You withdrew a consent. ${revokedAttrs.count + revokedIdentifiers.count} bound item${revokedAttrs.count + revokedIdentifiers.count === 1 ? "" : "s"} (attributes / signals) sourced from it ${revokedAttrs.count + revokedIdentifiers.count === 1 ? "was" : "were"} revoked.`
+   670→  );
+   671→
+   672→  return { ok: true, revokedAttributes: revokedAttrs.count, revokedIdentifiers: revokedIdentifiers.count, identityRevoked };
+   673→}
+   674→
+   675→// ---------------------------------------------------------------------------
+   676→// Read model
+   677→// ---------------------------------------------------------------------------
+   678→
+   679→export interface TrustIdentityInfo {
+   680→  status: "PENDING" | "VERIFIED" | "EXPIRED" | "REVOKED" | "NONE";
+   681→  assuranceLevel: number;
+   682→  provider: string;
+   683→  providerMode: string;
+   684→  providerIdentityRef: string | null;
+   685→  verifiedAt: string | null;
+   686→  expiresAt: string | null;
+   687→  createdAt: string;
+   688→}
+   689→
+   690→export function shapeIdentity(
+   691→  identity: {
+   692→    status: string;
+   693→    assuranceLevel: number;
+   694→    provider: string;
+   695→    providerMode: string;
+   696→    providerIdentityRef: string | null;
+   697→    verifiedAt: Date | null;
+   698→    expiresAt: Date | null;
+   699→    createdAt: Date;
+   700→  },
+   701→  statusOverride?: string
+   702→): TrustIdentityInfo {
+   703→  return {
+   704→    status: (statusOverride ?? identity.status) as TrustIdentityInfo["status"],
+   705→    assuranceLevel: identity.assuranceLevel,
+   706→    provider: identity.provider,
+   707→    providerMode: identity.providerMode,
+   708→    providerIdentityRef: identity.providerIdentityRef,
+   709→    verifiedAt: identity.verifiedAt?.toISOString() ?? null,
+   710→    expiresAt: identity.expiresAt?.toISOString() ?? null,
+   711→    createdAt: identity.createdAt.toISOString(),
+   712→  };
+   713→}
+   714→
+   715→export async function getIdentityForUser(
+   716→  userId: string,
+   717→  crossSignal?: { consistent: boolean }
+   718→) {
+   719→  const identity = await db.trustIdentity.findUnique({
+   720→    where: { userId },
+   721→    include: {
+   722→      identifiers: { orderBy: { verifiedAt: "desc" } },
+   723→      attributes: { orderBy: { key: "asc" } },
+   724→      evidence: { orderBy: { collectedAt: "desc" }, take: 10 },
+   725→    },
+   726→  });
+   727→  const consents = await db.consent.findMany({
+   728→    where: { userId },
+   729→    orderBy: { grantedAt: "desc" },
+   730→    take: 5,
+   731→    select: {
+   732→      id: true,
+   733→      requester: true,
+   734→      purpose: true,
+   735→      scopes: true,
+   736→      policyVersion: true,
+   737→      grantedAt: true,
+   738→      withdrawnAt: true,
+   739→    },
+   740→  });
+   741→  const lastSession = await db.verificationSession.findFirst({
+   742→    where: { userId },
+   743→    orderBy: { createdAt: "desc" },
+   744→    select: {
+   745→      id: true,
+   746→      status: true,
+   747→      provider: true,
+   748→      providerMode: true,
+   749→      flow: true,
+   750→      createdAt: true,
+   751→      events: {
+   752→        orderBy: { createdAt: "asc" },
+   753→        select: { id: true, eventType: true, createdAt: true },
+   754→      },
+   755→    },
+   756→  });
+   757→
+   758→  // Lazy freshness: an identity past its horizon reads as EXPIRED (L1 lost
+   759→  // until re-verification) — the read model stays honest without a cron job.
+   760→  const isStale =
+   761→    identity !== null &&
+   762→    identity.status === "VERIFIED" &&
+   763→    identity.expiresAt !== null &&
+   764→    identity.expiresAt.getTime() < Date.now();
+   765→
+   766→  const activeIdentifierTypes = (identity?.identifiers ?? [])
+   767→    .filter((i) => i.status === "ACTIVE" && (i.expiresAt?.getTime() ?? Infinity) > Date.now())
+   768→    .map((i) => i.type);
+   769→
+   770→  const ladder = computeAssuranceLadder({
+   771→    identityVerified: identity?.status === "VERIFIED" && !isStale,
+   772→    activeIdentifierTypes,
+   773→    crossSignalConsistent: crossSignal?.consistent ?? false,
+   774→  });
+   775→
+   776→  return {
+   777→    identity: identity
+   778→      ? shapeIdentity(identity, isStale ? "EXPIRED" : undefined)
+   779→      : ({
+   780→          status: "NONE",
+   781→          assuranceLevel: 0,
+   782→          provider: NINAUTH_PROVIDER_NAME,
+   783→          providerMode: NINAUTH_MODE,
+   784→          providerIdentityRef: null,
+   785→          verifiedAt: null,
+   786→          expiresAt: null,
+   787→          createdAt: new Date().toISOString(),
+   788→        } satisfies TrustIdentityInfo),
+   789→    ladder,
+   790→    identifiers: (identity?.identifiers ?? []).map((i) => ({
+   791→      id: i.id,
+   792→      type: i.type,
+   793→      hint: i.hint,
+   794→      status: i.status,
+   795→      verifiedAt: i.verifiedAt.toISOString(),
+   796→      expiresAt: i.expiresAt?.toISOString() ?? null,
+   797→      hashPrefix: `${i.hash.slice(0, 8)}…`, // display-only prefix, never the full hash
+   798→    })),
+   799→    attributes: (identity?.attributes ?? []).map((a) => ({
+   800→      id: a.id,
+   801→      key: a.key,
+   802→      value: a.status === "ACTIVE" ? a.value : "—",
+   803→      scope: a.scope,
+   804→      status: a.status,
+   805→      source: a.source,
+   806→      assertedAt: a.assertedAt.toISOString(),
+   807→      expiresAt: a.expiresAt?.toISOString() ?? null,
+   808→      consentId: a.consentId,
+   809→    })),
+   810→    evidence: (identity?.evidence ?? []).map((e) => ({
+   811→      id: e.id,
+   812→      type: e.type,
+   813→      provider: e.provider,
+   814→      providerMode: e.providerMode,
+   815→      summary: e.summary,
+   816→      confidence: e.confidence,
+   817→      status: e.status,
+   818→      collectedAt: e.collectedAt.toISOString(),
+   819→      expiresAt: e.expiresAt?.toISOString() ?? null,
+   820→    })),
+   821→    consents: consents.map((c) => ({
+   822→      ...c,
+   823→      scopes: JSON.parse(c.scopes) as string[],
+   824→      grantedAt: c.grantedAt.toISOString(),
+   825→      withdrawnAt: c.withdrawnAt?.toISOString() ?? null,
+   826→    })),
+   827→    lastSession: lastSession
+   828→      ? {
+   829→          ...lastSession,
+   830→          createdAt: lastSession.createdAt.toISOString(),
+   831→          events: lastSession.events.map((e) => ({
+   832→            ...e,
+   833→            createdAt: e.createdAt.toISOString(),
+   834→          })),
+   835→        }
+   836→      : null,
+   837→  };
+   838→}
+   839→
+   840→export async function recordEvent(
+   841→  sessionId: string,
+   842→  eventType: string,
+   843→  detail?: Record<string, unknown>
+   844→) {
+   845→  try {
+   846→    await db.verificationEvent.create({
+   847→      data: {
+   848→        sessionId,
+   849→        eventType,
+   850→        detail: detail ? JSON.stringify(detail) : null,
+   851→      },
+   852→    });
+   853→  } catch (err) {
+   854→    console.error("[identity] event record failed:", (err as Error).message);
+   855→  }
+   856→}
+   857→
+   858→export function consentScreen(scopes: string[]): ConsentScreen {
+   859→  return consentScreenFor(scopes);
+   860→}
+   861→

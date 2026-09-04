@@ -139,6 +139,12 @@ export async function recentAuditForUser(userId: string, limit = 10) {
         { action: { startsWith: "AUTH_" } },
         { action: { startsWith: "IDENTITY_" } },
         { action: { startsWith: "SIGNAL_" } },
+        // Stage 5 — Trust Passport surfaces in the same audit feed
+        { action: { startsWith: "SHARE_" } },
+        { action: { startsWith: "CREDENTIAL_" } },
+        { action: { startsWith: "DSR_" } },
+        { action: { startsWith: "SESSION_" } },
+        { action: "SCORE_SNAPSHOT" },
       ],
     },
     orderBy: { createdAt: "desc" },

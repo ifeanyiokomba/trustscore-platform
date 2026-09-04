@@ -3,8 +3,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 
-const STAGE = "4 — Trust Signals (phone OTP + biometric liveness, L2–L4 escalation, cross-signal consistency)";
-const VERSION = "1.3.0";
+const STAGE = "5 — Trust Passport (TrustScore snapshots, credentials, QR trust card, share tokens, security center, trust receipts, DSR)";
+const VERSION = "1.4.0";
 const startedAt = Date.now();
 
 export async function GET(_req: NextRequest) {

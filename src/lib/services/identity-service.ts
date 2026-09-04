@@ -34,6 +34,7 @@ import {
 } from "@/lib/providers/ninauth";
 import { recordAudit } from "@/lib/services/audit-service";
 import { notifyUser } from "@/lib/services/notification-service";
+import { markMaterialChange } from "@/lib/services/trustscore-service";
 
 const TERMINAL_STATUSES = new Set(["COMPLETED", "FAILED", "CONSENT_DENIED", "EXPIRED"]);
 
@@ -546,6 +547,9 @@ export async function completeCallback(
       ? `Your government identity was verified through NINAuth (mock provider). Assurance Level 1, valid for 90 days — ${attributeCount} consent-scoped attributes added to your profile.`
       : "Your government identity was verified through NINAuth (mock provider). Assurance Level 1, valid for 90 days. A consent record has been added to your history."
   );
+  // Stage 5: material change — recompute the TrustScore snapshot + sync
+  // credentials so the passport reflects the new identity immediately.
+  await markMaterialChange(userId, "IDENTITY_VERIFIED");
 
   return { ok: true, identity: shapeIdentity(identity) };
 }
@@ -668,6 +672,9 @@ export async function withdrawConsent(
       ? `You withdrew the consent that established your Trust Identity. Your identity, its identifiers, attributes and evidence have been revoked. You can re-verify anytime.`
       : `You withdrew a consent. ${revokedAttrs.count + revokedIdentifiers.count} bound item${revokedAttrs.count + revokedIdentifiers.count === 1 ? "" : "s"} (attributes / signals) sourced from it ${revokedAttrs.count + revokedIdentifiers.count === 1 ? "was" : "were"} revoked.`
   );
+  // Stage 5: material change — the read model moved (attributes/identifiers
+  // revoked); recompute the snapshot and let credentials lapse with sources.
+  await markMaterialChange(userId, "CONSENT_WITHDRAWN");
 
   return { ok: true, revokedAttributes: revokedAttrs.count, revokedIdentifiers: revokedIdentifiers.count, identityRevoked };
 }

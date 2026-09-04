@@ -22,7 +22,20 @@ export type AuditAction =
   | "SIGNAL_PHONE_FAILED"
   | "SIGNAL_LIVENESS_STARTED"
   | "SIGNAL_LIVENESS_PASSED"
-  | "SIGNAL_LIVENESS_FAILED";
+  | "SIGNAL_LIVENESS_FAILED"
+  // Stage 5 — Trust Passport
+  | "SCORE_SNAPSHOT"
+  | "CREDENTIAL_ISSUED"
+  | "CREDENTIAL_REVOKED"
+  | "SHARE_TOKEN_CREATED"
+  | "SHARE_TOKEN_VIEWED"
+  | "SHARE_TOKEN_REVOKED"
+  | "SHARE_TOKEN_BLOCKED" // view rejected: expired / revoked / view limit
+  | "SESSION_REVOKED"
+  | "DSR_EXPORT_REQUESTED"
+  | "DSR_EXPORT_COMPLETED"
+  | "DSR_DELETE_REQUESTED"
+  | "DSR_DELETE_COMPLETED";
 
 interface AuditInput {
   actorType: "USER" | "SYSTEM" | "ANONYMOUS";
@@ -55,6 +68,21 @@ const SAFE_METADATA_KEYS = new Set([
   "faceMatch",
   "level",
   "providerMode",
+  // Stage 5 — non-PII counters / labels / prefixes only
+  "score",
+  "trigger",
+  "type",
+  "credentialTypes",
+  "ttlHours",
+  "maxViews",
+  "views",
+  "viewsLeft",
+  "tokenPrefix",
+  "scopeSet",
+  "exportBytes",
+  "requests",
+  "deleted",
+  "current",
 ]);
 
 export async function recordAudit(input: AuditInput): Promise<void> {

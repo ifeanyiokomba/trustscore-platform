@@ -301,3 +301,26 @@ Later stages append: `trust_identities`, `identity_identifiers`, `identity_attri
 **Deviations (accepted):** SIM-swap risk is a deterministic mock (hash-bucketed LOW/MEDIUM, test override via `simSwapRisk` param — LIVE swaps an MNO/aggregator lookup); liveness scores are deterministic seeded values in sandbox (LIVE = partner verdict, same shape); phone freshness capped at 90 days aligned to the identity horizon; OTP expiry not directly testable end-to-end (5-min TTL) — covered indirectly via resend rotation + lockout + status transitions.
 
 **Verdict:** Stage 4 complete and re-audited. The signal spine is live behind contract-first MOCK transports: real PKCE/OAuth (Stage 2) + real consent/identifier/evidence mechanics (Stage 3) + real OTP/liveness/escalation mechanics (Stage 4). Next: Stage 5 (Trust Passport: profile, score snapshot, QR trust card, share tokens, security center, DSR self-service) only on explicit go-ahead.
+
+---
+
+## Appendix E — Stage 5 re-audit (Trust Passport)
+
+**Re-audit date:** audit cycle 5 (this session). **Result: PASS — stage gate closed. Stage 6 not started.**
+
+| Gate criterion (§4.2 Stage 5) | Evidence |
+|---|---|
+| TrustScore engine per §35/§36 | `trustscore-service.ts`: Identity Assurance (max 60, ladder-scaled + freshness factor) + Verified Credentials (max 20, evidence-backed) + Verified Reputation (max 15, **honest zero — Stage 6**) + Resolution History (max 10, **honest zero — Stage 7**) − Confirmed Risk (Stage 8 pipeline). Output = Score + Confidence + Risk Band + Status (NEW/VERIFIED/ESTABLISHED/CAUTION/HIGH_RISK/REVIEW_REQUIRED) + Explanation[] + Freshness (24h) |
+| NDPA §37 automated-decision transparency | Explanation lines rendered verbatim in the score card ("How this score was computed" collapsible) + appeal-path note (Stage 9) |
+| Immutable snapshots, change detection | `TrustScoreSnapshot` rows w/ inputsHash; new row on MATERIAL_CHANGE (identity verified/withdrawn, signals, credential revoke) or TTL lapse; last 20 retained; INITIAL/PERIODIC/MATERIAL_CHANGE triggers surfaced in UI |
+| Credentials (§6, wallet alignment) | Auto-issued from live evidence (GOV_ID_VERIFIED / PHONE_VERIFIED / LIVENESS_VERIFIED); masked claims only (hints/counts, never attribute values); issuer = platform w/ MOCK provider honesty; manual revocation sticks; lapse when source expires |
+| QR Trust Card + share tokens / Trust Link | Raw `ts_<192-bit>` token returned ONCE; at rest sha256 only; TTL 1h–7d; maxViews 1–50; per-scope (PROFILE/SIGNALS/ATTRIBUTES/SCORE); view-counted; QR renders client-side (qrcode lib, black-on-white modules), PNG download; revocation kills link instantly |
+| Public Trust Card viewer (`/?trust=` on the single `/` route) | Locked language: "No confirmed adverse signals found" + explicit not-a-guarantee disclaimer (§50); anti-enumeration generic 404; 410 for revoked/expired/view-limit; 429 rate-limited (30/min/IP); viewer told the check is receipted |
+| Trust receipts (who checked you) | Every open writes a receipt (viewer label, what was shown, when, salted ipHash for abuse dedupe only); last 50 retained; first-open notification |
+| Identity Security Center (§15) | Active sessions (10 most recent + total count) w/ remote revoke (current session protected → 409); change alerts on login / link created / first view / credential revoke / session revoke / DSR; security timeline includes anonymous viewer events via subject linkage |
+| DSR self-service (NDPA §36) | EXPORT: full JSON (incl. hashes — they ARE the stored data), 7-day retention, Content-Disposition download; DELETE: password-confirmed, final export generated, cascade wipe, redacted audit tombstone survives (no FK); rectification routed to consent withdrawal |
+| Strategic red lines | No NIN in URLs/logs (share tokens are opaque random); no raw phone anywhere (masked hints only in receipts/cards); no "this person is safe" language anywhere; no giant NIN database (evidence + hashed fingerprints only) |
+| Test evidence | `tests/stage5_matrix.py` **101/101 PASS** (twice, back-to-back — idempotent); `tests/stage5_e2e.sh` full pass (dialog → QR → public viewer → receipts → session revoke → dead link → DSR export → mobile/dark/console); regressions: stage2 36/36, stage3 51/51, stage4 83/83, qa_regression pass; tsc 0 errors; ESLint 0 problems; VLM QA on 6 screenshots (fixed: QR module contrast → pure black, public-viewer small-text contrast, DSR mobile density) |
+| Bugs found & fixed during QA | (1) Background refetch unmounted the once-only token dialog (loading state now preserves mounted data); (2) anonymous viewer events missing from owner timeline (subject-linkage query); (3) console-error checks were no-ops (ConsoleGuard now captures real errors); (4) DSR rate limiter re-keyed per user (shared NAT safe) |
+
+**Verdict:** Stage 5 complete and re-audited. The Trust Passport is live end-to-end behind contract-first MOCK providers: a real score engine with explainable, NDPA-transparent math; credentials that shadow evidence; scoped, expiring, receipted trust links with a QR artifact and a public viewer that never overclaims; a security center; and genuine data-subject rights. Next: Stage 6 (Safety Check + Trust Requests — verifier-side, hash-lookup matches) only on explicit go-ahead.

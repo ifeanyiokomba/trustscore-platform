@@ -346,3 +346,29 @@
     animation: none;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Stage 5 — Trust Passport utilities
+--------------------------------------------------------------------------- */
+
+/* QR Trust Card — emerald gradient band (the shareable artifact) */
+.ts-trust-card {
+  background:
+    radial-gradient(120% 160% at 85% -20%, oklch(0.769 0.17 70) 0%, transparent 45%),
+    linear-gradient(135deg, oklch(0.505 0.12 160) 0%, oklch(0.596 0.128 163) 55%, oklch(0.696 0.085 178) 100%);
+  color: white;
+}
+
+/* Focus-visible polish for passport inline actions (revoke buttons etc.) */
+.ts-trust-card button:focus-visible,
+.ts-rung-active button:focus-visible {
+  outline: 2px solid color-mix(in oklch, var(--trust) 65%, transparent);
+  outline-offset: 2px;
+}
+
+/* Reduced motion — Stage 5 additions */
+@media (prefers-reduced-motion: reduce) {
+  .ts-trust-card .ts-shimmer {
+    animation: none;
+  }
+}

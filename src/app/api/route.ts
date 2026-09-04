@@ -5,8 +5,8 @@ import { NextResponse } from "next/server";
 export async function GET() {
   return NextResponse.json({
     name: "TrustScore Platform API",
-    stage: "4 — Trust Signals (phone OTP + biometric liveness, L2–L4 escalation, cross-signal consistency)",
-    version: "1.3.0",
+    stage: "5 — Trust Passport (TrustScore snapshots, credentials, QR trust card, share tokens/trust link, security center, trust receipts, DSR)",
+    version: "1.4.0",
     notice:
       "NINAuth integration is implemented behind a contract-first MOCK provider adapter (OAuth 2.0 + PKCE + OIDC-style ID tokens). Phone (SMS OTP) and biometric (liveness) signals are likewise contract-first MOCK transports. No live government or MNO/biometric integration is claimed. The LIVE transports activate once partner sandbox credentials exist (audit §2.2).",
     endpoints: [
@@ -27,9 +27,22 @@ export async function GET() {
       { method: "POST", path: "/api/v1/identity/signals/phone/confirm", auth: "session", description: "Stage 4: confirm OTP → PHONE identifier (hashed) + evidence → ladder L2" },
       { method: "POST", path: "/api/v1/identity/signals/biometrics/start", auth: "session", description: "Stage 4: create liveness job (MOCK Smile-ID-class contract, consent, 10-min window)" },
       { method: "POST", path: "/api/v1/identity/signals/biometrics/complete", auth: "session", description: "Stage 4: submit capture → verdict (liveness + face-match vs government record) → ladder L3/L4" },
+      { method: "GET", path: "/api/v1/passport/me", auth: "session", description: "Stage 5: Trust Passport — score snapshot, credentials, share tokens, receipts, sessions, notifications" },
+      { method: "POST", path: "/api/v1/passport/share", auth: "session", description: "Stage 5: create Trust Link (raw token shown ONCE; hashed at rest; view-counted, expiring, revocable)" },
+      { method: "GET", path: "/api/v1/passport/share", auth: "session", description: "Stage 5: list share tokens (metadata only)" },
+      { method: "DELETE", path: "/api/v1/passport/share/:id", auth: "session", description: "Stage 5: revoke a Trust Link" },
+      { method: "GET", path: "/api/v1/passport/public/:token", auth: "public", description: "Stage 5: PUBLIC trust-card view — anti-enumeration, view-counted, receipted (410 when dead, 429 when abused)" },
+      { method: "POST", path: "/api/v1/passport/credentials/:id/revoke", auth: "session", description: "Stage 5: manually revoke a passport credential (sticks until re-verification)" },
+      { method: "POST", path: "/api/v1/passport/dsr", auth: "session", description: "Stage 5: NDPA §36 DSR — EXPORT (data download, 7-day retention) or DELETE (password-confirmed cascade)" },
+      { method: "GET", path: "/api/v1/passport/dsr", auth: "session", description: "Stage 5: list DSR requests" },
+      { method: "GET", path: "/api/v1/passport/dsr/:id/export", auth: "session", description: "Stage 5: download a completed data export" },
+      { method: "GET", path: "/api/v1/passport/notifications", auth: "session", description: "Stage 5: notification feed (change alerts)" },
+      { method: "POST", path: "/api/v1/passport/notifications", auth: "session", description: "Stage 5: mark notifications read ({id} or {all:true})" },
+      { method: "POST", path: "/api/v1/security/sessions/:id/revoke", auth: "session", description: "Stage 5: remote sign-out of another active session" },
     ],
     roadmap: {
-      "5": "Trust Passport: profile, score snapshot, QR trust card, share tokens, security center",
+      "6": "Safety Check + Trust Requests (verifier-side, hash-lookup matches)",
+      "7": "Resolution + Appeals (flags, disputes, human review)",
     },
   });
 }

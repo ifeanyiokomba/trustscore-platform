@@ -12,6 +12,7 @@ import { Roadmap } from "@/components/landing/roadmap";
 import { Security } from "@/components/landing/security";
 import { AuthView } from "@/components/auth/auth-view";
 import { DashboardView } from "@/components/dashboard/dashboard-view";
+import { TrustViewer } from "@/components/public/trust-viewer";
 import { useTrustStore } from "@/lib/store";
 
 function LandingView() {
@@ -27,12 +28,34 @@ function LandingView() {
   );
 }
 
+// Read the location once (SSR-safe via useSyncExternalStore). The trust
+// token is an opaque random value — never a NIN/identifier.
+const subscribeNoop = () => () => {};
+
 export default function Home() {
   const { view, refreshMe } = useTrustStore();
+  const search = React.useSyncExternalStore(
+    subscribeNoop,
+    () => window.location.search,
+    () => ""
+  );
+  const trustToken = React.useMemo(() => {
+    const t = new URLSearchParams(search).get("trust");
+    return t && /^ts_[A-Za-z0-9_-]{10,80}$/.test(t) ? t : null;
+  }, [search]);
 
   React.useEffect(() => {
     void refreshMe();
   }, [refreshMe]);
+
+  // Public Trust Link view — anonymous, standalone (no auth surface).
+  if (trustToken) {
+    return (
+      <div className="flex min-h-screen flex-col">
+        <TrustViewer token={trustToken} />
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen flex-col">
