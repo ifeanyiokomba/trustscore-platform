@@ -38,7 +38,9 @@ import { notifyUser } from "@/lib/services/notification-service";
 const TERMINAL_STATUSES = new Set(["COMPLETED", "FAILED", "CONSENT_DENIED", "EXPIRED"]);
 
 // Assurance ladder (directive §30): L1 government (NINAuth, Stage 2–3),
-// L2 phone, L3 biometric, L4 cross-signal history — L2+ unlock in Stage 4+.
+// L2 phone, L3 biometric, L4 cross-signal consistency — L2–L4 live in Stage 4.
+// Cumulative by design: a signal never skips a rung, and L4 requires ALL
+// signals to agree (including no SIM-swap flags and a consistent face match).
 export const ASSURANCE_LADDER = [
   {
     level: 1,
@@ -51,28 +53,29 @@ export const ASSURANCE_LADDER = [
     level: 2,
     key: "phone",
     title: "Verified phone",
-    detail: "Phone number bound via OTP to the same identity",
-    stage: "Stage 4",
+    detail: "Phone number bound via OTP to the same identity — stored as a fingerprint only",
+    stage: "Live now",
   },
   {
     level: 3,
     key: "biometric",
     title: "Biometric liveness",
     detail: "Selfie liveness check consistent with the government record",
-    stage: "Stage 4",
+    stage: "Live now",
   },
   {
     level: 4,
     key: "cross_signal",
-    title: "Cross-signal history",
-    detail: "Multiple verified signals agree over time — strongest assurance",
-    stage: "Stage 4+",
+    title: "Cross-signal consistency",
+    detail: "All verified signals agree — no SIM-swap flags, face match holds, freshness intact",
+    stage: "Live now",
   },
 ] as const;
 
 export function computeAssuranceLadder(input: {
   identityVerified: boolean;
   activeIdentifierTypes: string[];
+  crossSignalConsistent?: boolean;
 }): Array<{
   level: number;
   key: string;
@@ -82,14 +85,20 @@ export function computeAssuranceLadder(input: {
   achieved: boolean;
 }> {
   const hasPhone = input.activeIdentifierTypes.includes("PHONE");
+  const hasBiometric = input.activeIdentifierTypes.includes("BIOMETRIC");
+  const l2 = input.identityVerified && hasPhone;
+  const l3 = l2 && hasBiometric;
+  const l4 = l3 && (input.crossSignalConsistent ?? false);
   return ASSURANCE_LADDER.map((r) => ({
     ...r,
     achieved:
       r.level === 1
         ? input.identityVerified
         : r.level === 2
-          ? input.identityVerified && hasPhone
-          : false, // L3/L4 arrive Stage 4+
+          ? l2
+          : r.level === 3
+            ? l3
+            : l4,
   }));
 }
 
@@ -571,7 +580,7 @@ async function failSession(
 // ---------------------------------------------------------------------------
 
 export type WithdrawResult =
-  | { ok: true; revokedAttributes: number; identityRevoked: boolean }
+  | { ok: true; revokedAttributes: number; revokedIdentifiers: number; identityRevoked: boolean }
   | { ok: false; code: "NOT_FOUND" | "ALREADY_WITHDRAWN" };
 
 export async function withdrawConsent(
@@ -599,6 +608,14 @@ export async function withdrawConsent(
     data: { status: "REVOKED" },
   });
 
+  // Stage 4 — revoke identifiers SOURCED from this consent (phone / biometric
+  // signal bindings). Withdrawing the signal consent unbinds the signal and
+  // de-escalates the ladder — the identifier never outlives its consent.
+  const revokedIdentifiers = await db.identityIdentifier.updateMany({
+    where: { consentId: consent.id, status: "ACTIVE" },
+    data: { status: "REVOKED" },
+  });
+
   // If this consent established the current TrustIdentity, revoke the spine.
   const identity = await db.trustIdentity.findUnique({ where: { userId } });
   let identityRevoked = false;
@@ -612,16 +629,21 @@ export async function withdrawConsent(
       data: { status: "REVOKED" },
     });
     await db.evidence.updateMany({
-      where: { consentId: consent.id, status: "ACTIVE" },
+      where: { trustIdentityId: identity.id, status: "ACTIVE" },
       data: { status: "REVOKED" },
     });
     identityRevoked = true;
   } else {
-    // Non-establishing consent: only revoke its own evidence records.
+    // Non-establishing consent: revoke its own evidence records.
     await db.evidence.updateMany({
       where: { consentId: consent.id, status: "ACTIVE" },
       data: { status: "REVOKED" },
     });
+    // De-escalate the ladder for the surviving identity (Stage 4).
+    if (identity && identity.status !== "REVOKED") {
+      const { recomputeAssuranceLevel } = await import("@/lib/services/signal-service");
+      await recomputeAssuranceLevel(userId);
+    }
   }
 
   await recordAudit({
@@ -634,6 +656,7 @@ export async function withdrawConsent(
     metadata: {
       outcome: "withdrawn",
       revokedAttributes: revokedAttrs.count,
+      revokedIdentifiers: revokedIdentifiers.count,
       identityRevoked,
     },
   });
@@ -642,11 +665,11 @@ export async function withdrawConsent(
     "SECURITY",
     "Consent withdrawn",
     identityRevoked
-      ? `You withdrew the consent that established your Trust Identity. Your identity, its attributes and its evidence have been revoked. You can re-verify anytime.`
-      : `You withdrew a consent. ${revokedAttrs.count} attribute${revokedAttrs.count === 1 ? "" : "s"} sourced from it ${revokedAttrs.count === 1 ? "was" : "were"} revoked.`
+      ? `You withdrew the consent that established your Trust Identity. Your identity, its identifiers, attributes and evidence have been revoked. You can re-verify anytime.`
+      : `You withdrew a consent. ${revokedAttrs.count + revokedIdentifiers.count} bound item${revokedAttrs.count + revokedIdentifiers.count === 1 ? "" : "s"} (attributes / signals) sourced from it ${revokedAttrs.count + revokedIdentifiers.count === 1 ? "was" : "were"} revoked.`
   );
 
-  return { ok: true, revokedAttributes: revokedAttrs.count, identityRevoked };
+  return { ok: true, revokedAttributes: revokedAttrs.count, revokedIdentifiers: revokedIdentifiers.count, identityRevoked };
 }
 
 // ---------------------------------------------------------------------------
@@ -689,7 +712,10 @@ export function shapeIdentity(
   };
 }
 
-export async function getIdentityForUser(userId: string) {
+export async function getIdentityForUser(
+  userId: string,
+  crossSignal?: { consistent: boolean }
+) {
   const identity = await db.trustIdentity.findUnique({
     where: { userId },
     include: {
@@ -744,6 +770,7 @@ export async function getIdentityForUser(userId: string) {
   const ladder = computeAssuranceLadder({
     identityVerified: identity?.status === "VERIFIED" && !isStale,
     activeIdentifierTypes,
+    crossSignalConsistent: crossSignal?.consistent ?? false,
   });
 
   return {

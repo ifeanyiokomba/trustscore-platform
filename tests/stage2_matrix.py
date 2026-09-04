@@ -116,6 +116,8 @@ check("full timeline recorded", "CONSENT_GRANTED" in ev_types and "CODE_EXCHANGE
       and "TOKEN_VALIDATED" in ev_types and "IDENTITY_VERIFIED" in ev_types, str(ev_types))
 
 # ---------------------------------------------------------------- 10) deny path
+s, b = call(ada, "GET", "/api/v1/identity/me")
+PRE_DNY_STATUS = b["identity"]["status"]
 s, b = call(ada, "POST", "/api/v1/identity/sessions", {})
 SID3 = b["session"]["id"]
 s, b = call(ada, "POST", f"/api/v1/identity/sessions/{SID3}/consent", {"decision": "DENY"})
@@ -123,10 +125,10 @@ check("deny acknowledged", s == 200 and b.get("decision") == "DENY")
 s, b = call(ada, "GET", f"/api/v1/identity/sessions/{SID3}")
 check("session CONSENT_DENIED", b["session"]["status"] == "CONSENT_DENIED")
 s, b = call(ada, "GET", "/api/v1/identity/me")
-# Stage 3 note: ada's baseline can now be NONE/REVOKED/VERIFIED depending on
-# lifecycle tests. The deny invariant: a denied session must NEVER establish
-# (or leave) a VERIFIED identity for this flow — no identity change on DENY.
-check("deny never establishes identity", b["identity"]["status"] != "VERIFIED",
+# Stage 3/4 note: ada's baseline can be NONE/REVOKED/VERIFIED depending on
+# lifecycle + signal tests. The deny invariant: a denied session must NEVER
+# change the identity state — capture pre-deny status and compare.
+check("deny never changes identity", b["identity"]["status"] == PRE_DNY_STATUS,
       f"status={b['identity']['status']}")
 
 # ---------------------------------------------------------------- 11) consent on denied

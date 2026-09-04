@@ -3,8 +3,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 
-const STAGE = "3 — Trust Identity Management (assurance ladder, hashed identifiers, consent-scoped attributes)";
-const VERSION = "1.2.0";
+const STAGE = "4 — Trust Signals (phone OTP + biometric liveness, L2–L4 escalation, cross-signal consistency)";
+const VERSION = "1.3.0";
 const startedAt = Date.now();
 
 export async function GET(_req: NextRequest) {

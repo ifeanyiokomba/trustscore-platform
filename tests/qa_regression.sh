@@ -31,11 +31,22 @@ $AB eval "JSON.stringify({
   footerStuck: (()=>{const f=document.querySelector('footer');const r=f.getBoundingClientRect();return r.bottom<=window.innerHeight+2})(),
 })" 2>&1 | tail -1
 
+SIGNED_IN=$($AB eval "!!Array.from(document.querySelectorAll('button')).find(b => b.textContent.trim() === 'Sign out')" 2>/dev/null | tail -1)
+if echo "$SIGNED_IN" | grep -q "true"; then
+  $AB find role button click --name "Sign out" >/dev/null 2>&1
+  sleep 2
+  echo "(stale session cleared)"
+fi
+
 # ---------- 2. sign in (ada — existing verified user) ----------
 $AB find role button click --name "Get started" >/dev/null 2>&1
 sleep 1
-$AB find role tab click --name "Sign in" >/dev/null 2>&1
-sleep 0.8
+# robust tab switch: retry the native tab click until the Sign-in panel activates
+for i in $(seq 1 12); do
+  $AB snapshot -i 2>/dev/null | grep -qE 'tabpanel "Sign in"' && break
+  $AB find role tab click --name "Sign in" >/dev/null 2>&1
+  sleep 0.8
+done
 EMAIL_REF=$($AB snapshot -i 2>/dev/null | grep -oE 'textbox "Email" \[required, ref=e[0-9]+\]' | grep -oE 'e[0-9]+' | head -1)
 PW_REF=$($AB snapshot -i 2>/dev/null | grep -oE 'textbox "Password" \[required, ref=e[0-9]+\]' | grep -oE 'e[0-9]+' | head -1)
 $AB fill "@${EMAIL_REF}" "ada@example.com" >/dev/null 2>&1
@@ -61,8 +72,12 @@ if ! $AB get text "main" 2>/dev/null | grep -q "Get started"; then
 fi
 $AB find role button click --name "Get started" >/dev/null 2>&1
 sleep 1
-$AB find role tab click --name "Sign in" >/dev/null 2>&1
-sleep 0.8
+# robust tab switch: retry the native tab click until the Sign-in panel activates
+for i in $(seq 1 12); do
+  $AB snapshot -i 2>/dev/null | grep -qE 'tabpanel "Sign in"' && break
+  $AB find role tab click --name "Sign in" >/dev/null 2>&1
+  sleep 0.8
+done
 EMAIL_REF=$($AB snapshot -i 2>/dev/null | grep -oE 'textbox "Email" \[required, ref=e[0-9]+\]' | grep -oE 'e[0-9]+' | head -1)
 PW_REF=$($AB snapshot -i 2>/dev/null | grep -oE 'textbox "Password" \[required, ref=e[0-9]+\]' | grep -oE 'e[0-9]+' | head -1)
 $AB fill "@${EMAIL_REF}" "ada@example.com" >/dev/null 2>&1
@@ -77,11 +92,11 @@ $AB eval "JSON.stringify({alert: document.querySelector('[role=alert]')?.textCon
 $AB fill "@${PW_REF}" "SuperSecret1" >/dev/null 2>&1
 $AB click "@${SUBMIT}" >/dev/null 2>&1
 sleep 2.5
-$AB find role button click --name "Toggle theme" >/dev/null 2>&1 || $AB eval "document.querySelector('button[aria-label*=theme i], button[title*=theme i]')?.click(); 'clicked'" >/dev/null 2>&1
+$AB find role button click --name "Toggle dark mode" >/dev/null 2>&1 || $AB eval "document.querySelector('button[aria-label*=theme i], button[title*=theme i]')?.click(); 'clicked'" >/dev/null 2>&1
 sleep 1
 echo "--- DARK MODE ---"
 $AB eval "JSON.stringify({dark: document.documentElement.classList.contains('dark')})" 2>&1 | tail -1
-$AB find role button click --name "Toggle theme" >/dev/null 2>&1 || $AB eval "document.querySelector('button[aria-label*=theme i], button[title*=theme i]')?.click(); 'clicked'" >/dev/null 2>&1
+$AB find role button click --name "Toggle dark mode" >/dev/null 2>&1 || $AB eval "document.querySelector('button[aria-label*=theme i], button[title*=theme i]')?.click(); 'clicked'" >/dev/null 2>&1
 sleep 0.5
 
 # ---------- 5. mobile viewport ----------

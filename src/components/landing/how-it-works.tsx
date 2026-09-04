@@ -8,6 +8,7 @@ import {
   KeyRound,
   FileCheck2,
   Fingerprint,
+  ScanFace,
   ArrowRight,
   Lock,
 } from "lucide-react";
@@ -40,6 +41,11 @@ const FLOW_STEPS = [
     title: "4 · Your Trust Identity is established",
     body: "We record consent-scoped attributes and time-bound evidence with full provenance. Freshness is tracked — “verified 11 days ago”, not just “verified”.",
   },
+  {
+    icon: ScanFace,
+    title: "5 · Signals stack, assurance climbs",
+    body: "Bind your phone via OTP, run a liveness selfie — each signal is a consent you can withdraw. Assurance only reaches the top when independent signals agree.",
+  },
 ];
 
 export function HowItWorks() {
@@ -64,7 +70,7 @@ export function HowItWorks() {
           </p>
         </div>
 
-        <ol className="mt-12 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <ol className="mt-12 grid gap-4 md:grid-cols-2 lg:grid-cols-5">
           {FLOW_STEPS.map((step, i) => (
             <motion.li
               key={step.title}

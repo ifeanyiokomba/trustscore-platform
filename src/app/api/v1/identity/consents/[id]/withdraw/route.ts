@@ -1,6 +1,7 @@
-// POST /api/v1/identity/consents/:id/withdraw — Stage 3, NDPA §31 consent
-// withdrawal. Revokes the consent + attributes it produced; if it established
-// the TrustIdentity, revokes the identity spine (re-verify to re-establish).
+// POST /api/v1/identity/consents/:id/withdraw — Stage 3–4, NDPA §31 consent
+// withdrawal. Revokes the consent + attributes it produced + identifiers
+// (phone / biometric signals) it sourced; if it established the TrustIdentity,
+// revokes the identity spine (re-verify to re-establish).
 
 import { NextRequest } from "next/server";
 import { jsonOk, jsonError, newRequestId, rateLimit, clientKey } from "@/lib/platform/http";
@@ -39,6 +40,7 @@ export async function POST(
   return jsonOk({
     withdrawn: true,
     revokedAttributes: result.revokedAttributes,
+    revokedIdentifiers: result.revokedIdentifiers,
     identityRevoked: result.identityRevoked,
   });
 }

@@ -135,7 +135,11 @@ export async function recentAuditForUser(userId: string, limit = 10) {
   return db.auditEvent.findMany({
     where: {
       actorId: userId,
-      OR: [{ action: { startsWith: "AUTH_" } }, { action: { startsWith: "IDENTITY_" } }],
+      OR: [
+        { action: { startsWith: "AUTH_" } },
+        { action: { startsWith: "IDENTITY_" } },
+        { action: { startsWith: "SIGNAL_" } },
+      ],
     },
     orderBy: { createdAt: "desc" },
     take: limit,

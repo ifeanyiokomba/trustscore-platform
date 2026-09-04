@@ -73,7 +73,7 @@ check("fresh identity NONE", s == 200 and ident.get("status") == "NONE")
 ladder = b.get("ladder", [])
 check("ladder has 4 rungs", len(ladder) == 4)
 check("ladder L1 not achieved pre-verify", ladder[0]["achieved"] is False)
-check("ladder L2-L4 locked w/ stage labels", all(r["stage"] in ("Stage 4", "Stage 4+") for r in ladder[1:]))
+check("ladder L2-L4 live in Stage 4", all(r["stage"] == "Live now" for r in ladder[1:]) and all(not r["achieved"] for r in ladder[1:]))
 check("no identifiers/attributes/evidence pre-verify",
       b.get("identifiers") == [] and b.get("attributes") == [] and b.get("evidence") == [])
 

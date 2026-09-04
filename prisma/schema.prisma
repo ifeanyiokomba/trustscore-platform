@@ -1,10 +1,13 @@
 // TrustScore — NIN-First rebuild
-// Stage 1–3 schema (per docs/STAGE0_AUDIT.md §4.3 / §4.2)
+// Stage 1–4 schema (per docs/STAGE0_AUDIT.md §4.3 / §4.2)
 //
 // Principle: UserAccount ≠ TrustIdentity ≠ NIN ≠ Phone (directive §29).
 // Raw identity numbers (NIN, BVN, raw phone) are NEVER stored here.
-// Stage 3 adds the Trust Identity management layer: hashed identifiers,
+// Stage 3 added the Trust Identity management layer: hashed identifiers,
 // consent-scoped attributes, evidence records with provenance + freshness.
+// Stage 4 adds phone (OTP) + biometric (liveness) verification sessions —
+// contract-first MOCK providers; raw phone numbers are stored ONLY as
+// peppered sha256 fingerprints with masked display hints.
 
 generator client {
   provider = "prisma-client-js"
@@ -20,16 +23,16 @@ datasource db {
 // ---------------------------------------------------------------------------
 
 model UserAccount {
-  id              String    @id @default(cuid())
-  email           String    @unique
+  id              String   @id @default(cuid())
+  email           String   @unique
   passwordHash    String // scrypt output (never plaintext, never reversible)
   passwordSalt    String // per-user random salt
   displayName     String
-  handle          String    @unique // reserved for future trustscore.ng/@handle Trust Link (Stage 5)
-  status          String    @default("ACTIVE") // ACTIVE | SUSPENDED | PENDING_DELETION
-  acceptedTermsAt DateTime  @default(now())
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  handle          String   @unique // reserved for future trustscore.ng/@handle Trust Link (Stage 5)
+  status          String   @default("ACTIVE") // ACTIVE | SUSPENDED | PENDING_DELETION
+  acceptedTermsAt DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   sessions             Session[]
   notifications        Notification[]
@@ -37,6 +40,8 @@ model UserAccount {
   verificationSessions VerificationSession[]
   consents             Consent[]
   evidence             Evidence[]
+  phoneVerifications   PhoneVerification[]
+  livenessSessions     LivenessSession[]
 
   @@index([email])
   @@index([status])
@@ -49,18 +54,18 @@ model UserAccount {
 // ---------------------------------------------------------------------------
 
 model TrustIdentity {
-  id                  String    @id @default(cuid())
-  userId              String    @unique
-  status              String    @default("PENDING") // PENDING | VERIFIED | EXPIRED | REVOKED
-  assuranceLevel      Int       @default(0) // 0 = none; 1 = government-verified via NINAuth; L2 phone/L3 biometric arrive Stage 4; L4 cross-signal
-  provider            String    @default("NINAUTH_MOCK")
-  providerMode        String    @default("MOCK") // MOCK until partner sandbox creds exist (audit §2.2)
-  providerIdentityRef String? // masked subject from provider — never a raw NIN
+  id                    String    @id @default(cuid())
+  userId                String    @unique
+  status                String    @default("PENDING") // PENDING | VERIFIED | EXPIRED | REVOKED
+  assuranceLevel        Int       @default(0) // 0 = none; 1 = government-verified via NINAuth; L2 phone/L3 biometric arrive Stage 4; L4 cross-signal
+  provider              String    @default("NINAUTH_MOCK")
+  providerMode          String    @default("MOCK") // MOCK until partner sandbox creds exist (audit §2.2)
+  providerIdentityRef   String? // masked subject from provider — never a raw NIN
   establishingConsentId String? // the consent that established this identity (withdrawal semantics, Stage 3)
-  verifiedAt          DateTime?
-  expiresAt           DateTime? // verification freshness horizon (90 days)
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
+  verifiedAt            DateTime?
+  expiresAt             DateTime? // verification freshness horizon (90 days)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
   user        UserAccount          @relation(fields: [userId], references: [id], onDelete: Cascade)
   identifiers IdentityIdentifier[]
@@ -143,7 +148,7 @@ model Evidence {
   expiresAt       DateTime? // evidence freshness
   createdAt       DateTime  @default(now())
 
-  user          UserAccount @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user          UserAccount    @relation(fields: [userId], references: [id], onDelete: Cascade)
   trustIdentity TrustIdentity? @relation(fields: [trustIdentityId], references: [id], onDelete: SetNull)
 
   @@index([userId, collectedAt])
@@ -176,7 +181,7 @@ model VerificationSession {
   updatedAt             DateTime  @updatedAt
 
   events VerificationEvent[]
-  user  UserAccount @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   UserAccount         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([status])
@@ -197,20 +202,77 @@ model VerificationEvent {
 // Consent record per directive §31: who requested, why, what scopes were
 // requested/granted, when, which provider, policy version.
 model Consent {
-  id           String    @id @default(cuid())
-  userId       String
-  sessionId    String?   @unique
-  requester    String // who requested the identity access
-  purpose      String
-  scopes       String // JSON array granted
+  id            String    @id @default(cuid())
+  userId        String
+  sessionId     String?   @unique
+  requester     String // who requested the identity access
+  purpose       String
+  scopes        String // JSON array granted
   policyVersion String
-  grantedAt    DateTime  @default(now())
-  withdrawnAt  DateTime?
-  createdAt    DateTime  @default(now())
+  grantedAt     DateTime  @default(now())
+  withdrawnAt   DateTime?
+  createdAt     DateTime  @default(now())
 
   user UserAccount @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+}
+
+// ---------------------------------------------------------------------------
+// Stage 4 — Phone verification (OTP, contract-first MOCK SMS transport).
+// The raw phone number NEVER lands in this table: only a peppered sha256
+// fingerprint (matching Stage 3 identifier discipline) + a masked display
+// hint. The OTP itself is stored hashed; attempts are capped server-side.
+// ---------------------------------------------------------------------------
+
+model PhoneVerification {
+  id          String    @id @default(cuid())
+  userId      String
+  phoneHash   String // sha256(pepper + E.164) — NEVER raw phone
+  phoneHint   String // masked display hint, e.g. "+234 8•• ••• ••34"
+  status      String    @default("PENDING") // PENDING | VERIFIED | FAILED | EXPIRED
+  otpHash     String // sha256(pepper + code) — never plaintext
+  attempts    Int       @default(0) // wrong-OTP attempts (max 3, reset on resend)
+  resends     Int       @default(0) // resend count (max 3)
+  simSwapRisk String    @default("LOW") // LOW | MEDIUM | HIGH — mock network signal
+  consentId   String // the consent that authorized this verification
+  expiresAt   DateTime // OTP TTL (5 minutes)
+  verifiedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user UserAccount @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([status])
+}
+
+// ---------------------------------------------------------------------------
+// Stage 4 — Biometric liveness (selfie/liveness, Smile-ID-class MOCK adapter).
+// The provider returns a verdict contract: liveness score, face-match against
+// the government-anchored reference, consistency flag. No selfie pixels or
+// biometric templates are ever stored — only the redacted verdict + a
+// fingerprint of the subject linkage.
+// ---------------------------------------------------------------------------
+
+model LivenessSession {
+  id              String    @id @default(cuid())
+  userId          String
+  trustIdentityId String?
+  jobId           String    @unique // provider job reference (mock)
+  status          String    @default("PENDING") // PENDING | PASSED | FAILED | EXPIRED
+  result          String? // JSON verdict: passed, livenessScore, faceMatchScore, consistent, reason (redacted)
+  confidence      Int? // provider confidence 0–100
+  consentId       String // the consent that authorized this check
+  expiresAt       DateTime // capture-window TTL (10 minutes)
+  completedAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  user UserAccount @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([status])
 }
 
 model Session {

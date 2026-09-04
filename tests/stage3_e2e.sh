@@ -21,11 +21,22 @@ $AB open http://127.0.0.1:3000 >/dev/null 2>&1
 $AB wait --load networkidle >/dev/null 2>&1
 sleep 1
 
+SIGNED_IN=$($AB eval "!!Array.from(document.querySelectorAll('button')).find(b => b.textContent.trim() === 'Sign out')" 2>/dev/null | tail -1)
+if echo "$SIGNED_IN" | grep -q "true"; then
+  $AB find role button click --name "Sign out" >/dev/null 2>&1
+  sleep 2
+  echo "(stale session cleared)"
+fi
+
 # --- login (ada: identity revoked by prior API tests) ---
 $AB find role button click --name "Get started" >/dev/null 2>&1
 sleep 1
-$AB find role tab click --name "Sign in" >/dev/null 2>&1
-sleep 0.8
+# robust tab switch: retry the native tab click until the Sign-in panel activates
+for i in $(seq 1 12); do
+  $AB snapshot -i 2>/dev/null | grep -qE 'tabpanel "Sign in"' && break
+  $AB find role tab click --name "Sign in" >/dev/null 2>&1
+  sleep 0.8
+done
 EMAIL_REF=$($AB snapshot -i 2>/dev/null | grep -oE 'textbox "Email" \[required, ref=e[0-9]+\]' | grep -oE 'e[0-9]+' | head -1)
 PW_REF=$($AB snapshot -i 2>/dev/null | grep -oE 'textbox "Password" \[required, ref=e[0-9]+\]' | grep -oE 'e[0-9]+' | head -1)
 $AB fill "@${EMAIL_REF}" "ada@example.com" >/dev/null 2>&1
@@ -45,7 +56,13 @@ $AB eval "JSON.stringify({
 })" 2>&1 | tail -1
 
 # --- 2. re-verify with attributes (works from revoked OR verified state) ---
-$AB eval "(() => { const b = Array.from(document.querySelectorAll('button')).find(x => x.textContent.includes('Continue with NINAuth') || x.textContent.includes('Re-verify')); if (b) { b.click(); return 'clicked: ' + b.textContent.trim().split('\n')[0]; } return 'no-cta'; })()" 2>&1 | tail -1
+CTA="no-cta"
+for i in $(seq 1 10); do
+  CTA=$($AB eval "(() => { const b = Array.from(document.querySelectorAll('button')).find(x => x.textContent.includes('Continue with NINAuth') || x.textContent.includes('Re-verify')); if (b) { b.click(); return 'clicked: ' + b.textContent.trim().split('\n')[0]; } return 'no-cta'; })()" 2>&1 | tail -1)
+  echo "$CTA" | grep -q "clicked" && break
+  sleep 1
+done
+echo "$CTA"
 sleep 2
 echo "--- 2b. consent modal with scope opt-ins ---"
 $AB eval "JSON.stringify({

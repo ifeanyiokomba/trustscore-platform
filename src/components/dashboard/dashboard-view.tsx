@@ -13,6 +13,11 @@ import {
   LogOut,
   Bell,
   History,
+  Network,
+  EyeOff,
+  CalendarClock,
+  FileCheck2,
+  Fingerprint,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,6 +25,9 @@ import { IdentityCard } from "@/components/dashboard/identity-card";
 import { AssuranceLadder } from "@/components/dashboard/assurance-ladder";
 import { AttributesCard } from "@/components/dashboard/attributes-card";
 import { EvidenceCard } from "@/components/dashboard/evidence-card";
+import { SignalsCard } from "@/components/dashboard/signals-card";
+import { PhoneVerifyModal } from "@/components/auth/phone-modal";
+import { LivenessModal } from "@/components/auth/liveness-modal";
 import { useTrustStore } from "@/lib/store";
 import type { ActivityEvent, IdentityMe } from "@/lib/types";
 
@@ -34,6 +42,13 @@ const ACTION_LABELS: Record<string, string> = {
   IDENTITY_VERIFIED: "Trust Identity established",
   IDENTITY_SESSION_FAILED: "Verification failed",
   IDENTITY_CONSENT_WITHDRAWN: "Consent withdrawn (NDPA right)",
+  SIGNAL_PHONE_STARTED: "Phone verification started",
+  SIGNAL_PHONE_RESENT: "New SMS code sent",
+  SIGNAL_PHONE_VERIFIED: "Phone verified — Level 2",
+  SIGNAL_PHONE_FAILED: "Phone verification failed",
+  SIGNAL_LIVENESS_STARTED: "Liveness check started",
+  SIGNAL_LIVENESS_PASSED: "Liveness passed",
+  SIGNAL_LIVENESS_FAILED: "Liveness check failed",
 };
 
 function timeAgo(iso: string): string {
@@ -53,6 +68,8 @@ export function DashboardView() {
   const [activityLoading, setActivityLoading] = React.useState(true);
   const [identityData, setIdentityData] = React.useState<IdentityMe | null>(null);
   const [identityLoading, setIdentityLoading] = React.useState(true);
+  const [phoneModalOpen, setPhoneModalOpen] = React.useState(false);
+  const [livenessModalOpen, setLivenessModalOpen] = React.useState(false);
 
   const refreshIdentity = React.useCallback(async () => {
     setIdentityLoading(true);
@@ -111,7 +128,7 @@ export function DashboardView() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.2em] text-primary">
-            Stage 3 · Trust Identity
+            Stage 4 · Trust Signals
           </p>
           <h1 id="dash-heading" className="mt-1 text-3xl font-bold tracking-tight">
             Welcome back, {user.displayName.split(" ")[0]}
@@ -198,6 +215,18 @@ export function DashboardView() {
             <AssuranceLadder ladder={identityData?.ladder ?? []} />
           </div>
 
+          {/* Stage 4 — Trust signals (phone + biometric + cross-signal) */}
+          <div className="min-w-0 lg:col-span-2">
+            <SignalsCard
+              signals={identityData?.signals ?? null}
+              loading={identityLoading}
+              hasIdentity={hasIdentity}
+              onPhoneVerify={() => setPhoneModalOpen(true)}
+              onLiveness={() => setLivenessModalOpen(true)}
+              onChanged={refreshIdentity}
+            />
+          </div>
+
           {/* Stage 3 — Consent-scoped attributes */}
           <div className="min-w-0 lg:col-span-2">
             <AttributesCard
@@ -212,6 +241,55 @@ export function DashboardView() {
           <div className="min-w-0 lg:col-span-1">
             <EvidenceCard evidence={identityData?.evidence ?? []} />
           </div>
+
+          {/* Stage 4 — Signals privacy explainer */}
+          <Card className="ts-card-hover min-w-0 lg:col-span-1">
+            <CardHeader className="flex-row items-center gap-3 space-y-0">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <EyeOff className="h-5 w-5" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <CardTitle className="text-base">How your signals are protected</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <ul className="space-y-2.5 text-xs leading-relaxed text-muted-foreground">
+                <li className="flex items-start gap-2">
+                  <Fingerprint className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" />
+                  <span>
+                    Your phone number is stored as a <span className="font-medium text-foreground">salted fingerprint</span> —
+                    never the raw number. Biometrics store the <span className="font-medium text-foreground">verdict only</span>,
+                    never selfie pixels or templates.
+                  </span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <CalendarClock className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" />
+                  <span>
+                    Every signal carries a <span className="font-medium text-foreground">90-day freshness horizon</span> —
+                    stale signals drop out of the ladder automatically.
+                  </span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <FileCheck2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" />
+                  <span>
+                    Each binding is a <span className="font-medium text-foreground">standing consent</span> (NDPA §31):
+                    withdraw it and the signal is revoked instantly, with the action audited.
+                  </span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Network className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" />
+                  <span>
+                    L4 requires <span className="font-medium text-foreground">cross-signal agreement</span> — no SIM-swap
+                    flags, a matching face, fresh signals. One document alone never gets there.
+                  </span>
+                </li>
+              </ul>
+              <p className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-[11px] leading-snug text-muted-foreground">
+                Phone and biometric providers are honestly labeled <span className="font-semibold text-primary">MOCK</span> —
+                contract-first adapters that activate LIVE once partner credentials exist.
+              </p>
+            </CardContent>
+          </Card>
 
           {/* Security center preview */}
           <Card className="ts-card-hover min-w-0 lg:col-span-2">
@@ -272,6 +350,18 @@ export function DashboardView() {
           </Card>
         </div>
       )}
+
+      {/* Stage 4 modals */}
+      <PhoneVerifyModal
+        open={phoneModalOpen}
+        onOpenChange={setPhoneModalOpen}
+        onVerified={refreshIdentity}
+      />
+      <LivenessModal
+        open={livenessModalOpen}
+        onOpenChange={setLivenessModalOpen}
+        onCompleted={refreshIdentity}
+      />
     </motion.section>
   );
 }

@@ -35,14 +35,14 @@ const STAGES: { id: string; title: string; status: StageStatus; detail: string }
   {
     id: "3",
     title: "Trust Identity",
-    status: "active",
+    status: "done",
     detail: "Assurance ladder L1–L4, hashed identifiers, consent-scoped attributes, evidence provenance + NDPA withdrawal.",
   },
   {
     id: "4",
     title: "Phone + biometric",
-    status: "planned",
-    detail: "Independent signals that agree — assurance escalates.",
+    status: "active",
+    detail: "Phone OTP + liveness signals bound to the identity spine — L2–L4 escalation with cross-signal consistency (mock transports, real contracts).",
   },
   {
     id: "5",

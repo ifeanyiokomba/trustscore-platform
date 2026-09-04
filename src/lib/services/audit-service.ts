@@ -15,7 +15,14 @@ export type AuditAction =
   | "IDENTITY_CONSENT_DENIED"
   | "IDENTITY_VERIFIED"
   | "IDENTITY_SESSION_FAILED"
-  | "IDENTITY_CONSENT_WITHDRAWN";
+  | "IDENTITY_CONSENT_WITHDRAWN"
+  | "SIGNAL_PHONE_STARTED"
+  | "SIGNAL_PHONE_RESENT"
+  | "SIGNAL_PHONE_VERIFIED"
+  | "SIGNAL_PHONE_FAILED"
+  | "SIGNAL_LIVENESS_STARTED"
+  | "SIGNAL_LIVENESS_PASSED"
+  | "SIGNAL_LIVENESS_FAILED";
 
 interface AuditInput {
   actorType: "USER" | "SYSTEM" | "ANONYMOUS";
@@ -38,7 +45,16 @@ const SAFE_METADATA_KEYS = new Set([
   "scopes",
   "attributes",
   "revokedAttributes",
+  "revokedIdentifiers",
   "identityRevoked",
+  // Stage 4 signal keys — all non-PII counters / labels
+  "attemptsLeft",
+  "simSwap",
+  "confidence",
+  "liveness",
+  "faceMatch",
+  "level",
+  "providerMode",
 ]);
 
 export async function recordAudit(input: AuditInput): Promise<void> {

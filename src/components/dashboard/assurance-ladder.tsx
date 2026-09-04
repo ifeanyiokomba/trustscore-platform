@@ -53,11 +53,18 @@ export function AssuranceLadder({ ladder }: { ladder: AssuranceRung[] }) {
       </CardHeader>
       <CardContent>
         <ol className="relative space-y-2.5" aria-label="Identity assurance levels">
-          {/* connector rail */}
+          {/* connector rail: base + progress fill up to achieved level */}
           <span
             className="absolute bottom-5 left-[19px] top-5 w-0.5 rounded bg-border"
             aria-hidden="true"
           />
+          {achievedCount > 0 && (
+            <span
+                           className="ts-rail-fill absolute left-[18px] top-5 w-[3px] rounded bg-gradient-to-b from-primary/90 to-primary/50"
+              style={{ height: `calc(${(achievedCount / ladder.length) * 100}% - 4px)` }}
+              aria-hidden="true"
+            />
+          )}
           {ladder.map((rung, i) => {
             const Icon = RUNG_ICONS[rung.key] ?? Landmark;
             return (
@@ -67,7 +74,7 @@ export function AssuranceLadder({ ladder }: { ladder: AssuranceRung[] }) {
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.08 * i, duration: 0.3 }}
                 className={cn(
-                  "relative flex items-start gap-3 rounded-xl border p-3 transition-colors",
+                  "group/rung relative flex items-start gap-3 rounded-xl border p-3 transition-colors",
                   rung.achieved
                     ? "ts-rung-active border-solid"
                     : "border-dashed border-border bg-muted/20"
@@ -105,9 +112,7 @@ export function AssuranceLadder({ ladder }: { ladder: AssuranceRung[] }) {
                         "rounded-full px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide",
                         rung.achieved
                           ? "bg-primary/15 text-primary"
-                          : rung.stage === "Live now"
-                            ? "bg-muted text-muted-foreground"
-                            : "bg-muted text-muted-foreground"
+                          : "bg-muted text-muted-foreground"
                       )}
                     >
                       {rung.achieved ? "Achieved" : rung.stage}
@@ -117,9 +122,9 @@ export function AssuranceLadder({ ladder }: { ladder: AssuranceRung[] }) {
                     {rung.detail}
                   </p>
                 </div>
-                {!rung.achieved && rung.key !== "government" && (
+                {!rung.achieved && (
                   <Icon
-                    className="mt-1 h-4 w-4 shrink-0 text-muted-foreground/50"
+                    className="mt-1 h-4 w-4 shrink-0 text-muted-foreground/50 transition-colors group-hover/rung:text-primary/60"
                     aria-hidden="true"
                   />
                 )}
@@ -130,9 +135,7 @@ export function AssuranceLadder({ ladder }: { ladder: AssuranceRung[] }) {
         <div className="mt-4 flex items-start gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2.5">
           <ChevronRight className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary/70" aria-hidden="true" />
           <p className="text-[11px] leading-snug text-muted-foreground">
-            L2–L4 unlock when phone and biometric signals arrive (Stage 4).
-            Higher assurance requires <span className="font-medium text-foreground">agreement across signals</span> — a
-            single document never pushes you past L1.
+            Phone and biometric signals are live (Stage 4) — bind them from the <span className="font-medium text-foreground">Trust signals</span> card. Higher assurance requires <span className="font-medium text-foreground">agreement across signals</span> — a single document never pushes you past L1.
           </p>
         </div>
       </CardContent>
