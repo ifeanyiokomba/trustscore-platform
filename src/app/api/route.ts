@@ -58,6 +58,7 @@ export async function GET() {
       { method: "GET", path: "/api/v1/engine/admin/overview", auth: "session+admin", description: "Stage 8: admin console — snapshot-state distribution, policies, DPIA registry, gate" },
       { method: "POST", path: "/api/v1/engine/admin/policies", auth: "session+admin", description: "Stage 8: create a DRAFT policy version (rules validated + clamped server-side; change summary published)" },
       { method: "POST", path: "/api/v1/engine/admin/policies/:id/activate", auth: "session+admin", description: "Stage 8: activate a draft — REQUIRES a completed DPIA (NDPC gate); retires the previous version; scores recompute" },
+      { method: "POST", path: "/api/v1/engine/admin/policies/:id/simulate", auth: "session+admin", description: "Stage 8: read-only impact dry-run — recompute the cohort under draft rules vs active; buckets, transitions, masked movers; nothing is written" },
       { method: "POST", path: "/api/v1/engine/admin/dpia", auth: "session+admin", description: "Stage 8: record a DPIA assessment for a policy (completes only when every checklist item is done)" },
       { method: "POST", path: "/api/v1/engine/admin/gate", auth: "session+admin", description: "Stage 8: toggle automated-significant-decisions (DPIA-gated + typed confirmation; disabling always allowed)" },
     ],

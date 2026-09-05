@@ -52,6 +52,7 @@ export type AuditAction =
   // Stage 8 — Trust Engine (policy lifecycle, DPIA, gate)
   | "POLICY_DRAFTED"
   | "POLICY_ACTIVATED"
+  | "POLICY_SIMULATED"
   | "DPIA_RECORDED"
   | "ENGINE_GATE_TOGGLED";
 
@@ -112,6 +113,10 @@ const SAFE_METADATA_KEYS = new Set([
   "residualRisk",
   "status",
   "warnings",
+  // Stage 8 simulation — counters only (never member identities)
+  "cohort",
+  "frozenExcluded",
+  "simulated",
 ]);
 
 export async function recordAudit(input: AuditInput): Promise<void> {

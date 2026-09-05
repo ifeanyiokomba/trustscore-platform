@@ -722,6 +722,40 @@ export interface EngineMe {
   policy: { version: number; changeSummary: string; activatedAt: string | null } | null;
   automatedSignificantDecisions: boolean;
   frozenNote: string | null;
+  // Stage 8 — snapshot history (oldest → newest, latest 20 rows) feeding
+  // the member's score-over-time sparkline + lifecycle log.
+  history: {
+    score: number;
+    status: string;
+    state: string;
+    trigger: string;
+    computedAt: string;
+    policyVersion: number | null;
+  }[];
+}
+
+export interface PolicySimulation {
+  draftVersion: number;
+  activeVersion: number | null;
+  cohort: number;
+  frozenExcluded: number;
+  moved: number;
+  avgBefore: number;
+  avgAfter: number;
+  avgDelta: number;
+  maxUp: number;
+  maxDown: number;
+  buckets: { label: string; before: number; after: number }[];
+  transitions: { from: string; to: string; count: number }[];
+  movers: {
+    label: string;
+    before: number;
+    after: number;
+    delta: number;
+    statusBefore: string;
+    statusAfter: string;
+  }[];
+  note: string;
 }
 
 export interface DpiaAdminRecord {

@@ -144,15 +144,35 @@ export function deriveState(row: { state: string; expiresAt: Date }): SnapshotSt
 // ---------------------------------------------------------------------------
 
 export async function getEngineMe(userId: string) {
-  const [snapshot, gate, policy] = await Promise.all([
+  const [snapshot, gate, policy, historyRows, policyRows] = await Promise.all([
     db.trustScoreSnapshot.findFirst({
       where: { userId },
       orderBy: { computedAt: "desc" },
     }),
     isAutomatedDecisionsEnabled(),
     getActivePolicy(),
+    // Stage 8 — snapshot history (immutable rows, latest 20 retained):
+    // feeds the member's score-over-time sparkline + lifecycle log.
+    db.trustScoreSnapshot.findMany({
+      where: { userId },
+      orderBy: { computedAt: "desc" },
+      take: 20,
+    }),
+    db.scoringPolicy.findMany({ select: { id: true, version: true } }),
   ]);
+  const versionById = new Map(policyRows.map((p) => [p.id, p.version]));
   const state = snapshot ? deriveState(snapshot) : null;
+  const history = historyRows
+    .slice()
+    .reverse() // chronological — oldest → newest
+    .map((row) => ({
+      score: row.score,
+      status: row.status,
+      state: deriveState(row),
+      trigger: row.trigger,
+      computedAt: row.computedAt.toISOString(),
+      policyVersion: row.policyId ? versionById.get(row.policyId) ?? null : null,
+    }));
   return {
     snapshot: snapshot
       ? {
@@ -173,6 +193,7 @@ export async function getEngineMe(userId: string) {
         }
       : null,
     automatedSignificantDecisions: gate,
+    history,
     frozenNote:
       state === "FROZEN"
         ? "Your TrustScore is frozen while an appeal is under human review — it cannot move up or down until the reviewer decides. This is a fairness guarantee (NDPA §37)."

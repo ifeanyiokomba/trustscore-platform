@@ -25,7 +25,12 @@
 
 import { db } from "@/lib/db";
 import { sha256Hex } from "@/lib/platform/crypto";
-import { getActivePolicy, policyRulesHash, type PolicyRules } from "@/lib/services/policy-service";
+import {
+  getActivePolicy,
+  policyRulesHash,
+  validateRules,
+  type PolicyRules,
+} from "@/lib/services/policy-service";
 
 export const SCORE_VERSION = 1;
 export const SNAPSHOT_RETAIN = 20; // last N snapshots kept per user
@@ -680,4 +685,175 @@ export async function getCredentialsForUser(userId: string) {
       revokedAt: c.revokedAt?.toISOString() ?? null,
     };
   });
+}
+
+// ---------------------------------------------------------------------------
+// Stage 8 — Policy impact simulation (read-only dry-run, ADMIN-only)
+//
+// Governance affordance: before a draft policy is activated (which is
+// DPIA-gated), an admin can dry-run it against the live scored cohort.
+// Nothing is written — no snapshots, no state changes. The engine simply
+// recomputes every member's score in memory under BOTH the active rules
+// ("before") and the draft rules ("after") and reports the deltas.
+//
+// FROZEN members (appeal pending) are EXCLUDED from the delta cohort and
+// counted separately — their scores cannot move until the human decision
+// lands (freeze guarantee), and they recompute under whatever policy is
+// active when the freeze lifts. The report says so honestly.
+// ---------------------------------------------------------------------------
+
+export interface SimulationMover {
+  label: string; // masked email — governance sees trends, not identities
+  before: number;
+  after: number;
+  delta: number;
+  statusBefore: string;
+  statusAfter: string;
+}
+
+export interface SimulationBucket {
+  label: string;
+  before: number;
+  after: number;
+}
+
+export interface SimulationTransition {
+  from: string;
+  to: string;
+  count: number;
+}
+
+export type SimulationResult =
+  | {
+      ok: true;
+      draftVersion: number;
+      activeVersion: number | null;
+      cohort: number; // members simulated (frozen excluded)
+      frozenExcluded: number; // members under appeal freeze right now
+      moved: number;
+      avgBefore: number;
+      avgAfter: number;
+      avgDelta: number;
+      maxUp: number;
+      maxDown: number;
+      buckets: SimulationBucket[];
+      transitions: SimulationTransition[];
+      movers: SimulationMover[]; // top movers by |delta|
+      note: string;
+    }
+  | { ok: false; code: "NOT_FOUND" | "NOT_DRAFT" | "NO_ACTIVE" };
+
+const SIMULATION_NOTE =
+  "Read-only dry-run — no snapshot was written and no member's score changed. Real movement happens only on activation (DPIA-gated): each member's next read then recomputes under the new rules. Frozen members (appeal pending) are excluded and recompute when their freeze lifts.";
+
+// Mask an email for governance reporting: keep the first two characters of
+// the local part + domain. Trends visible, identities shielded.
+export function maskEmail(email: string): string {
+  const at = email.indexOf("@");
+  if (at <= 0) return "member";
+  const local = email.slice(0, at);
+  const domain = email.slice(at);
+  const head = local.slice(0, 2);
+  return `${head}${local.length > 2 ? "••" : ""}${domain}`;
+}
+
+export async function simulatePolicyImpact(policyId: string): Promise<SimulationResult> {
+  const [draftRow, active] = await Promise.all([
+    db.scoringPolicy.findUnique({ where: { id: policyId } }),
+    getActivePolicy(),
+  ]);
+  if (!draftRow) return { ok: false, code: "NOT_FOUND" };
+  if (draftRow.status !== "DRAFT") return { ok: false, code: "NOT_DRAFT" };
+  if (!active) return { ok: false, code: "NO_ACTIVE" };
+
+  const draftRules = validateRules(JSON.parse(draftRow.rules)).rules;
+  const activeTtl = active.rules.snapshotTtlHours * 3_600_000;
+  const draftTtl = draftRules.snapshotTtlHours * 3_600_000;
+
+  // Cohort: every member with at least one snapshot, minus frozen members.
+  const users = await db.userAccount.findMany({
+    where: { status: "ACTIVE", scoreSnapshots: { some: {} } },
+    select: { id: true, email: true },
+  });
+
+  const frozenIds = new Set(
+    (
+      await db.trustScoreSnapshot.findMany({
+        where: { state: "FROZEN" },
+        select: { userId: true },
+      })
+    ).map((s) => s.userId)
+  );
+
+  const bucketLabels = ["0–19", "20–39", "40–59", "60–79", "80–100"];
+  const bucketOf = (s: number) => Math.min(4, Math.floor(s / 20));
+  const beforeBuckets = [0, 0, 0, 0, 0];
+  const afterBuckets = [0, 0, 0, 0, 0];
+  const transitions = new Map<string, SimulationTransition>();
+  const movers: SimulationMover[] = [];
+
+  let cohort = 0;
+  let sumBefore = 0;
+  let sumAfter = 0;
+  let moved = 0;
+  let maxUp = 0;
+  let maxDown = 0;
+
+  for (const u of users) {
+    if (frozenIds.has(u.id)) continue;
+    const inputs = await collectInputs(u.id, active.rules.interactionWindowDays);
+    const beforeScore = computeScoreFromInputs(inputs, "PERIODIC", active.rules, activeTtl);
+    const afterScore = computeScoreFromInputs(inputs, "PERIODIC", draftRules, draftTtl);
+    const delta = afterScore.score - beforeScore.score;
+
+    cohort += 1;
+    sumBefore += beforeScore.score;
+    sumAfter += afterScore.score;
+    beforeBuckets[bucketOf(beforeScore.score)] += 1;
+    afterBuckets[bucketOf(afterScore.score)] += 1;
+
+    if (beforeScore.status !== afterScore.status) {
+      const key = `${beforeScore.status}→${afterScore.status}`;
+      const existing = transitions.get(key);
+      if (existing) existing.count += 1;
+      else transitions.set(key, { from: beforeScore.status, to: afterScore.status, count: 1 });
+    }
+    if (delta !== 0) {
+      moved += 1;
+      maxUp = Math.max(maxUp, delta);
+      maxDown = Math.min(maxDown, delta);
+      movers.push({
+        label: maskEmail(u.email),
+        before: beforeScore.score,
+        after: afterScore.score,
+        delta,
+        statusBefore: beforeScore.status,
+        statusAfter: afterScore.status,
+      });
+    }
+  }
+
+  movers.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
+
+  return {
+    ok: true,
+    draftVersion: draftRow.version,
+    activeVersion: active.version,
+    cohort,
+    frozenExcluded: users.filter((u) => frozenIds.has(u.id)).length,
+    moved,
+    avgBefore: cohort > 0 ? Math.round((sumBefore / cohort) * 10) / 10 : 0,
+    avgAfter: cohort > 0 ? Math.round((sumAfter / cohort) * 10) / 10 : 0,
+    avgDelta: cohort > 0 ? Math.round(((sumAfter - sumBefore) / cohort) * 10) / 10 : 0,
+    maxUp,
+    maxDown,
+    buckets: bucketLabels.map((label, i) => ({
+      label,
+      before: beforeBuckets[i],
+      after: afterBuckets[i],
+    })),
+    transitions: [...transitions.values()],
+    movers: movers.slice(0, 10),
+    note: SIMULATION_NOTE,
+  };
 }

@@ -1,0 +1,644 @@
+     1→"use client";
+     2→
+     3→// TrustScore Stage 8 — AdminConsoleCard: engine administration (ADMIN role,
+     4→// operational grant — like the Stage 7 reviewer grant, granted via
+     5→// `bun run admin:make <email>`, never self-service).
+     6→// Surfaces: snapshot-state distribution, policy version list, draft editor
+     7→// (rules clamped + validated server-side; live budget preview + warnings),
+     8→// DPIA checklist recorder, activation (hard-gated on a completed DPIA) and
+     9→// the automated-decision gate (typed confirmation + DPIA-gated enabling).
+    10→
+    11→import * as React from "react";
+    12→import { motion } from "framer-motion";
+    13→import {
+    14→  Settings2,
+    15→  GitBranch,
+    16→  FileCheck2,
+    17→  ShieldCheck,
+    18→  Loader2,
+    19→  Plus,
+    20→  Zap,
+    21→  Info,
+    22→} from "lucide-react";
+    23→import {
+    24→  Card,
+    25→  CardContent,
+    26→  CardDescription,
+    27→  CardHeader,
+    28→  CardTitle,
+    29→} from "@/components/ui/card";
+    30→import { Badge } from "@/components/ui/badge";
+    31→import { Button } from "@/components/ui/button";
+    32→import { Input } from "@/components/ui/input";
+    33→import { Textarea } from "@/components/ui/textarea";
+    34→import { Label } from "@/components/ui/label";
+    35→import { Checkbox } from "@/components/ui/checkbox";
+    36→import {
+    37→  Select,
+    38→  SelectContent,
+    39→  SelectItem,
+    40→  SelectTrigger,
+    41→  SelectValue,
+    42→} from "@/components/ui/select";
+    43→import {
+    44→  Dialog,
+    45→  DialogContent,
+    46→  DialogDescription,
+    47→  DialogFooter,
+    48→  DialogHeader,
+    49→  DialogTitle,
+    50→  DialogTrigger,
+    51→} from "@/components/ui/dialog";
+    52→import {
+    53→  AlertDialog,
+    54→  AlertDialogAction,
+    55→  AlertDialogCancel,
+    56→  AlertDialogContent,
+    57→  AlertDialogDescription,
+    58→  AlertDialogFooter,
+    59→  AlertDialogHeader,
+    60→  AlertDialogTitle,
+    61→  AlertDialogTrigger,
+    62→} from "@/components/ui/alert-dialog";
+    63→import { useToast } from "@/hooks/use-toast";
+    64→import type { EngineAdminOverview, PolicyRulesInfo } from "@/lib/types";
+    65→import { cn } from "@/lib/utils";
+    66→
+    67→// Number-input rule fields surfaced in the draft editor (with clamp ranges
+    68→// mirroring the server-side validateRules contract).
+    69→const RULE_FIELDS: {
+    70→  key: keyof PolicyRulesInfo;
+    71→  label: string;
+    72→  min: number;
+    73→  max: number;
+    74→  step: number;
+    75→  hint: string;
+    76→}[] = [
+    77→  { key: "credentialPoints", label: "Credential points", min: 0, max: 20, step: 1, hint: "per fresh ACTIVE credential" },
+    78→  { key: "credentialMax", label: "Credential cap", min: 0, max: 40, step: 1, hint: "component ceiling" },
+    79→  { key: "interactionPoints", label: "Interaction points", min: 0, max: 10, step: 1, hint: "per distinct L2+ verifier" },
+    80→  { key: "interactionMax", label: "Interaction cap", min: 1, max: 20, step: 1, hint: "distinct verifiers counted" },
+    81→  { key: "clearedPoints", label: "Cleared-flag points", min: 0, max: 10, step: 1, hint: "per human-reviewed cleared flag" },
+    82→  { key: "clearedMax", label: "Cleared-flag cap", min: 1, max: 20, step: 1, hint: "flags counted" },
+    83→  { key: "riskPenaltyPer", label: "Risk penalty", min: 0, max: 50, step: 1, hint: "per confirmed flag" },
+    84→  { key: "riskMaxPenalty", label: "Risk cap", min: 0, max: 100, step: 1, hint: "total penalty ceiling" },
+    85→  { key: "snapshotTtlHours", label: "Snapshot TTL (h)", min: 1, max: 168, step: 1, hint: "freshness horizon" },
+    86→];
+    87→
+    88→const CHECKLIST_LABELS: Record<string, string> = {
+    89→  scope: "Profiling scope mapped (data categories, sources, subjects)",
+    90→  special: "No special-category data without legal basis",
+    91→  necessity: "Proportionality & necessity of each input reviewed",
+    92→  rights: "NDPA rights paths verified (explanation, review, appeal, DSR)",
+    93→  bias: "Bias / disparate-impact review of weights",
+    94→  security: "Security measures for score data reviewed",
+    95→  human: "Human-in-the-loop for adverse outcomes",
+    96→  retention: "Retention & deletion aligned with DSR cascade",
+    97→};
+    98→const CHECKLIST_IDS = Object.keys(CHECKLIST_LABELS);
+    99→
+   100→function policyDraftTemplate(active: PolicyRulesInfo | undefined): Partial<PolicyRulesInfo> {
+   101→  if (!active) return {};
+   102→  return {
+   103→    credentialPoints: active.credentialPoints,
+   104→    credentialMax: active.credentialMax,
+   105→    interactionPoints: active.interactionPoints,
+   106→    interactionMax: active.interactionMax,
+   107→    clearedPoints: active.clearedPoints,
+   108→    clearedMax: active.clearedMax,
+   109→    riskPenaltyPer: active.riskPenaltyPer,
+   110→    riskMaxPenalty: active.riskMaxPenalty,
+   111→    snapshotTtlHours: active.snapshotTtlHours,
+   112→  };
+   113→}
+   114→
+   115→export function AdminConsoleCard({
+   116→  overview,
+   117→  onChanged,
+   118→}: {
+   119→  overview: EngineAdminOverview;
+   120→  onChanged: () => Promise<void>;
+   121→}) {
+   122→  const { toast } = useToast();
+   123→  const active = overview.policies.find((p) => p.status === "ACTIVE");
+   124→  const [draftOpen, setDraftOpen] = React.useState(false);
+   125→  const [dpiaOpen, setDpiaOpen] = React.useState(false);
+   126→  const [gateConfirm, setGateConfirm] = React.useState("");
+   127→  const [busy, setBusy] = React.useState<string | null>(null);
+   128→
+   129→  // Draft form state
+   130→  const [rules, setRules] = React.useState<Partial<PolicyRulesInfo>>(() =>
+   131→    policyDraftTemplate(active?.rules)
+   132→  );
+   133→  const [summary, setSummary] = React.useState("");
+   134→
+   135→  // DPIA form state
+   136→  const [dpiaPolicyId, setDpiaPolicyId] = React.useState<string>("");
+   137→  const [dpiaSummary, setDpiaSummary] = React.useState("");
+   138→  const [dpiaResidual, setDpiaResidual] = React.useState<"LOW" | "MEDIUM" | "HIGH">("LOW");
+   139→  const [checks, setChecks] = React.useState<Record<string, boolean>>({});
+   140→
+   141→  const drafts = overview.policies.filter((p) => p.status === "DRAFT");
+   142→  const draftForDpia = dpiaPolicyId
+   143→    ? overview.policies.find((p) => p.id === dpiaPolicyId)
+   144→    : drafts[0];
+   145→
+   146→  const budgetTotal =
+   147→    (active?.rules.assuranceBase[4] ?? 60) +
+   148→    (Number(rules.credentialMax) || 0) +
+   149→    (Number(rules.interactionMax) || 0) * (Number(rules.interactionPoints) || 0) +
+   150→    (Number(rules.clearedMax) || 0) * (Number(rules.clearedPoints) || 0);
+   151→
+   152→  async function api(
+   153→    name: string,
+   154→    path: string,
+   155→    body: object,
+   156→    method = "POST"
+   157→  ): Promise<{ ok: boolean; message: string }> {
+   158→    setBusy(name);
+   159→    try {
+   160→      const res = await fetch(path, {
+   161→        method,
+   162→        headers: { "Content-Type": "application/json" },
+   163→        body: JSON.stringify(body),
+   164→      });
+   165→      const data = (await res.json().catch(() => ({}))) as {
+   166→        note?: string;
+   167→        error?: { message?: string };
+   168→      };
+   169→      const ok = res.ok;
+   170→      toast({
+   171→        title: ok ? "Done" : "Rejected",
+   172→        description: ok ? (data.note ?? "OK") : (data.error?.message ?? "Request failed"),
+   173→        variant: ok ? "default" : "destructive",
+   174→      });
+   175→      if (ok) await onChanged();
+   176→      return { ok, message: data.note ?? data.error?.message ?? "" };
+   177→    } catch {
+   178→      toast({ title: "Error", description: "Network error", variant: "destructive" });
+   179→      return { ok: false, message: "network" };
+   180→    } finally {
+   181→      setBusy(null);
+   182→    }
+   183→  }
+   184→
+   185→  return (
+   186→    <Card className="ts-card-hover min-w-0" data-testid="engine-admin">
+   187→      <CardHeader className="flex-row flex-wrap items-center gap-3 space-y-0">
+   188→        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+   189→          <Settings2 className="h-5 w-5" />
+   190→        </span>
+   191→        <div className="min-w-0 flex-1">
+   192→          <CardTitle className="text-base">Engine administration</CardTitle>
+   193→          <CardDescription className="truncate">
+   194→            Policy versions, DPIA records and the automated-decision gate —
+   195→            operational grant (ADMIN), never self-service
+   196→          </CardDescription>
+   197→        </div>
+   198→        <Dialog open={draftOpen} onOpenChange={setDraftOpen}>
+   199→          <DialogTrigger asChild>
+   200→            <Button
+   201→              className="gap-1.5"
+   202→              onClick={() => {
+   203→                setRules(policyDraftTemplate(active?.rules));
+   204→                setSummary("");
+   205→              }}
+   206→            >
+   207→              <Plus className="h-4 w-4" aria-hidden="true" />
+   208→              New policy draft
+   209→            </Button>
+   210→          </DialogTrigger>
+   211→          <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+   212→            <DialogHeader>
+   213→              <DialogTitle>Draft a new scoring policy</DialogTitle>
+   214→              <DialogDescription>
+   215→                Rules are validated and clamped server-side; the draft activates
+   216→                only after a completed DPIA record. Published change summaries
+   217→                must be honest and specific.
+   218→              </DialogDescription>
+   219→            </DialogHeader>
+   220→            <div className="space-y-4">
+   221→              <div className="grid gap-3 sm:grid-cols-2">
+   222→                {RULE_FIELDS.map((f) => (
+   223→                  <div key={f.key} className="space-y-1.5">
+   224→                    <Label htmlFor={`rule-${f.key}`} className="text-xs">
+   225→                      {f.label}{" "}
+   226→                      <span className="font-normal text-muted-foreground">({f.hint})</span>
+   227→                    </Label>
+   228→                    <Input
+   229→                      id={`rule-${f.key}`}
+   230→                      type="number"
+   231→                      min={f.min}
+   232→                      max={f.max}
+   233→                      step={f.step}
+   234→                      value={(rules[f.key] as number) ?? ""}
+   235→                      onChange={(e) =>
+   236→                        setRules((r) => ({ ...r, [f.key]: Number(e.target.value) }))
+   237→                      }
+   238→                      className="tabular-nums"
+   239→                    />
+   240→                  </div>
+   241→                ))}
+   242→              </div>
+   243→              <div className="ts-inset rounded-lg px-3.5 py-3">
+   244→                <p className="text-xs font-semibold">
+   245→                  Projected budget:{" "}
+   246→                  <span
+   247→                    className={cn(
+   248→                      "tabular-nums",
+   249→                      budgetTotal > 100 ? "text-destructive" : "text-primary"
+   250→                    )}
+   251→                  >
+   252→                    {budgetTotal}/100
+   253→                  </span>{" "}
+   254→                  (identity {active?.rules.assuranceBase[4] ?? 60} + credentials{" "}
+   255→                  {Number(rules.credentialMax) || 0} + reputation{" "}
+   256→                  {(Number(rules.interactionMax) || 0) * (Number(rules.interactionPoints) || 0)} +
+   257→                  resolution{" "}
+   258→                  {(Number(rules.clearedMax) || 0) * (Number(rules.clearedPoints) || 0)})
+   259→                </p>
+   260→                <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
+   261→                  {budgetTotal > 100
+   262→                    ? "Over 100 — the engine clamps final scores to 0–100, but the server will warn and you should re-balance."
+   263→                    : "The engine clamps every rule at write time; snapshots name the policy that produced them."}
+   264→                </p>
+   265→              </div>
+   266→              <div className="space-y-1.5">
+   267→                <Label htmlFor="policy-summary" className="text-xs">
+   268→                  Change summary (published — min 30 chars)
+   269→                </Label>
+   270→                <Textarea
+   271→                  id="policy-summary"
+   272→                  value={summary}
+   273→                  onChange={(e) => setSummary(e.target.value)}
+   274→                  rows={3}
+   275→                  placeholder="What changed, why, and what members will see differently…"
+   276→                  aria-describedby="policy-summary-hint"
+   277→                />
+   278→                <p id="policy-summary-hint" className="text-[10px] text-muted-foreground">
+   279→                  {summary.trim().length}/30 characters minimum
+   280→                </p>
+   281→              </div>
+   282→            </div>
+   283→            <DialogFooter>
+   284→              <Button
+   285→                disabled={busy !== null || summary.trim().length < 30}
+   286→                onClick={async () => {
+   287→                  const r = await api("draft", "/api/v1/engine/admin/policies", {
+   288→                    rules,
+   289→                    changeSummary: summary,
+   290→                  });
+   291→                  if (r.ok) setDraftOpen(false);
+   292→                }}
+   293→              >
+   294→                {busy === "draft" ? (
+   295→                  <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+   296→                ) : null}
+   297→                Create draft
+   298→              </Button>
+   299→            </DialogFooter>
+   300→          </DialogContent>
+   301→        </Dialog>
+   302→      </CardHeader>
+   303→      <CardContent className="space-y-5">
+   304→        {/* Snapshot state distribution */}
+   305→        <div className="ts-inset rounded-lg px-3.5 py-3.5">
+   306→          <p className="flex items-center gap-2 text-xs font-semibold">
+   307→            <GitBranch className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
+   308→            Snapshot lifecycle distribution
+   309→          </p>
+   310→          <div className="mt-2.5 flex flex-wrap gap-2">
+   311→            {(["ACTIVE", "STALE", "FROZEN", "RETIRED"] as const).map((s) => (
+   312→              <span
+   313→                key={s}
+   314→                className={cn(
+   315→                  "rounded-md border px-2 py-1 text-[11px] font-semibold tabular-nums",
+   316→                  s === "FROZEN"
+   317→                    ? "border-teal-600/40 bg-teal-600/10 text-teal-700 dark:text-teal-300"
+   318→                    : "border-border bg-muted/40 text-muted-foreground"
+   319→                )}
+   320→              >
+   321→                {s} · {overview.snapshots.byState[s] ?? 0}
+   322→              </span>
+   323→            ))}
+   324→            <span className="rounded-md border border-border px-2 py-1 text-[11px] font-semibold tabular-nums text-muted-foreground">
+   325→              total · {overview.snapshots.total}
+   326→            </span>
+   327→          </div>
+   328→        </div>
+   329→
+   330→        {/* Policy versions */}
+   331→        <div>
+   332→          <p className="flex items-center gap-2 text-xs font-semibold">
+   333→            <GitBranch className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
+   334→            Policy versions
+   335→          </p>
+   336→          <ul className="mt-2.5 space-y-2.5">
+   337→            {overview.policies.map((p) => (
+   338→              <motion.li
+   339→                key={p.id}
+   340→                initial={{ opacity: 0, y: 6 }}
+   341→                animate={{ opacity: 1, y: 0 }}
+   342→                className={cn(
+   343→                  "rounded-lg border px-3.5 py-3",
+   344→                  p.status === "ACTIVE" ? "border-primary/40 bg-primary/5" : "border-border"
+   345→                )}
+   346→              >
+   347→                <div className="flex flex-wrap items-center gap-2">
+   348→                  <span className="font-mono text-xs font-bold">v{p.version}</span>
+   349→                  <Badge
+   350→                    variant="outline"
+   351→                    className={cn(
+   352→                      "text-[10px] font-semibold",
+   353→                      p.status === "ACTIVE"
+   354→                        ? "bg-primary/15 text-primary"
+   355→                        : p.status === "DRAFT"
+   356→                          ? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+   357→                          : "bg-muted text-muted-foreground"
+   358→                    )}
+   359→                  >
+   360→                    {p.status}
+   361→                  </Badge>
+   362→                  <span className="ml-auto text-[10px] text-muted-foreground">
+   363→                    {p.status === "DRAFT"
+   364→                      ? "awaiting DPIA + activation"
+   365→                      : p.activatedAt
+   366→                        ? `activated ${new Date(p.activatedAt).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })}`
+   367→                        : ""}
+   368→                  </span>
+   369→                </div>
+   370→                <p className="mt-1.5 line-clamp-2 text-[11px] leading-relaxed text-muted-foreground">
+   371→                  {p.changeSummary}
+   372→                </p>
+   373→                {p.status === "DRAFT" ? (
+   374→                  <div className="mt-2.5 flex flex-wrap gap-2">
+   375→                    <Button
+   376→                      size="sm"
+   377→                      variant="outline"
+   378→                      className="h-8 gap-1.5"
+   379→                      onClick={() => {
+   380→                        setDpiaPolicyId(p.id);
+   381→                        setDpiaSummary("");
+   382→                        setChecks({});
+   383→                        setDpiaOpen(true);
+   384→                      }}
+   385→                    >
+   386→                      <FileCheck2 className="h-3.5 w-3.5" aria-hidden="true" />
+   387→                      Record DPIA
+   388→                    </Button>
+   389→                    <AlertDialog>
+   390→                      <AlertDialogTrigger asChild>
+   391→                        <Button size="sm" className="h-8 gap-1.5">
+   392→                          <Zap className="h-3.5 w-3.5" aria-hidden="true" />
+   393→                          Activate
+   394→                        </Button>
+   395→                      </AlertDialogTrigger>
+   396→                      <AlertDialogContent>
+   397→                        <AlertDialogHeader>
+   398→                          <AlertDialogTitle>Activate policy v{p.version}?</AlertDialogTitle>
+   399→                          <AlertDialogDescription>
+   400→                            Activation retires the current active version. Every
+   401→                            member&apos;s score recomputes under the new rules on
+   402→                            their next read, and every new snapshot names this
+   403→                            policy. This action is audited and requires a
+   404→                            completed DPIA record for v{p.version}.
+   405→                          </AlertDialogDescription>
+   406→                        </AlertDialogHeader>
+   407→                        <AlertDialogFooter>
+   408→                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+   409→                          <AlertDialogAction
+   410→                            onClick={() =>
+   411→                              api("activate", `/api/v1/engine/admin/policies/${p.id}/activate`, {})
+   412→                            }
+   413→                          >
+   414→                            Activate v{p.version}
+   415→                          </AlertDialogAction>
+   416→                        </AlertDialogFooter>
+   417→                      </AlertDialogContent>
+   418→                    </AlertDialog>
+   419→                  </div>
+   420→                ) : null}
+   421→              </motion.li>
+   422→            ))}
+   423→          </ul>
+   424→        </div>
+   425→
+   426→        {/* DPIA registry */}
+   427→        {overview.dpia.length > 0 ? (
+   428→          <div>
+   429→            <p className="flex items-center gap-2 text-xs font-semibold">
+   430→              <FileCheck2 className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
+   431→              DPIA registry
+   432→            </p>
+   433→            <ul className="mt-2.5 space-y-2">
+   434→              {overview.dpia.slice(0, 6).map((d) => (
+   435→                <li key={d.id} className="rounded-lg border border-border px-3.5 py-3">
+   436→                  <div className="flex flex-wrap items-center gap-2">
+   437→                    <span className="font-mono text-[10px] font-bold text-muted-foreground">
+   438→                      v{d.policyVersion ?? "—"}
+   439→                    </span>
+   440→                    <Badge
+   441→                      variant="outline"
+   442→                      className={cn(
+   443→                        "text-[10px] font-semibold",
+   444→                        d.status === "COMPLETED"
+   445→                          ? "bg-primary/10 text-primary"
+   446→                          : "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+   447→                      )}
+   448→                    >
+   449→                      {d.status === "COMPLETED" ? "completed" : "in progress"}
+   450→                    </Badge>
+   451→                    <span className="text-[10px] text-muted-foreground">
+   452→                      residual {d.residualRisk}
+   453→                    </span>
+   454→                    {d.completedAt ? (
+   455→                      <span className="ml-auto text-[10px] text-muted-foreground">
+   456→                        {new Date(d.completedAt).toLocaleDateString("en-NG", {
+   457→                          day: "numeric",
+   458→                          month: "short",
+   459→                          year: "numeric",
+   460→                        })}
+   461→                      </span>
+   462→                    ) : null}
+   463→                  </div>
+   464→                  <p className="mt-1.5 line-clamp-2 text-[11px] leading-relaxed text-muted-foreground">
+   465→                    {d.summary}
+   466→                  </p>
+   467→                </li>
+   468→              ))}
+   469→            </ul>
+   470→          </div>
+   471→        ) : null}
+   472→
+   473→        {/* The automated-decision gate */}
+   474→        <div
+   475→          className={cn(
+   476→            "rounded-lg border px-3.5 py-3.5",
+   477→            overview.gate.automatedSignificantDecisions
+   478→              ? "border-primary/40 bg-primary/5"
+   479→              : "border-border"
+   480→          )}
+   481→        >
+   482→          <p className="flex items-center gap-2 text-xs font-semibold">
+   483→            <ShieldCheck
+   484→              className={cn(
+   485→                "h-4 w-4",
+   486→                overview.gate.automatedSignificantDecisions ? "text-primary" : "text-muted-foreground"
+   487→              )}
+   488→              aria-hidden="true"
+   489→            />
+   490→            Automated significant decisions:{" "}
+   491→            {overview.gate.automatedSignificantDecisions ? "ENABLED" : "DISABLED"}
+   492→          </p>
+   493→          <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">
+   494→            {overview.gate.note}
+   495→          </p>
+   496→          {overview.gate.automatedSignificantDecisions ? (
+   497→            <Button
+   498→              size="sm"
+   499→              variant="outline"
+   500→              className="mt-2.5 h-8"
+   501→              disabled={busy !== null}
+   502→              onClick={() => api("gate-off", "/api/v1/engine/admin/gate", { enabled: false, confirm: "" })}
+   503→            >
+   504→              {busy === "gate-off" ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : null}
+   505→              Disable (always allowed)
+   506→            </Button>
+   507→          ) : (
+   508→            <div className="mt-2.5 space-y-2">
+   509→              <div className="space-y-1.5">
+   510→                <Label htmlFor="gate-confirm" className="text-xs">
+   511→                  Type <span className="font-mono font-semibold">I UNDERSTAND</span> to enable
+   512→                </Label>
+   513→                <Input
+   514→                  id="gate-confirm"
+   515→                  value={gateConfirm}
+   516→                  onChange={(e) => setGateConfirm(e.target.value)}
+   517→                  placeholder="I UNDERSTAND"
+   518→                  className="sm:max-w-xs"
+   519→                />
+   520→              </div>
+   521→              <Button
+   522→                size="sm"
+   523→                className="h-8"
+   524→                disabled={busy !== null || gateConfirm.trim() !== "I UNDERSTAND"}
+   525→                onClick={async () => {
+   526→                  const r = await api("gate-on", "/api/v1/engine/admin/gate", {
+   527→                    enabled: true,
+   528→                    confirm: gateConfirm,
+   529→                  });
+   530→                  if (r.ok) setGateConfirm("");
+   531→                }}
+   532→              >
+   533→                {busy === "gate-on" ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : null}
+   534→                Enable under DPIA
+   535→              </Button>
+   536→              <p className="flex items-start gap-1.5 text-[10px] leading-snug text-muted-foreground">
+   537→                <Info className="mt-0.5 h-3 w-3 shrink-0" aria-hidden="true" />
+   538→                Enabling requires a completed DPIA on the ACTIVE policy (NDPC guidance) and stays
+   539→                fully audited.
+   540→              </p>
+   541→            </div>
+   542→          )}
+   543→        </div>
+   544→      </CardContent>
+   545→
+   546→      {/* DPIA recorder dialog */}
+   547→      <Dialog open={dpiaOpen} onOpenChange={setDpiaOpen}>
+   548→        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
+   549→          <DialogHeader>
+   550→            <DialogTitle>
+   551→              Record a DPIA
+   552→              {draftForDpia ? ` for policy v${draftForDpia.version}` : ""}
+   553→            </DialogTitle>
+   554→            <DialogDescription>
+   555→              The record completes only when every checklist item is done — a
+   556→              completed DPIA is what unlocks activation (NDPC gate).
+   557→            </DialogDescription>
+   558→          </DialogHeader>
+   559→          {drafts.length === 0 && !draftForDpia ? (
+   560→            <p className="text-sm text-muted-foreground">
+   561→              Create a policy draft first — DPIAs are recorded against drafts.
+   562→            </p>
+   563→          ) : (
+   564→            <div className="space-y-4">
+   565→              <div className="space-y-1.5">
+   566→                <Label htmlFor="dpia-summary" className="text-xs">
+   567→                  Assessment summary (registry entry — min 60 chars)
+   568→                </Label>
+   569→                <Textarea
+   570→                  id="dpia-summary"
+   571→                  value={dpiaSummary}
+   572→                  onChange={(e) => setDpiaSummary(e.target.value)}
+   573→                  rows={4}
+   574→                  placeholder="Scope, risks identified, mitigations, residual risk rationale…"
+   575→                  aria-describedby="dpia-summary-hint"
+   576→                />
+   577→                <p id="dpia-summary-hint" className="text-[10px] text-muted-foreground">
+   578→                  {dpiaSummary.trim().length}/60 characters minimum
+   579→                </p>
+   580→              </div>
+   581→              <div className="space-y-1.5">
+   582→                <Label className="text-xs">Residual risk (post-mitigation)</Label>
+   583→                <Select
+   584→                  value={dpiaResidual}
+   585→                  onValueChange={(v) => setDpiaResidual(v as "LOW" | "MEDIUM" | "HIGH")}
+   586→                >
+   587→                  <SelectTrigger className="w-32" aria-label="Residual risk">
+   588→                    <SelectValue />
+   589→                  </SelectTrigger>
+   590→                  <SelectContent>
+   591→                    <SelectItem value="LOW">LOW</SelectItem>
+   592→                    <SelectItem value="MEDIUM">MEDIUM</SelectItem>
+   593→                    <SelectItem value="HIGH">HIGH</SelectItem>
+   594→                  </SelectContent>
+   595→                </Select>
+   596→              </div>
+   597→              <fieldset className="space-y-2.5">
+   598→                <legend className="text-xs font-semibold">Governance checklist</legend>
+   599→                {CHECKLIST_IDS.map((id) => (
+   600→                  <label
+   601→                    key={id}
+   602→                    className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-border px-3 py-2.5 transition-colors hover:bg-muted/40"
+   603→                  >
+   604→                    <Checkbox
+   605→                      id={`chk-${id}`}
+   606→                      checked={checks[id] ?? false}
+   607→                      onCheckedChange={(v) => setChecks((c) => ({ ...c, [id]: v === true }))}
+   608→                      aria-label={CHECKLIST_LABELS[id]}
+   609→                    />
+   610→                    <span className="text-[11px] leading-snug text-muted-foreground">
+   611→                      {CHECKLIST_LABELS[id]}
+   612→                    </span>
+   613→                  </label>
+   614→                ))}
+   615→              </fieldset>
+   616→            </div>
+   617→          )}
+   618→          <DialogFooter>
+   619→            <Button
+   620→              disabled={
+   621→                busy !== null ||
+   622→                dpiaSummary.trim().length < 60 ||
+   623→                !draftForDpia
+   624→              }
+   625→              onClick={async () => {
+   626→                const r = await api("dpia", "/api/v1/engine/admin/dpia", {
+   627→                  policyId: draftForDpia?.id,
+   628→                  summary: dpiaSummary,
+   629→                  residualRisk: dpiaResidual,
+   630→                  checklist: CHECKLIST_IDS.map((id) => ({ id, done: checks[id] ?? false })),
+   631→                });
+   632→                if (r.ok) setDpiaOpen(false);
+   633→              }}
+   634→            >
+   635→              {busy === "dpia" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" /> : null}
+   636→              Save assessment
+   637→            </Button>
+   638→          </DialogFooter>
+   639→        </DialogContent>
+   640→      </Dialog>
+   641→    </Card>
+   642→  );
+   643→}
+   644→

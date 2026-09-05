@@ -79,6 +79,7 @@ const EVENT_LABELS: Record<string, string> = {
   // Stage 8 — Trust Engine
   POLICY_DRAFTED: "A scoring-policy draft was created",
   POLICY_ACTIVATED: "A new scoring policy version was activated",
+  POLICY_SIMULATED: "A policy impact dry-run was simulated (nothing changed)",
   DPIA_RECORDED: "A DPIA assessment was recorded",
   ENGINE_GATE_TOGGLED: "The automated-decision gate was changed",
   DSR_EXPORT_REQUESTED: "Data export requested",

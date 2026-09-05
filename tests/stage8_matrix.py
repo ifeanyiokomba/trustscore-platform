@@ -372,9 +372,62 @@ s, me = call(subj, "GET", "/api/v1/engine/me")
 check("engine/me back to ACTIVE", me["snapshot"]["state"] == "ACTIVE")
 
 # ---------------------------------------------------------------------------
+print("== Simulation (read-only policy impact dry-run) ==")
+con = sqlite3.connect(DB, timeout=30)
+snap_before = con.execute("SELECT COUNT(*) FROM TrustScoreSnapshot").fetchone()[0]
+con.close()
+s, sim = call(adm, "POST", f"/api/v1/engine/admin/policies/{draft_clamped}/simulate", {})
+check("simulate 200 for a DRAFT policy", s == 200, f"s={s}")
+sim = sim.get("simulation", {})
+check("simulation names draft + active versions", sim.get("draftVersion") is not None and sim.get("activeVersion") == v2_version)
+check("simulation cohort is a positive integer", isinstance(sim.get("cohort"), int) and sim.get("cohort", 0) > 0)
+check("simulation buckets are 5 score ranges", len(sim.get("buckets", [])) == 5)
+check("simulation bucket totals match cohort",
+      sum(x["before"] for x in sim.get("buckets", [])) == sim.get("cohort") and
+      sum(x["after"] for x in sim.get("buckets", [])) == sim.get("cohort"))
+check("simulation movers identities masked", all("•" in m["label"] for m in sim.get("movers", [])) or sim.get("movers") == [])
+check("simulation movers carry statusBefore/After", all("statusBefore" in m and "statusAfter" in m for m in sim.get("movers", [])))
+check("simulation avgDelta consistent with movers", abs(sim.get("avgDelta", 0)) <= max(1, abs(sim.get("maxUp", 0)) + abs(sim.get("maxDown", 0))))
+check("simulation note explains read-only", "read-only" in (sim.get("note") or "").lower())
+con = sqlite3.connect(DB, timeout=30)
+snap_after = con.execute("SELECT COUNT(*) FROM TrustScoreSnapshot").fetchone()[0]
+con.close()
+check("simulation wrote NO snapshots (read-only)", snap_after == snap_before,
+      f"before={snap_before} after={snap_after}")
+s, b = call(subj, "POST", f"/api/v1/engine/admin/policies/{draft_clamped}/simulate", {})
+check("simulate 403 for USER", s == 403)
+s, b = call(adm, "POST", f"/api/v1/engine/admin/policies/{v2_id}/simulate", {})
+check("simulate ACTIVE policy 409 NOT_DRAFT", s == 409 and errcode(b) == "NOT_DRAFT")
+sim_unauth = client()
+s, b = call(sim_unauth, "POST", f"/api/v1/engine/admin/policies/{draft_clamped}/simulate", {})
+check("simulate unauth 401", s == 401)
+con = sqlite3.connect(DB, timeout=30)
+sim_evt = con.execute("SELECT metadata FROM AuditEvent WHERE action='POLICY_SIMULATED' ORDER BY createdAt DESC LIMIT 1").fetchone()
+con.close()
+sim_meta = json.loads(sim_evt[0]) if sim_evt else {}
+check("POLICY_SIMULATED audited with counters only",
+      sim_evt is not None and all(isinstance(v, (int, float)) for v in sim_meta.values()) and "cohort" in sim_meta,
+      f"meta={sim_meta}")
+
+# ---------------------------------------------------------------------------
+print("== engine/me snapshot history (sparkline feed) ==")
+s, me = call(subj, "GET", "/api/v1/engine/me")
+hist = me.get("history", [])
+check("engine/me carries a history array", isinstance(hist, list) and len(hist) >= 1)
+if hist:
+    check("history entries carry score/state/computedAt", all(
+        isinstance(h.get("score"), int) and "state" in h and "computedAt" in h for h in hist))
+    check("history is chronological (oldest → newest)",
+          all(hist[i]["computedAt"] <= hist[i + 1]["computedAt"] for i in range(len(hist) - 1)))
+    check("history latest matches current snapshot", hist[-1]["score"] == score_restored["score"])
+    check("history capped at retention window", len(hist) <= 20)
+s, me_noauth = call(client(), "GET", "/api/v1/engine/me")
+check("engine/me history unauth 401", s == 401)
+
+# ---------------------------------------------------------------------------
 print("== Audit discipline (Stage 8 events: labels/counters only) ==")
 con = sqlite3.connect(DB, timeout=30)
-rows = con.execute("SELECT action, metadata FROM AuditEvent WHERE action IN ('POLICY_DRAFTED','POLICY_ACTIVATED','DPIA_RECORDED','ENGINE_GATE_TOGGLED') ORDER BY createdAt DESC LIMIT 12").fetchall()
+rows = con.execute("SELECT action, metadata FROM AuditEvent WHERE action IN ('POLICY_DRAFTED','POLICY_ACTIVATED','POLICY_SIMULATED','DPIA_RECORDED','ENGINE_GATE_TOGGLED') ORDER BY createdAt DESC LIMIT 12").fetchall()
 con.close()
 check("policy audit events exist", len(rows) >= 4)
 ok_meta = True

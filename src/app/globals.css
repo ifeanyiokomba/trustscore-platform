@@ -551,3 +551,75 @@ label:has(> [data-state="checked"]) {
     transition: none;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Stage 8.1 — Engine deep-detail utilities (sparkline, lifecycle log,
+   simulation dry-run dialog, policy diff). Emerald family only.
+--------------------------------------------------------------------------- */
+
+/* Slim custom scrollbars for dense engine lists (lifecycle log, movers) */
+.ts-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in oklch, var(--trust) 45%, transparent) transparent;
+}
+.ts-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.ts-scrollbar::-webkit-scrollbar-thumb {
+  background: color-mix(in oklch, var(--trust) 45%, transparent);
+  border-radius: 999px;
+}
+.ts-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in oklch, var(--trust) 65%, transparent);
+}
+.ts-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Sparkline — pointer affordance on the chart surface */
+[data-testid="score-sparkline"] svg {
+  cursor: crosshair;
+}
+
+/* Lifecycle log rows — newest row gets a quiet emphasis */
+[data-testid="lifecycle-log"] li:first-child {
+  border-color: color-mix(in oklch, var(--trust) 35%, transparent);
+  background: color-mix(in oklch, var(--trust) 4%, transparent);
+}
+[data-testid="lifecycle-log"] li {
+  transition: border-color 150ms ease, background 150ms ease;
+}
+[data-testid="lifecycle-log"] li:hover {
+  border-color: color-mix(in oklch, var(--trust) 30%, transparent);
+}
+
+/* Simulation dialog — movers table rows hover + delta chips */
+[data-testid="sim-movers"] tr {
+  transition: background 120ms ease;
+}
+[data-testid="sim-movers"] tr:hover {
+  background: color-mix(in oklch, var(--trust) 5%, transparent);
+}
+
+/* Policy diff rows — dashed container reads as "working notes" */
+[data-testid="policy-diff"] li {
+  transition: background 120ms ease;
+}
+[data-testid="policy-diff"] li:hover {
+  background: color-mix(in oklch, var(--trust) 7%, transparent);
+}
+
+/* Histogram bars in the simulation dialog — motion-safe shimmer on after-bar */
+@keyframes ts-sim-bar-settle {
+  from { filter: brightness(1.35); }
+  to { filter: brightness(1); }
+}
+[data-testid="sim-buckets"] .bg-primary\/80 {
+  animation: ts-sim-bar-settle 600ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-testid="sim-buckets"] .bg-primary\/80 {
+    animation: none;
+  }
+}

@@ -148,9 +148,17 @@ $AB screenshot /home/z/my-project/research/stage8-e2e-admin.png >/dev/null 2>&1
 echo "--- 2. draft policy via UI form ---"
 $AB find role button click --name "New policy draft" >/dev/null 2>&1
 sleep 1.5
-# fill credential points + cap (8 / 24)
+# fill credential points + cap (8 / 24) — React controlled inputs need the
+# native value setter (direct el.value assignment is swallowed by React's
+# value tracker, and the draft would silently keep v1 rules).
 $AB eval "
-  const set = (id, v) => { const el = document.getElementById(id); if (el) { el.value = v; el.dispatchEvent(new Event('input', {bubbles: true})); el.dispatchEvent(new Event('change', {bubbles: true})); } };
+  const set = (id, v) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+    setter.call(el, v);
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  };
   set('rule-credentialPoints', '8'); set('rule-credentialMax', '24');
   'rules-set'" >/dev/null 2>&1
 sleep 0.6
@@ -169,8 +177,28 @@ sleep 2.5
 $AB eval "JSON.stringify({
   draftListed: !!Array.from(document.querySelectorAll('[data-testid=engine-admin] li')).find(li => li.textContent.includes('awaiting DPIA + activation')),
   budgetPreview: document.body.textContent.includes('Projected budget'),
+  simulateBtn: !!document.querySelector('[data-testid=simulate-btn]'),
+  diffTrigger: Array.from(document.querySelectorAll('button')).some(b => b.textContent.includes('Diff vs active')),
 })" 2>&1 | tail -1
 $AB screenshot /home/z/my-project/research/stage8-e2e-draft.png >/dev/null 2>&1
+
+# 2b) ADMIN — policy diff (pure client-side) + impact simulation dry-run
+echo "--- 2b. policy diff + simulate impact via UI ---"
+$AB find role button click --name "Diff vs active" >/dev/null 2>&1
+sleep 1.2
+$AB eval "JSON.stringify({diffRows: document.querySelectorAll('[data-testid=policy-diff] li').length})" 2>&1 | tail -1
+$AB eval "document.querySelector('[data-testid=simulate-btn]')?.click()" >/dev/null 2>&1
+sleep 4
+$AB eval "JSON.stringify({
+  simDialog: !!document.querySelector('[data-testid=simulate-dialog]'),
+  simStats: document.querySelectorAll('[data-testid=sim-stats] > div').length,
+  simBuckets: document.querySelectorAll('[data-testid=sim-buckets] > div').length,
+  simMovers: document.querySelectorAll('[data-testid=sim-movers] tr').length,
+  simNote: !!document.querySelector('[data-testid=sim-note]'),
+})" 2>&1 | tail -1
+$AB screenshot /home/z/my-project/research/stage8-e2e-simulate.png >/dev/null 2>&1
+$AB press Escape >/dev/null 2>&1
+sleep 1
 
 # ===========================================================================
 # 3) ADMIN — activate w/o DPIA → honest rejection; then record DPIA; activate
@@ -331,6 +359,10 @@ $AB eval "JSON.stringify({
   active: document.body.textContent.includes('Active') || document.body.textContent.includes('Stale'),
   policyNote: document.body.textContent.includes('Scored under policy'),
   noAdmin: !document.body.textContent.includes('Engine administration'),
+  sparkline: !!document.querySelector('[data-testid=score-sparkline] svg'),
+  sparkDots: document.querySelectorAll('[data-testid=score-sparkline] circle').length,
+  lifecycleLog: !!document.querySelector('[data-testid=lifecycle-log]'),
+  logRows: document.querySelectorAll('[data-testid=lifecycle-log] li').length,
 })" 2>&1 | tail -1
 $AB screenshot /home/z/my-project/research/stage8-e2e-member.png >/dev/null 2>&1
 
