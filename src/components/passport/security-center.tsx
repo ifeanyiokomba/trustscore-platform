@@ -69,6 +69,13 @@ const EVENT_LABELS: Record<string, string> = {
   SAFETY_CHECK_RUN: "A member ran a safety check on you",
   SAFETY_SETTINGS_UPDATED: "Safety-check settings updated",
   TRUST_REQUEST_SENT: "Trust request received",
+  // Stage 7 — Reputation
+  FLAG_SUBMITTED: "A member filed a flag against you",
+  FLAG_RESPONSE: "You responded to a flag",
+  FLAG_RESOLUTION: "A flag against you was decided (human review)",
+  FLAG_WITHDRAWN: "A flag against you was withdrawn",
+  APPEAL_FILED: "You appealed a confirmed flag",
+  APPEAL_DECIDED: "An appeal on your flag was decided",
   DSR_EXPORT_REQUESTED: "Data export requested",
   DSR_EXPORT_COMPLETED: "Data export delivered",
   DSR_DELETE_REQUESTED: "Account deletion requested",

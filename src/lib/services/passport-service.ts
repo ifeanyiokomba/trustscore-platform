@@ -105,7 +105,8 @@ export async function getPassportForUser(userId: string, currentToken?: string) 
 
   // Security events: the user's own actions PLUS anonymous viewer events on
   // their share tokens PLUS Stage 6 named safety checks + trust requests
-  // (subject linkage — the owner sees who-checked-when).
+  // PLUS Stage 7 flag/appeal events about them (subject linkage — the owner
+  // sees who-checked-when and flag milestones).
   const securityEvents = await db.auditEvent.findMany({
     where: {
       OR: [
@@ -118,7 +119,7 @@ export async function getPassportForUser(userId: string, currentToken?: string) 
         },
         {
           AND: [
-            { action: { in: ["SAFETY_CHECK_RUN", "TRUST_REQUEST_SENT"] } },
+            { action: { in: ["SAFETY_CHECK_RUN", "TRUST_REQUEST_SENT", "FLAG_SUBMITTED", "FLAG_RESOLUTION", "APPEAL_DECIDED"] } },
             { subjectType: "UserAccount", subjectId: userId },
           ],
         },
@@ -541,7 +542,7 @@ export async function markNotificationsRead(userId: string, id?: string): Promis
 // ---------------------------------------------------------------------------
 
 async function buildExportPayload(userId: string): Promise<Record<string, unknown>> {
-  const [user, identity, consents, evidence, credentials, shareTokens, receipts, sessions, notifications, audit, dsr, phoneVerifications, livenessSessions, verificationSessions, safetyChecks, trustRequests] =
+  const [user, identity, consents, evidence, credentials, shareTokens, receipts, sessions, notifications, audit, dsr, phoneVerifications, livenessSessions, verificationSessions, safetyChecks, trustRequests, flags] =
     await Promise.all([
       db.userAccount.findUnique({ where: { id: userId } }),
       db.trustIdentity.findUnique({
@@ -567,6 +568,19 @@ async function buildExportPayload(userId: string): Promise<Record<string, unknow
       db.trustRequest.findMany({
         where: { OR: [{ verifierId: userId }, { subjectId: userId }] },
         orderBy: { createdAt: "desc" },
+      }),
+      // Stage 7 — full reputation record (reporter identities are unmasked in
+      // the export: NDPA access right beats the UI retaliation shield)
+      db.flag.findMany({
+        where: { OR: [{ reporterId: userId }, { subjectId: userId }] },
+        orderBy: { createdAt: "desc" },
+        include: {
+          reporter: { select: { handle: true } },
+          subject: { select: { handle: true } },
+          evidence: { orderBy: { createdAt: "asc" } },
+          resolution: true,
+          appeal: true,
+        },
       }),
     ]);
 
@@ -662,6 +676,45 @@ async function buildExportPayload(userId: string): Promise<Record<string, unknow
       createdAt: r.createdAt,
       respondedAt: r.respondedAt,
     })),
+    reputation: {
+      note: "Reporter identities are masked in the product UI to prevent retaliation; this export is your complete data-subject record (NDPA s.36) and includes them.",
+      flags: flags.map((f) => ({
+        id: f.id,
+        role: f.reporterId === userId ? "reporter" : "subject",
+        category: f.category,
+        description: f.description,
+        status: f.status,
+        reporterHandle: f.reporter.handle,
+        subjectHandle: f.subject.handle,
+        createdAt: f.createdAt,
+        subjectRespondedAt: f.subjectRespondedAt,
+        evidence: f.evidence.map((e) => ({
+          id: e.id,
+          role: e.role,
+          kind: e.kind,
+          content: e.content,
+          submittedBy: e.submittedById === userId ? "you" : "counterparty",
+          createdAt: e.createdAt,
+        })),
+        resolution: f.resolution
+          ? {
+              outcome: f.resolution.outcome,
+              rationale: f.resolution.rationale,
+              fraudSignal: f.resolution.fraudSignal,
+              decidedAt: f.resolution.decidedAt,
+            }
+          : null,
+        appeal: f.appeal
+          ? {
+              status: f.appeal.status,
+              reason: f.appeal.reason,
+              decisionNote: f.appeal.decisionNote,
+              createdAt: f.appeal.createdAt,
+              decidedAt: f.appeal.decidedAt,
+            }
+          : null,
+      })),
+    },
   };
 }
 

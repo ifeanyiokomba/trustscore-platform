@@ -1,5 +1,5 @@
 // TrustScore — NIN-First rebuild
-// Stage 1–4 schema (per docs/STAGE0_AUDIT.md §4.3 / §4.2)
+// Stage 1–7 schema (per docs/STAGE0_AUDIT.md §4.3 / §4.2)
 //
 // Principle: UserAccount ≠ TrustIdentity ≠ NIN ≠ Phone (directive §29).
 // Raw identity numbers (NIN, BVN, raw phone) are NEVER stored here.
@@ -8,6 +8,9 @@
 // Stage 4 adds phone (OTP) + biometric (liveness) verification sessions —
 // contract-first MOCK providers; raw phone numbers are stored ONLY as
 // peppered sha256 fingerprints with masked display hints.
+// Stage 7 adds the reputation layer: flags with evidence, human-reviewed
+// resolutions, appeals — anti-gaming by design (L2 reporter gate, one
+// open flag per pair, 3-per-7-day quota, mandatory evidence).
 
 generator client {
   provider = "prisma-client-js"
@@ -30,6 +33,7 @@ model UserAccount {
   displayName     String
   handle          String   @unique // reserved for future trustscore.ng/@handle Trust Link (Stage 5)
   status          String   @default("ACTIVE") // ACTIVE | SUSPENDED | PENDING_DELETION
+  role            String   @default("USER") // USER | REVIEWER — reviewer role grants human-review queue access (operational grant, never self-service)
   acceptedTermsAt DateTime @default(now())
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -51,6 +55,10 @@ model UserAccount {
   safetyChecksReceived SafetyCheck[]     @relation("SafetyChecksReceived")
   trustRequestsSent    TrustRequest[]    @relation("TrustRequestsSent")
   trustRequestsReceived TrustRequest[]   @relation("TrustRequestsReceived")
+  flagsFiled          Flag[]            @relation("FlagsFiled")
+  flagsReceived       Flag[]            @relation("FlagsReceived")
+  flagResolutions     FlagResolution[]  @relation("FlagResolutions")
+  flagAppeals         FlagAppeal[]      @relation("FlagAppeals")
 
   @@index([email])
   @@index([status])
@@ -480,6 +488,102 @@ model Session {
 
   @@index([userId])
   @@index([expiresAt])
+}
+
+
+// ---------------------------------------------------------------------------
+// Stage 7 — Reputation: Flags with evidence (directive §29 flags/flag_evidence).
+// A flag is a REPORT TO THE PLATFORM about a member's conduct — never a
+// public accusation: nothing about a flag is visible to anyone except the
+// reporter, the subject and human reviewers. Anti-gaming by design
+// (enforced in reputation-service):
+//   * the reporter must hold a live L2+ Trust Identity (a verified human)
+//   * one OPEN/UNDER_REVIEW flag per reporter→subject pair (409 duplicate)
+//   * at most 3 flags per rolling 7-day window per reporter (429 window)
+//   * at least one evidence item is mandatory at submission (422 zod)
+//   * reporter identity is MASKED to the subject (retaliation shield);
+//     the full record remains available via NDPA DSR export
+// ---------------------------------------------------------------------------
+
+model Flag {
+  id                 String    @id @default(cuid())
+  reporterId         String
+  subjectId          String
+  category           String // FRAUD | IMPERSONATION | NON_PAYMENT | SCAM | HARASSMENT | OTHER
+  description        String // the reporter's claim — shown to subject + reviewer
+  status             String    @default("OPEN") // OPEN | UNDER_REVIEW | RESOLVED_CONFIRMED | RESOLVED_UNFOUNDED | RESOLVED_DISMISSED | WITHDRAWN
+  evidenceCount      Int       @default(0)
+  subjectRespondedAt DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  reporter   UserAccount     @relation("FlagsFiled", fields: [reporterId], references: [id], onDelete: Cascade)
+  subject    UserAccount     @relation("FlagsReceived", fields: [subjectId], references: [id], onDelete: Cascade)
+  evidence   FlagEvidence[]
+  resolution FlagResolution?
+  appeal     FlagAppeal?
+
+  @@index([subjectId, status])
+  @@index([reporterId, createdAt])
+}
+
+// Evidence items attached by either party. Content is their own statement or
+// reference (text/link) — user data: shown to the two parties + reviewers,
+// included in the DSR export, NEVER in audit metadata (directive §38).
+
+model FlagEvidence {
+  id            String   @id @default(cuid())
+  flagId        String
+  submittedById String
+  role          String // REPORTER | SUBJECT — which side submitted it
+  kind          String // TEXT | LINK
+  content       String
+  createdAt     DateTime @default(now())
+
+  flag Flag @relation(fields: [flagId], references: [id], onDelete: Cascade)
+
+  @@index([flagId])
+}
+
+// Human-reviewed resolution (directive §33 — no automated significant
+// decisions in Stage 7). A REVIEWER decides CONFIRMED / UNFOUNDED / DISMISSED
+// with a published rationale. CONFIRMED sets fraudSignal=true and feeds the
+// score engine's Confirmed Risk component (−25 per confirmed flag, cap −50).
+
+model FlagResolution {
+  id          String   @id @default(cuid())
+  flagId      String   @unique
+  reviewerId  String
+  outcome     String // CONFIRMED | UNFOUNDED | DISMISSED
+  rationale   String // published to subject + reporter
+  fraudSignal Boolean  @default(false) // true when outcome = CONFIRMED
+  decidedAt   DateTime @default(now())
+
+  reviewer UserAccount @relation("FlagResolutions", fields: [reviewerId], references: [id], onDelete: Cascade)
+  flag     Flag        @relation(fields: [flagId], references: [id], onDelete: Cascade)
+
+  @@index([reviewerId])
+}
+
+// Subject appeal of a CONFIRMED resolution — one per flag, 14-day window
+// from the decision. UPHELD keeps the outcome; OVERTURNED flips the flag to
+// RESOLVED_UNFOUNDED and restores the score (NDPA §37 redress path).
+
+model FlagAppeal {
+  id           String    @id @default(cuid())
+  flagId       String    @unique
+  appellantId  String // the flag subject
+  reason       String
+  status       String    @default("PENDING") // PENDING | UPHELD | OVERTURNED
+  reviewerId   String?
+  decisionNote String?
+  decidedAt    DateTime?
+  createdAt    DateTime  @default(now())
+
+  appellant UserAccount @relation("FlagAppeals", fields: [appellantId], references: [id], onDelete: Cascade)
+  flag      Flag        @relation(fields: [flagId], references: [id], onDelete: Cascade)
+
+  @@index([status])
 }
 
 // ---------------------------------------------------------------------------

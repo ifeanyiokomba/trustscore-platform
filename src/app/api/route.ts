@@ -5,8 +5,8 @@ import { NextResponse } from "next/server";
 export async function GET() {
   return NextResponse.json({
     name: "TrustScore Platform API",
-    stage: "6 — Safety Check (verifier-side checks by handle/phone-hash/trust-link/QR, sanitized assessments, per-check consent + receipts, trust requests)",
-    version: "1.5.0",
+    stage: "7 — Reputation (flags with evidence, human-reviewed resolutions, appeals, verified interactions; anti-gaming by design)",
+    version: "1.6.0",
     notice:
       "NINAuth integration is implemented behind a contract-first MOCK provider adapter (OAuth 2.0 + PKCE + OIDC-style ID tokens). Phone (SMS OTP) and biometric (liveness) signals are likewise contract-first MOCK transports. No live government or MNO/biometric integration is claimed. The LIVE transports activate once partner sandbox credentials exist (audit §2.2).",
     endpoints: [
@@ -45,10 +45,18 @@ export async function GET() {
       { method: "POST", path: "/api/v1/safety/settings", auth: "session", description: "Stage 6: update standing SAFETY_CHECK consent (enable/disable + scope toggles)" },
       { method: "POST", path: "/api/v1/safety/request", auth: "session", description: "Stage 6: send a trust request to an uncheckable member (7-day expiry, one pending per pair)" },
       { method: "POST", path: "/api/v1/safety/request/:id/respond", auth: "session", description: "Stage 6: subject ACCEPT (mints scoped trust link + runs named assessment) or DECLINE" },
+      { method: "POST", path: "/api/v1/reputation/flags", auth: "session", description: "Stage 7: file a flag with evidence (L2 reporter gate, one open per pair, 3/7-day quota, human review)" },
+      { method: "GET", path: "/api/v1/reputation/me", auth: "session", description: "Stage 7: flags against me (masked reporters), my filed flags, response/appeal states, anti-gaming eligibility" },
+      { method: "POST", path: "/api/v1/reputation/flags/:id/respond", auth: "session", description: "Stage 7: subject's response + evidence → UNDER_REVIEW (human review queue)" },
+      { method: "POST", path: "/api/v1/reputation/flags/:id/withdraw", auth: "session", description: "Stage 7: reporter withdraws an OPEN flag (zero score effect)" },
+      { method: "POST", path: "/api/v1/reputation/flags/:id/appeal", auth: "session", description: "Stage 7: subject appeals a CONFIRMED flag (once, 14-day window)" },
+      { method: "GET", path: "/api/v1/reputation/review", auth: "session+reviewer", description: "Stage 7: HUMAN review queue (REVIEWER role — operational grant)" },
+      { method: "POST", path: "/api/v1/reputation/review/:flagId/decision", auth: "session+reviewer", description: "Stage 7: reviewer decides CONFIRMED / UNFOUNDED / DISMISSED with published rationale" },
+      { method: "POST", path: "/api/v1/reputation/appeals/:id/decision", auth: "session+reviewer", description: "Stage 7: reviewer decides appeal UPHELD / OVERTURNED (overturn restores the score)" },
     ],
     roadmap: {
-      "7": "Resolution + Appeals (flags, disputes, human review)",
       "8": "Trust Engine hardening (rules-first scoring policy, DPIA gate)",
+      "9": "B2B platform (developer portal, API keys, Trust Decision API)",
     },
   });
 }

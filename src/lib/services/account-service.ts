@@ -126,6 +126,7 @@ export async function getUserById(userId: string) {
       displayName: true,
       handle: true,
       status: true,
+      role: true,
       createdAt: true,
     },
   });
@@ -148,6 +149,10 @@ export async function recentAuditForUser(userId: string, limit = 10) {
         // Stage 6 — Safety Check + Trust Requests
         { action: { startsWith: "SAFETY_" } },
         { action: { startsWith: "TRUST_REQUEST" } },
+        // Stage 7 — Reputation (own actions only; subject-linkage events surface
+        // in the Security Center timeline)
+        { action: { startsWith: "FLAG_" } },
+        { action: { startsWith: "APPEAL_" } },
       ],
     },
     orderBy: { createdAt: "desc" },

@@ -3,8 +3,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 
-const STAGE = "6 — Safety Check (verifier-side checks by handle/phone-hash/trust-link/QR, sanitized assessments, per-check consent + receipts, trust requests)";
-const VERSION = "1.5.0";
+const STAGE = "7 — Reputation (flags with evidence, human-reviewed resolutions, appeals, verified interactions; anti-gaming by design)";
+const VERSION = "1.6.0";
 const startedAt = Date.now();
 
 export async function GET(_req: NextRequest) {

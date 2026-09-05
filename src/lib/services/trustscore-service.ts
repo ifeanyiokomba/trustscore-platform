@@ -1,4 +1,4 @@
-// TrustScore Stage 5 — TrustScore engine (directive §35/§36 score contract).
+// TrustScore Stage 5–7 — TrustScore engine (directive §35/§36 score contract).
 //
 // Formula (directive §36):
 //   score = Identity Assurance + Verified Reputation + Verified Credentials
@@ -8,9 +8,13 @@
 // meaningful explanation of automated decisions, which the passport surfaces):
 //   identityAssurance   max 60  (L1 20 / L2 34 / L3 47 / L4 60, freshness-scaled)
 //   verifiedCredentials max 20  (6 per fresh ACTIVE credential)
-//   verifiedReputation  max 15  (reputation graph opens Stage 6 — honest zero today)
-//   resolutionHistory   max 10  (dispute resolution opens Stage 7 — honest zero today)
-//   confirmedRisk       penalty (−25 per confirmed flag, cap −50; flags open Stage 8)
+//   verifiedReputation  max 15  (Stage 7: verified interactions — +3 per distinct
+//                                L2+ verifier who ran a consent-backed check
+//                                on the subject in the last 90 days, cap 5)
+//   resolutionHistory   max 10  (Stage 7: +2 per human-reviewed cleared flag,
+//                                cap 5)
+//   confirmedRisk       penalty (−25 per confirmed flag, cap −50; flags arrive
+//                                Stage 7, outcomes are HUMAN decisions)
 //
 // Output contract: Score (0–100) + Confidence (0–100) + Risk Band
 // (LOW/MEDIUM/HIGH) + Status (NEW/VERIFIED/ESTABLISHED/CAUTION/HIGH_RISK/
@@ -80,7 +84,57 @@ interface ScoreInputs {
     expiresAt: Date | null;
     manualRevoked: boolean;
   }[];
-  confirmedRiskCount: number; // Stage 8 — always 0 today
+  // Stage 7 — reputation inputs (computed here so the engine owns its inputs)
+  verifiedInteractions: number; // distinct L2+ verifiers, consent-backed checks, 90d
+  clearedFlags: number; // human-reviewed UNFOUNDED / DISMISSED / OVERTURNED
+  confirmedFlags: number; // human-confirmed flags (appeals upheld or none)
+}
+
+// Verified-interaction horizon: checks older than 90 days stop counting —
+// reputation must be earned continuously, not banked once.
+const INTERACTION_WINDOW_MS = 90 * 24 * 60 * 60 * 1000;
+
+async function collectReputationInputs(userId: string): Promise<{
+  verifiedInteractions: number;
+  clearedFlags: number;
+  confirmedFlags: number;
+}> {
+  const flags = await db.flag.findMany({
+    where: { subjectId: userId },
+    select: { status: true },
+  });
+  const confirmedFlags = flags.filter((f) => f.status === "RESOLVED_CONFIRMED").length;
+  const clearedFlags = flags.filter((f) =>
+    ["RESOLVED_UNFOUNDED", "RESOLVED_DISMISSED"].includes(f.status)
+  ).length;
+
+  // Verified interactions: distinct verifiers who ran a CONSENT-BACKED check
+  // (handle / trust link / QR — never the anonymous phone probe) on this
+  // member within the window, and who currently hold L2+.
+  const checks = await db.safetyCheck.findMany({
+    where: {
+      subjectId: userId,
+      method: { in: ["HANDLE", "TRUST_LINK", "QR"] },
+      createdAt: { gte: new Date(Date.now() - INTERACTION_WINDOW_MS) },
+    },
+    select: { verifierId: true },
+  });
+  const verifierIds = [...new Set(checks.map((c) => c.verifierId))].filter(
+    (id) => id !== userId
+  );
+  let verifiedInteractions = 0;
+  if (verifierIds.length > 0) {
+    const identities = await db.trustIdentity.findMany({
+      where: { userId: { in: verifierIds } },
+      select: { userId: true, status: true, assuranceLevel: true, expiresAt: true },
+    });
+    const now = Date.now();
+    for (const id of identities) {
+      const live = id.status === "VERIFIED" && (id.expiresAt?.getTime() ?? 0) > now;
+      if (live && id.assuranceLevel >= 2) verifiedInteractions += 1;
+    }
+  }
+  return { verifiedInteractions, clearedFlags, confirmedFlags };
 }
 
 async function collectInputs(userId: string): Promise<ScoreInputs> {
@@ -101,6 +155,7 @@ async function collectInputs(userId: string): Promise<ScoreInputs> {
     where: { userId },
     select: { id: true, type: true, status: true, expiresAt: true, manualRevoked: true },
   });
+  const reputation = await collectReputationInputs(userId);
   return {
     identity: identity
       ? {
@@ -118,7 +173,9 @@ async function collectInputs(userId: string): Promise<ScoreInputs> {
       expiresAt: e.expiresAt,
     })),
     credentials,
-    confirmedRiskCount: 0, // no risk-flag pipeline until Stage 8
+    verifiedInteractions: reputation.verifiedInteractions,
+    clearedFlags: reputation.clearedFlags,
+    confirmedFlags: reputation.confirmedFlags,
   };
 }
 
@@ -131,7 +188,7 @@ function inputsHashFor(inputs: ScoreInputs): string {
       .map((e) => [e.id, e.status ?? "ACTIVE", e.expiresAt?.getTime() ?? null])
       .sort(),
     c: inputs.credentials.map((c) => [c.type, c.status, c.manualRevoked]).sort(),
-    r: inputs.confirmedRiskCount,
+    r: [inputs.confirmedFlags, inputs.clearedFlags, inputs.verifiedInteractions],
   });
   return sha256Hex(canonical);
 }
@@ -169,13 +226,15 @@ export function computeScoreFromInputs(
   const credentialValue = clamp(freshCredentials.length * 6, 0, 20);
 
   // --- Verified Reputation (max 15) / Resolution History (max 10) ----------
-  // Honest zeros: those graphs open in Stage 6/7. The explanation says so —
-  // a score must never pretend to data it does not have (directive §59).
-  const reputationValue = 0;
-  const resolutionValue = 0;
+  // Stage 7: both components are REAL platform data (no provider involved).
+  // Verified interactions: distinct L2+ members who ran consent-backed
+  // checks on the subject in the last 90 days (+3 each, cap 5). Cleared
+  // flags: human-reviewed UNFOUNDED/DISMISSED (+2 each, cap 5).
+  const reputationValue = Math.min(5, inputs.verifiedInteractions) * 3;
+  const resolutionValue = Math.min(5, inputs.clearedFlags) * 2;
 
-  // --- Confirmed Risk (penalty, Stage 8) ------------------------------------
-  const riskPenalty = clamp(inputs.confirmedRiskCount * 25, 0, 50);
+  // --- Confirmed Risk (penalty) — human-confirmed flags (Stage 7) ---------
+  const riskPenalty = Math.min(2, inputs.confirmedFlags) * 25;
 
   const score = clamp(
     assuranceValue + credentialValue + reputationValue + resolutionValue - riskPenalty,
@@ -196,8 +255,8 @@ export function computeScoreFromInputs(
   // --- Status + risk band ---------------------------------------------------
   let status: ScoreStatus;
   let riskBand: "LOW" | "MEDIUM" | "HIGH";
-  if (inputs.confirmedRiskCount > 0) {
-    status = inputs.confirmedRiskCount >= 2 ? "HIGH_RISK" : "REVIEW_REQUIRED";
+  if (inputs.confirmedFlags > 0) {
+    status = inputs.confirmedFlags >= 2 ? "HIGH_RISK" : "REVIEW_REQUIRED";
     riskBand = "HIGH";
   } else if (identityStale) {
     status = "CAUTION";
@@ -229,14 +288,18 @@ export function computeScoreFromInputs(
         : "Verified Credentials 0/20: no active credentials — verify signals to earn them."
     );
     explanation.push(
-      "Verified Reputation 0/15: the reputation graph (marketplace reviews, flags) opens in Stage 6 — this component is an honest zero today."
+      inputs.verifiedInteractions > 0
+        ? `Verified Reputation ${reputationValue}/15: ${inputs.verifiedInteractions} verified interaction${inputs.verifiedInteractions === 1 ? "" : "s"} with distinct verified members (consent-backed checks in the last 90 days, +3 each, capped at 5).`
+        : "Verified Reputation 0/15: no consent-backed checks by verified members in the last 90 days — an honest zero, not a negative signal."
     );
     explanation.push(
-      "Resolution History 0/10: dispute resolution history opens in Stage 7 — this component is an honest zero today."
+      inputs.clearedFlags > 0
+        ? `Resolution History ${resolutionValue}/10: ${inputs.clearedFlags} flag${inputs.clearedFlags === 1 ? " was" : "s were"} raised against you and cleared by human review (+2 each, capped at 5).`
+        : "Resolution History 0/10: no human-reviewed flag resolutions on record yet — an honest zero, not a negative signal."
     );
     explanation.push(
       riskPenalty > 0
-        ? `Confirmed Risk −${riskPenalty}: ${inputs.confirmedRiskCount} confirmed risk flag${inputs.confirmedRiskCount === 1 ? "" : "s"} on record.`
+        ? `Confirmed Risk −${riskPenalty}: ${inputs.confirmedFlags} confirmed flag${inputs.confirmedFlags === 1 ? "" : "s"} on record after human review. You can appeal a confirmation for 14 days.`
         : "Confirmed Risk −0: no confirmed adverse signals found. This is a statement about recorded evidence only — never a guarantee that a person is safe to deal with."
     );
     explanation.push(
@@ -244,7 +307,7 @@ export function computeScoreFromInputs(
     );
   }
   explanation.push(
-    "Under NDPA §37 you can request human review of this decision; the appeal pipeline opens in Stage 9."
+    "Under NDPA §37 you can request human review of this decision; confirmed flags can be appealed for 14 days after the reviewer's decision."
   );
 
   return {
@@ -274,21 +337,30 @@ export function computeScoreFromInputs(
         label: "Verified Reputation",
         value: reputationValue,
         max: 15,
-        note: "Reputation graph opens Stage 6",
+        note:
+          inputs.verifiedInteractions > 0
+            ? `${inputs.verifiedInteractions} verified interaction${inputs.verifiedInteractions === 1 ? "" : "s"} (90-day window)`
+            : "No verified interactions in the last 90 days",
       },
       {
         key: "resolutionHistory",
         label: "Resolution History",
         value: resolutionValue,
         max: 10,
-        note: "Dispute resolution opens Stage 7",
+        note:
+          inputs.clearedFlags > 0
+            ? `${inputs.clearedFlags} flag${inputs.clearedFlags === 1 ? "" : "s"} cleared by human review`
+            : "No cleared flags on record yet",
       },
       {
         key: "confirmedRisk",
         label: "Confirmed Risk",
         value: -riskPenalty,
         max: 0,
-        note: "No confirmed flags on record",
+        note:
+          inputs.confirmedFlags > 0
+            ? `${inputs.confirmedFlags} confirmed flag${inputs.confirmedFlags === 1 ? "" : "s"} (human-reviewed, appealable)`
+            : "No confirmed flags on record",
       },
     ],
     explanation,

@@ -27,6 +27,7 @@ import {
   CheckCircle2,
   Info,
   History,
+  Flag,
   UserRound,
   ShieldAlert,
 } from "lucide-react";
@@ -50,7 +51,9 @@ import type {
   SafetyCheckRunResponse,
   SafetyAssessment,
   SafetyChecksResponse,
+  IdentityMe,
 } from "@/lib/types";
+import { FlagDialog } from "@/components/reputation/file-flag-card";
 import { cn } from "@/lib/utils";
 
 type Method = "handle" | "phone" | "link" | "qr";
@@ -132,9 +135,13 @@ function AssuranceDots({ level }: { level: number }) {
 function AssessmentPanel({
   assessment,
   self,
+  onFlag,
+  canFile,
 }: {
   assessment: SafetyAssessment;
   self: boolean;
+  onFlag: (subjectHandle: string) => void;
+  canFile: boolean;
 }) {
   const status = STATUS_META[assessment.summary.status] ?? STATUS_META.NEW;
   const risk = RISK_META[assessment.summary.riskBand] ?? RISK_META.LOW;
@@ -280,6 +287,28 @@ function AssessmentPanel({
               This check was receipted: the member sees who checked and what was shown.
             </p>
           )}
+          {!self && assessment.subject?.handle ? (
+            <div className="mt-3 border-t border-border/70 pt-3">
+              {canFile ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 w-full text-destructive hover:bg-destructive/10 hover:text-destructive"
+                  onClick={() => onFlag(assessment.subject!.handle!)}
+                  data-testid="report-concern-cta"
+                >
+                  <Flag className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+                  Report a serious concern about @{assessment.subject.handle}
+                </Button>
+              ) : (
+                <p className="flex items-start gap-1.5 text-[11px] leading-relaxed text-muted-foreground">
+                  <Flag className="mt-0.5 h-3 w-3 shrink-0 text-muted-foreground" aria-hidden="true" />
+                  Flagging requires L2 verification (anti-gaming by design) — verify your identity
+                  in the Overview tab to unlock it.
+                </p>
+              )}
+            </div>
+          ) : null}
         </div>
       </div>
     </motion.div>
@@ -295,6 +324,9 @@ export function SafetyConsole() {
   const [value, setValue] = React.useState("");
   const [running, setRunning] = React.useState(false);
   const [result, setResult] = React.useState<SafetyCheckRunResponse | null>(null);
+  const [flagSubject, setFlagSubject] = React.useState<string | null>(null);
+  const [canFile, setCanFile] = React.useState(false);
+  const [myLevel, setMyLevel] = React.useState(0);
   const [requestState, setRequestState] = React.useState<
     | { kind: "idle" }
     | { kind: "sending" }
@@ -315,6 +347,19 @@ export function SafetyConsole() {
 
   React.useEffect(() => {
     void refreshHistory();
+    // Stage 7: flag eligibility (L2 gate) for the report-concern action.
+    void (async () => {
+      try {
+        const res = await fetch("/api/v1/reputation/me", { cache: "no-store" });
+        if (res.ok) {
+          const me = (await res.json()) as { canFileFlags?: boolean; myAssuranceLevel?: number };
+          setCanFile(Boolean(me.canFileFlags));
+          setMyLevel(me.myAssuranceLevel ?? 0);
+        }
+      } catch {
+        /* gate falls back to closed */
+      }
+    })();
   }, [refreshHistory]);
 
   async function runCheck() {
@@ -543,10 +588,10 @@ export function SafetyConsole() {
               className="mt-6"
             >
               {result.outcome === "OK" && result.assessment && (
-                <AssessmentPanel assessment={result.assessment} self={false} />
+                <AssessmentPanel assessment={result.assessment} self={false} onFlag={(h) => setFlagSubject(h)} canFile={canFile} />
               )}
               {result.outcome === "SELF" && result.assessment && (
-                <AssessmentPanel assessment={result.assessment} self />
+                <AssessmentPanel assessment={result.assessment} self onFlag={(h) => setFlagSubject(h)} canFile={canFile} />
               )}
               {result.outcome === "UNAVAILABLE" && (
                 <div
@@ -748,6 +793,16 @@ export function SafetyConsole() {
             )}
           </CardContent>
         </Card>
+
+        {/* Stage 7 — flag filing (prefilled with the checked subject) */}
+        <FlagDialog
+          open={flagSubject !== null}
+          onOpenChange={(v) => !v && setFlagSubject(null)}
+          prefillSubject={flagSubject ?? undefined}
+          canFile={canFile}
+          myAssuranceLevel={myLevel}
+          onFiled={() => undefined}
+        />
       </div>
     </div>
   );

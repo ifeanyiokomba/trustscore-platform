@@ -13,6 +13,7 @@ import {
   ArrowRight,
   Lock,
   Search,
+  Gavel,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -57,6 +58,11 @@ const FLOW_STEPS = [
     icon: Search,
     title: "7 · Others check before they deal",
     body: "A member can run a consent-gated safety check — by your handle, a trust link, or a QR scan — and see a sanitized assessment: “No confirmed adverse signals found”, never “safe”. You control it, and every check is receipted with their name.",
+  },
+  {
+    icon: Gavel,
+    title: "8 · Flags get human review",
+    body: "A serious concern can be flagged with evidence — by a verified member only, capped and anti-gamed. The subject responds, a human reviewer decides, and a confirmed flag can be appealed for 14 days. Nothing touches a score automatically.",
   },
 ];
 

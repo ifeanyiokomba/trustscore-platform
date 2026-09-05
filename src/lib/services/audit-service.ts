@@ -41,7 +41,14 @@ export type AuditAction =
   | "SAFETY_SETTINGS_UPDATED"
   | "TRUST_REQUEST_SENT"
   | "TRUST_REQUEST_ACCEPTED"
-  | "TRUST_REQUEST_DECLINED";
+  | "TRUST_REQUEST_DECLINED"
+  // Stage 7 — Reputation (flags, resolutions, appeals)
+  | "FLAG_SUBMITTED"
+  | "FLAG_WITHDRAWN"
+  | "FLAG_RESPONSE"
+  | "FLAG_RESOLUTION"
+  | "APPEAL_FILED"
+  | "APPEAL_DECIDED";
 
 interface AuditInput {
   actorType: "USER" | "SYSTEM" | "ANONYMOUS";
@@ -91,6 +98,9 @@ const SAFE_METADATA_KEYS = new Set([
   "current",
   // Stage 6 — non-PII labels only
   "method",
+  // Stage 7 — non-PII labels / counters only (never flag text or rationale)
+  "category",
+  "evidenceCount",
 ]);
 
 export async function recordAudit(input: AuditInput): Promise<void> {

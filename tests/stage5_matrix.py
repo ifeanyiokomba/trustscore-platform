@@ -103,8 +103,13 @@ sc = p.get("score", {})
 check("score snapshot fields", all(k in sc for k in ("status", "score", "confidence", "riskBand", "components", "explanation", "computedAt", "expiresAt", "fresh", "trigger")))
 comp = {c["key"]: c for c in sc.get("components", [])}
 check("5 components", set(comp.keys()) == {"identityAssurance", "verifiedCredentials", "verifiedReputation", "resolutionHistory", "confirmedRisk"})
-check("honest zero: reputation", comp.get("verifiedReputation", {}).get("value") == 0)
-check("honest zero: resolution", comp.get("resolutionHistory", {}).get("value") == 0)
+# Stage 7 made these components REAL (verified interactions, cleared flags).
+# For a user with no reputation data they are honest zeros; ada (the demo
+# user) may carry live data from Stage 6/7 flows — assert the contract:
+rep_v = comp.get("verifiedReputation", {}).get("value")
+res_v = comp.get("resolutionHistory", {}).get("value")
+check("reputation component contract (0..15 int)", isinstance(rep_v, int) and 0 <= rep_v <= 15)
+check("resolution component contract (0..10 int)", isinstance(res_v, int) and 0 <= res_v <= 10)
 check("explanation mentions NDPA", any("NDPA" in l for l in sc.get("explanation", [])))
 check("card language locked", p.get("cardLanguage", {}).get("adverse") == "No confirmed adverse signals found")
 creds = p.get("credentials", [])
@@ -267,6 +272,12 @@ check("unknown session -> 404", s == 404)
 
 print("== 11. DSR export ==")
 s, exp = call(ADA, "POST", "/api/v1/passport/dsr", {"type": "EXPORT"})
+if s == 429:
+    # ada's DSR quota is 3/5min — repeated matrix runs can exhaust it; wait
+    # out the window once and retry (single-runs never hit this)
+    print("  (dsr quota warm — waiting out the 5-min window once)")
+    time.sleep(305)
+    s, exp = call(ADA, "POST", "/api/v1/passport/dsr", {"type": "EXPORT"})
 check("export -> 201", s == 201)
 check("downloadPath present", exp.get("downloadPath", "").startswith("/api/v1/passport/dsr/"))
 check("bytes counted", exp.get("bytes", 0) > 500)

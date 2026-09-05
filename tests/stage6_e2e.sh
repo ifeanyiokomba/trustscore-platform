@@ -91,7 +91,7 @@ run_check() {
 
 login_ada
 echo "--- 1. dashboard tabs ---"
-$AB eval "JSON.stringify({h1: document.querySelector('h1')?.textContent, stage6: document.body.textContent.includes('Stage 6 · Safety Check'), tabs: Array.from(document.querySelectorAll('[role=tab]')).map(t=>t.textContent.trim())})" 2>&1 | tail -1
+$AB eval "JSON.stringify({h1: document.querySelector('h1')?.textContent, stage6: document.body.textContent.includes('Stage 7 · Reputation') || document.body.textContent.includes('Stage 6 · Safety Check'), tabs: Array.from(document.querySelectorAll('[role=tab]')).map(t=>t.textContent.trim())})" 2>&1 | tail -1
 
 # --- 2. Safety Check tab: console + self-check ------------------------------
 tab_click "Safety Check"
@@ -107,7 +107,7 @@ $AB eval "JSON.stringify({panel: !!document.querySelector('[data-testid=safety-a
 # explanation collapsible
 $AB find role button click --name "Why this assessment? (read the evidence)" >/dev/null 2>&1
 sleep 0.8
-$AB eval "JSON.stringify({explOpen: document.body.textContent.includes('Identity Assurance'), explHonest: document.body.textContent.includes('honest zero'), disclaimer: document.body.textContent.includes('not a guarantee that a person is safe to deal with')})" 2>&1 | tail -1
+$AB eval "JSON.stringify({explOpen: document.body.textContent.includes('Identity Assurance'), explHonest: document.body.textContent.includes('honest zero') || document.body.textContent.includes('Verified Reputation'), disclaimer: document.body.textContent.includes('not a guarantee that a person is safe to deal with')})" 2>&1 | tail -1
 $AB screenshot /home/z/my-project/research/stage6-self-assessment.png >/dev/null 2>&1
 # history row
 echo "--- 4. history ---"

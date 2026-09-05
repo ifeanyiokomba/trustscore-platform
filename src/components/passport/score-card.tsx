@@ -169,11 +169,6 @@ export function ScoreCard({ score }: { score: TrustScoreInfo }) {
                 <div className="flex items-baseline justify-between gap-2">
                   <span className="truncate text-xs font-semibold text-foreground">
                     {c.label}
-                    {c.key.endsWith("Reputation") || c.key === "resolutionHistory" ? (
-                      <span className="ml-1.5 rounded-full border border-border px-1.5 py-px text-[9px] font-bold uppercase tracking-wide text-muted-foreground">
-                        opens next stages
-                      </span>
-                    ) : null}
                   </span>
                   <span
                     className={cn(
@@ -267,7 +262,8 @@ export function ScoreCard({ score }: { score: TrustScoreInfo }) {
             A TrustScore summarizes{" "}
             <span className="font-medium text-foreground">recorded verification evidence</span> —
             it is not a guarantee that a person is safe to deal with. Scores react to your profile
-            instantly; you can dispute outcomes (appeals open Stage 9).
+            instantly; confirmed flags can be <span className="font-medium text-foreground">appealed for 14 days</span>{" "}
+            after a human decision.
           </span>
         </p>
       </CardContent>

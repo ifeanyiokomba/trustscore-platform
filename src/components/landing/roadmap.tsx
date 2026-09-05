@@ -53,14 +53,14 @@ const STAGES: { id: string; title: string; status: StageStatus; detail: string }
   {
     id: "6",
     title: "Safety Check",
-    status: "active",
+    status: "done",
     detail: "Check before you deal — handle / phone-hash / trust link / QR assessments, per-check consent, named receipts, trust requests.",
   },
   {
     id: "7",
     title: "Reputation",
-    status: "planned",
-    detail: "Flags, evidence, resolution, appeals — with human review.",
+    status: "active",
+    detail: "Flags with evidence, human-reviewed resolutions and appeals, verified interactions — anti-gaming by design (L2 reporters, quotas, masked identities).",
   },
   {
     id: "8",

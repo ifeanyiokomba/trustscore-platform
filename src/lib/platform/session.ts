@@ -15,6 +15,7 @@ export interface SessionUser {
   displayName: string;
   handle: string;
   status: string;
+  role: string; // USER | REVIEWER (Stage 7 — operational grant)
   createdAt: Date;
 }
 
@@ -25,6 +26,7 @@ export function toPublicUser(u: SessionUser) {
     displayName: u.displayName,
     handle: u.handle,
     status: u.status,
+    role: u.role,
     createdAt: u.createdAt.toISOString(),
   };
 }

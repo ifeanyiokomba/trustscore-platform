@@ -6,6 +6,7 @@ export interface SessionUser {
   displayName: string;
   handle: string;
   status: string;
+  role: string; // USER | REVIEWER (Stage 7 — operational grant)
   createdAt: string;
 }
 
@@ -518,4 +519,123 @@ export interface TrustRequestAcceptResponse {
   decision: "ACCEPTED" | "DECLINED";
   token?: string;
   linkPath?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Stage 7 — Reputation (flags, resolutions, appeals, verified interactions)
+// ---------------------------------------------------------------------------
+
+export interface FlagEvidenceInfo {
+  id: string;
+  role: string; // REPORTER | SUBJECT
+  kind: string; // TEXT | LINK
+  content: string;
+  createdAt: string;
+}
+
+export interface FlagResolutionInfo {
+  outcome: string; // CONFIRMED | UNFOUNDED | DISMISSED
+  rationale: string;
+  decidedAt: string;
+}
+
+export interface FlagAppealInfo {
+  status: string; // PENDING | UPHELD | OVERTURNED
+  reason?: string;
+  decisionNote?: string | null;
+  decidedAt?: string | null;
+}
+
+export interface FlagAgainstMe {
+  id: string;
+  category: string;
+  categoryLabel: string;
+  description: string;
+  status: string; // OPEN | UNDER_REVIEW | RESOLVED_* | WITHDRAWN
+  reporter: { maskedHandle: string; assuranceLevel: number };
+  evidence: FlagEvidenceInfo[];
+  myResponse: { content: string; at: string } | null;
+  myEvidence: FlagEvidenceInfo[];
+  resolution: FlagResolutionInfo | null;
+  appeal: FlagAppealInfo | null;
+  canRespond: boolean;
+  canAppeal: boolean;
+  appealWindowEndsAt: string | null;
+  createdAt: string;
+  subjectRespondedAt: string | null;
+}
+
+export interface FlagFiledByMe {
+  id: string;
+  subjectHandle: string;
+  category: string;
+  categoryLabel: string;
+  description: string;
+  status: string;
+  evidenceCount: number;
+  resolution: FlagResolutionInfo | null;
+  appeal: { status: string } | null;
+  canWithdraw: boolean;
+  createdAt: string;
+}
+
+export interface ReputationStats {
+  openAgainstMe: number;
+  confirmedAgainstMe: number;
+  clearedAgainstMe: number;
+  filedByMe: number;
+}
+
+export interface ReputationMe {
+  role: string; // USER | REVIEWER
+  canFileFlags: boolean;
+  myAssuranceLevel: number;
+  flagWindow: { max: number; days: number };
+  appealWindowDays: number;
+  flagsAgainstMe: FlagAgainstMe[];
+  flagsFiledByMe: FlagFiledByMe[];
+  stats: ReputationStats;
+  maskNote: string;
+}
+
+export interface ReviewQueueFlag {
+  id: string;
+  category: string;
+  description: string;
+  status: string;
+  createdAt: string;
+  subjectRespondedAt: string | null;
+  reporter: { handle: string; displayName: string; assuranceLevel: number };
+  subject: { handle: string; displayName: string; assuranceLevel: number };
+  evidence: FlagEvidenceInfo[];
+}
+
+export interface ReviewQueueAppeal {
+  id: string;
+  reason: string;
+  createdAt: string;
+  flag: {
+    id: string;
+    category: string;
+    description: string;
+    status: string;
+    createdAt: string;
+    reporter: { handle: string; displayName: string };
+    subject: { handle: string; displayName: string };
+    resolution: { outcome: string; rationale: string; decidedAt: string } | null;
+    evidence: FlagEvidenceInfo[];
+  };
+}
+
+export interface ReviewQueue {
+  queue: ReviewQueueFlag[];
+  appeals: ReviewQueueAppeal[];
+  reviewerHandleNote: string;
+}
+
+export interface ScoreContributionInfo {
+  verifiedInteractions: number;
+  reputationPoints: number;
+  resolutionPoints: number;
+  confirmedPenalty: number;
 }
