@@ -103,6 +103,8 @@ const EVENT_LABELS: Record<string, string> = {
   NETWORK_INTERACTION_REVOKED: "A verified interaction was revoked",
   NETWORK_SIGNAL_MINTED: "A shared signal was recorded (human-confirmed event)",
   NETWORK_SIGNAL_RETRACTED: "A shared signal was retracted (appeal overturned)",
+  // Stage 11 — Score Insights
+  SCORE_HISTORY_EXPORTED: "You exported your score history (CSV/JSON)",
   DSR_EXPORT_REQUESTED: "Data export requested",
   DSR_EXPORT_COMPLETED: "Data export delivered",
   DSR_DELETE_REQUESTED: "Account deletion requested",

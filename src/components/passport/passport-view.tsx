@@ -12,6 +12,7 @@ import { ScoreCard } from "@/components/passport/score-card";
 import { CredentialsCard } from "@/components/passport/credentials-card";
 import { TrustShareCard } from "@/components/passport/trust-share-card";
 import { VerificationHistory } from "@/components/passport/verification-history";
+import { ScoreHistoryCard, useScoreHistory } from "@/components/passport/score-history-card";
 import type { DsrRequestInfo, IdentityMe, PassportMe } from "@/lib/types";
 
 export function usePassportData() {
@@ -68,6 +69,7 @@ export function PassportTab({
   identityLoading: boolean;
 }) {
   const { passport, loading, refresh } = usePassportData();
+  const history = useScoreHistory();
 
   if (loading) {
     return (
@@ -94,10 +96,15 @@ export function PassportTab({
     <div className="grid min-w-0 gap-6 lg:grid-cols-3">
       {/* Score + how to read it */}
       <div className="min-w-0 lg:col-span-2">
-        <ScoreCard score={passport.score} />
+        <ScoreCard score={passport.score} trend={history.data?.spark} />
       </div>
       <div className="min-w-0 lg:col-span-1">
         <TrustShareCard passport={passport} onChanged={refresh} />
+      </div>
+
+      {/* Stage 11 — Score Insights (full-width): history, deltas, events, export */}
+      <div className="min-w-0 lg:col-span-3">
+        <ScoreHistoryCard data={history.data} loading={history.loading} />
       </div>
 
       {/* Credentials + history */}

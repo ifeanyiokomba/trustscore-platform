@@ -3,8 +3,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 
-const STAGE = "10 — Trust Network (verified-interaction graph, mutual attestations, k-anonymized shared signals, pan-African provider registry)";
-const VERSION = "1.9.0";
+const STAGE = "11 — Score Insights (snapshot history, why-it-changed timeline, component deltas, series export)";
+const VERSION = "1.10.0";
 const startedAt = Date.now();
 
 export async function GET(_req: NextRequest) {

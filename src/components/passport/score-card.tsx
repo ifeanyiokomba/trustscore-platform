@@ -84,7 +84,50 @@ function freshnessLine(score: TrustScoreInfo): string {
   return `Computed ${computed} · refreshes in ${until}`;
 }
 
-export function ScoreCard({ score }: { score: TrustScoreInfo }) {
+// Stage 11 — mini spark under the gauge (2+ points). The interactive
+// chart with tooltips lives in the Score History card below.
+function MiniTrend({ points }: { points: { at: string; score: number }[] }) {
+  const W = 110;
+  const H = 26;
+  const n = points.length;
+  const scores = points.map((p) => p.score);
+  const min = Math.min(...scores);
+  const max = Math.max(...scores);
+  const range = max - min;
+  const x = (i: number) => (n === 1 ? W / 2 : 3 + (i / (n - 1)) * (W - 6));
+  const y = (v: number) => (range === 0 ? H / 2 : 3 + (1 - (v - min) / range) * (H - 6));
+  const line = points.map((p, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(1)},${y(p.score).toFixed(1)}`).join(" ");
+  const area = `${line} L${x(n - 1).toFixed(1)},${H} L${x(0).toFixed(1)},${H} Z`;
+  return (
+    <svg
+      viewBox={`0 0 ${W} ${H}`}
+      preserveAspectRatio="none"
+      className="mt-1.5 h-[26px] w-[110px]"
+      role="img"
+      aria-label={`Score trend over ${n} snapshots: from ${scores[0]} to ${scores[n - 1]}.`}
+    >
+      <path d={area} className="fill-primary/15" />
+      <path
+        d={line}
+        fill="none"
+        className="stroke-primary"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        vectorEffect="non-scaling-stroke"
+      />
+      <circle cx={x(n - 1)} cy={y(scores[n - 1])} r="2.5" className="fill-primary" />
+    </svg>
+  );
+}
+
+export function ScoreCard({
+  score,
+  trend,
+}: {
+  score: TrustScoreInfo;
+  trend?: { at: string; score: number }[];
+}) {
   const status = STATUS_META[score.status] ?? STATUS_META.NEW;
   const risk = RISK_META[score.riskBand] ?? RISK_META.LOW;
   const frozen = score.state === "FROZEN";
@@ -179,6 +222,7 @@ export function ScoreCard({ score }: { score: TrustScoreInfo }) {
               <span className={cn("mt-1 text-[11px] font-semibold", risk.className)}>
                 {risk.label}
               </span>
+              {trend && trend.length >= 2 ? <MiniTrend points={trend} /> : null}
             </div>
           </div>
 

@@ -166,6 +166,8 @@ export async function recentAuditForUser(userId: string, limit = 10) {
         // Stage 10 — Trust Network (own actions only; signal mint/retract
         // are SYSTEM-actor events surfaced via the Security Center timeline)
         { action: { startsWith: "NETWORK_" } },
+        // Stage 11 — Score Insights (own exports)
+        { action: "SCORE_HISTORY_EXPORTED" },
       ],
     },
     orderBy: { createdAt: "desc" },

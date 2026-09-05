@@ -75,7 +75,9 @@ export type AuditAction =
   | "NETWORK_INTERACTION_DECLINED"
   | "NETWORK_INTERACTION_REVOKED"
   | "NETWORK_SIGNAL_MINTED"
-  | "NETWORK_SIGNAL_RETRACTED";
+  | "NETWORK_SIGNAL_RETRACTED"
+  // Stage 11 — Score Insights (member-facing history + export)
+  | "SCORE_HISTORY_EXPORTED";
 
 interface AuditInput {
   actorType: "USER" | "SYSTEM" | "ANONYMOUS";
@@ -153,6 +155,9 @@ const SAFE_METADATA_KEYS = new Set([
   "windowDays",
   "degree",
   "signalCount",
+  // Stage 11 — score-insights export labels / counters only
+  "format",
+  "records",
 ]);
 
 export async function recordAudit(input: AuditInput): Promise<void> {

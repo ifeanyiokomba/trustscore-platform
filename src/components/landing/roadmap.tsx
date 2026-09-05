@@ -77,8 +77,14 @@ const STAGES: { id: string; title: string; status: StageStatus; detail: string }
   {
     id: "10",
     title: "Trust network",
-    status: "active",
+    status: "done",
     detail: "Verified-interaction graph (mutual attestations feeding Verified Reputation), FraudNet-class k-anonymized shared signals with the flag appeal path as the dispute route, and a pan-African provider registry — the long-term moat.",
+  },
+  {
+    id: "11",
+    title: "Score insights",
+    status: "active",
+    detail: "Every member can answer “why did my score change?” — full snapshot history, component-level deltas, audited events between snapshots (correlated context, never a verdict), and a self-service series export.",
   },
 ];
 

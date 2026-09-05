@@ -319,6 +319,79 @@ export interface TrustScoreInfo {
   frozenReason?: string | null;
 }
 
+// ---------------------------------------------------------------------------
+// Stage 11 — Score Insights types (mirror /api/v1/passport/score-history)
+// ---------------------------------------------------------------------------
+
+export interface ScoreHistorySnapshot {
+  id: string;
+  version: number;
+  score: number;
+  confidence: number;
+  status: string;
+  riskBand: string;
+  trigger: string;
+  computedAt: string;
+  state: string;
+  policyVersion: number | null;
+  components: ScoreComponentInfo[];
+}
+
+export interface ScoreHistoryEvent {
+  action: string;
+  label: string;
+  componentKey: string | null;
+  at: string;
+}
+
+export interface ScoreComponentDelta {
+  key: string;
+  label: string;
+  from: number;
+  to: number;
+  delta: number;
+}
+
+export interface ScoreChange {
+  id: string;
+  computedAt: string;
+  fromScore: number;
+  toScore: number;
+  delta: number;
+  fromConfidence: number;
+  toConfidence: number;
+  trigger: string;
+  fromPolicy: number | null;
+  toPolicy: number | null;
+  policyChanged: boolean;
+  state: string;
+  componentDeltas: ScoreComponentDelta[];
+  events: ScoreHistoryEvent[];
+  eventCount: number;
+}
+
+export interface ScoreHistorySummary {
+  snapshotCount: number;
+  changeCount: number;
+  firstAt: string | null;
+  latestAt: string | null;
+  firstScore: number | null;
+  latestScore: number | null;
+  minScore: number | null;
+  maxScore: number | null;
+  netChange: number;
+  upChanges: number;
+  downChanges: number;
+  flatChanges: number;
+}
+
+export interface ScoreHistory {
+  history: ScoreHistorySnapshot[];
+  changes: ScoreChange[];
+  summary: ScoreHistorySummary;
+  spark: { at: string; score: number }[];
+}
+
 export interface CredentialInfo {
   id: string;
   type: string;
