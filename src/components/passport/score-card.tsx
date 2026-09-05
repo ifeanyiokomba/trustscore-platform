@@ -15,6 +15,8 @@ import {
   CalendarClock,
   Scale,
   ChevronDown,
+  Snowflake,
+  ScrollText,
 } from "lucide-react";
 import {
   Card,
@@ -85,6 +87,8 @@ function freshnessLine(score: TrustScoreInfo): string {
 export function ScoreCard({ score }: { score: TrustScoreInfo }) {
   const status = STATUS_META[score.status] ?? STATUS_META.NEW;
   const risk = RISK_META[score.riskBand] ?? RISK_META.LOW;
+  const frozen = score.state === "FROZEN";
+  const stale = score.state === "STALE";
 
   // Gauge geometry
   const R = 78;
@@ -108,6 +112,28 @@ export function ScoreCard({ score }: { score: TrustScoreInfo }) {
         </Badge>
       </CardHeader>
       <CardContent>
+        {/* Stage 8 — freeze banner (appeal pending: the score cannot move) */}
+        {frozen ? (
+          <div
+            role="status"
+            className="mb-4 flex items-start gap-2 rounded-lg border border-teal-600/40 bg-teal-600/5 px-3.5 py-3"
+          >
+            <Snowflake className="mt-0.5 h-4 w-4 shrink-0 text-teal-600 dark:text-teal-300" aria-hidden="true" />
+            <p className="text-[11px] leading-relaxed">
+              <span className="font-semibold">Frozen while an appeal is under human review.</span>{" "}
+              <span className="text-muted-foreground">
+                Your score cannot move up or down until the reviewer decides — a
+                fairness guarantee under NDPA §37.
+              </span>
+            </p>
+          </div>
+        ) : null}
+        {stale ? (
+          <p className="mb-4 flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/5 px-3.5 py-2.5 text-[11px] leading-relaxed text-amber-700 dark:text-amber-400">
+            <CalendarClock className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            <span>Past its freshness horizon — it refreshes automatically the next time your passport is read.</span>
+          </p>
+        ) : null}
         <div className="grid items-center gap-6 sm:grid-cols-[auto_1fr]">
           {/* Gauge */}
           <div
@@ -225,6 +251,10 @@ export function ScoreCard({ score }: { score: TrustScoreInfo }) {
                   ? "first snapshot"
                   : "periodic refresh"}
             </p>
+            <p className="mt-1.5 flex items-center gap-1.5 text-[11px] leading-snug text-muted-foreground">
+              <ScrollText className="h-3 w-3 shrink-0 text-primary/70" aria-hidden="true" />
+              Scored under the public rules-first policy — see the Trust Engine tab.
+            </p>
           </div>
         </div>
 
@@ -263,7 +293,8 @@ export function ScoreCard({ score }: { score: TrustScoreInfo }) {
             <span className="font-medium text-foreground">recorded verification evidence</span> —
             it is not a guarantee that a person is safe to deal with. Scores react to your profile
             instantly; confirmed flags can be <span className="font-medium text-foreground">appealed for 14 days</span>{" "}
-            after a human decision.
+            after a human decision — and while an appeal is pending, the score is{" "}
+            <span className="font-medium text-foreground">frozen</span>.
           </span>
         </p>
       </CardContent>

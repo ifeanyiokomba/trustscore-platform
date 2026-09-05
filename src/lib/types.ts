@@ -6,7 +6,7 @@ export interface SessionUser {
   displayName: string;
   handle: string;
   status: string;
-  role: string; // USER | REVIEWER (Stage 7 — operational grant)
+  role: string; // USER | REVIEWER (Stage 7) | ADMIN (Stage 8 — operational grants)
   createdAt: string;
 }
 
@@ -312,6 +312,11 @@ export interface TrustScoreInfo {
   computedAt: string;
   expiresAt: string;
   fresh: boolean;
+  // Stage 8 — lifecycle + policy provenance
+  state?: "ACTIVE" | "STALE" | "FROZEN" | "RETIRED";
+  policyId?: string | null;
+  frozenAt?: string | null;
+  frozenReason?: string | null;
 }
 
 export interface CredentialInfo {
@@ -639,3 +644,111 @@ export interface ScoreContributionInfo {
   resolutionPoints: number;
   confirmedPenalty: number;
 }
+
+// ---------------------------------------------------------------------------
+// Stage 8 — Trust Engine
+// ---------------------------------------------------------------------------
+
+export interface PolicyRulesInfo {
+  assuranceBase: number[]; // L0..L4
+  freshnessFullDays: number;
+  freshnessMinFactor: number;
+  credentialPoints: number;
+  credentialMax: number;
+  interactionPoints: number;
+  interactionWindowDays: number;
+  interactionMax: number;
+  clearedPoints: number;
+  clearedMax: number;
+  riskPenaltyPer: number;
+  riskMaxPenalty: number;
+  riskHighAt: number;
+  snapshotTtlHours: number;
+  establishedMinLevel: number;
+}
+
+export interface PolicyInfo {
+  id: string;
+  version: number;
+  status: string; // DRAFT | ACTIVE | RETIRED
+  rules: PolicyRulesInfo;
+  changeSummary: string;
+  activatedAt: string | null;
+  createdAt: string;
+}
+
+export interface DpiaRegistryEntry {
+  status: string;
+  residualRisk: string | null;
+  policyVersion: number | null;
+  completedAt: string | null;
+}
+
+export interface EnginePublic {
+  activePolicy: {
+    version: number;
+    activatedAt: string | null;
+    changeSummary: string;
+    rules: PolicyRulesInfo;
+  } | null;
+  policyHistory: {
+    version: number;
+    status: string;
+    changeSummary: string;
+    activatedAt: string | null;
+  }[];
+  dpia: {
+    status: string; // COMPLETED | REQUIRED
+    completedAt: string | null;
+    residualRisk: string | null;
+    summary: string | null;
+  };
+  dpiRegistry: DpiaRegistryEntry[];
+  automatedSignificantDecisions: boolean;
+  gateNote: string;
+  language: string;
+}
+
+export interface EngineMe {
+  snapshot: {
+    state: string; // ACTIVE | STALE | FROZEN | RETIRED
+    frozenReason: string | null;
+    frozenAt: string | null;
+    policyVersion: number | null;
+    computedAt: string;
+    expiresAt: string;
+    trigger: string;
+  } | null;
+  policy: { version: number; changeSummary: string; activatedAt: string | null } | null;
+  automatedSignificantDecisions: boolean;
+  frozenNote: string | null;
+}
+
+export interface DpiaAdminRecord {
+  id: string;
+  policyVersion: number | null;
+  status: string;
+  summary: string;
+  residualRisk: string;
+  checklist: { id: string; label: string; done: boolean }[];
+  completedAt: string | null;
+  createdAt: string;
+}
+
+export interface EngineAdminOverview {
+  gate: { automatedSignificantDecisions: boolean; note: string };
+  policies: PolicyInfo[];
+  dpia: DpiaAdminRecord[];
+  snapshots: { total: number; byState: Record<string, number> };
+}
+
+export const DPIA_CHECKLIST_IDS = [
+  "scope",
+  "special",
+  "necessity",
+  "rights",
+  "bias",
+  "security",
+  "human",
+  "retention",
+] as const;

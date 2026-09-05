@@ -14,6 +14,7 @@ import {
   Lock,
   Search,
   Gavel,
+  Cpu,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -62,7 +63,12 @@ const FLOW_STEPS = [
   {
     icon: Gavel,
     title: "8 · Flags get human review",
-    body: "A serious concern can be flagged with evidence — by a verified member only, capped and anti-gamed. The subject responds, a human reviewer decides, and a confirmed flag can be appealed for 14 days. Nothing touches a score automatically.",
+    body: "A serious concern can be flagged with evidence — by a verified member only, capped and anti-gamed. The subject responds, a human reviewer decides, and a confirmed flag can be appealed for 14 days. While an appeal is pending, the score is frozen so it cannot move against you.",
+  },
+  {
+    icon: Cpu,
+    title: "9 · The engine is rules-first",
+    body: "The scoring policy is public, versioned and inspectable — every score names the policy that produced it. Changes ship only behind a completed DPIA, and automated significant decisions stay gated off until governance says otherwise.",
   },
 ];
 

@@ -27,6 +27,7 @@
 
 import { db } from "@/lib/db";
 import { recordAudit } from "@/lib/services/audit-service";
+import { freezeScoresFor, unfreezeScoresFor } from "@/lib/services/engine-service";
 import { notifyUser } from "@/lib/services/notification-service";
 
 export const FLAG_WINDOW_MS = 7 * 24 * 60 * 60 * 1000; // rolling reporter quota window
@@ -308,11 +309,17 @@ export async function fileAppeal(
   const appeal = await db.flagAppeal.create({
     data: { flagId: flag.id, appellantId: subjectId, reason: input.reason.trim() },
   });
+  // Stage 8 — fairness freeze: while the appeal is under human review, the
+  // subject's TrustScore cannot move (up or down). Recompute resumes on the
+  // appeal decision (unfreezeScoresFor → markMaterialChange).
+  const froze = await freezeScoresFor(subjectId, "APPEAL_PENDING");
   await notifyUser(
     subjectId,
     "SECURITY",
     "Appeal filed — under human review",
-    "Your appeal of a confirmed flag is queued for a reviewer. The reviewer examines the original evidence, your response and your appeal reason. You will be notified when the appeal is decided."
+    froze === "FROZEN" || froze === "ALREADY_FROZEN"
+      ? "Your appeal of a confirmed flag is queued for a reviewer. The reviewer examines the original evidence, your response and your appeal reason. While the appeal is pending, your TrustScore is FROZEN — it cannot move up or down until the human decision lands. You will be notified when the appeal is decided."
+      : "Your appeal of a confirmed flag is queued for a reviewer. The reviewer examines the original evidence, your response and your appeal reason. You will be notified when the appeal is decided."
   );
   await recordAudit({
     actorType: "USER",
@@ -540,6 +547,15 @@ export async function decideAppeal(
       decidedAt,
     },
   });
+
+  // Stage 8 — lift the fairness freeze: retire the FROZEN snapshot (kept in
+  // history) and recompute fresh. The routes call markMaterialChange too;
+  // unfreezeScoresFor is idempotent and safe to call first.
+  try {
+    await unfreezeScoresFor(appeal.appellantId);
+  } catch {
+    // A recompute failure must never block the human decision itself.
+  }
 
   if (input.outcome === "OVERTURNED") {
     // Redress: the confirmed flag flips to unfounded; the resolution row keeps

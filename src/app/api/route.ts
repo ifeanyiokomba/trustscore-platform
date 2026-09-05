@@ -5,8 +5,8 @@ import { NextResponse } from "next/server";
 export async function GET() {
   return NextResponse.json({
     name: "TrustScore Platform API",
-    stage: "7 — Reputation (flags with evidence, human-reviewed resolutions, appeals, verified interactions; anti-gaming by design)",
-    version: "1.6.0",
+    stage: "8 — Trust Engine (rules-first versioned scoring policy, DPIA-gated automated decisions, score lifecycle with freeze-on-appeal)",
+    version: "1.7.0",
     notice:
       "NINAuth integration is implemented behind a contract-first MOCK provider adapter (OAuth 2.0 + PKCE + OIDC-style ID tokens). Phone (SMS OTP) and biometric (liveness) signals are likewise contract-first MOCK transports. No live government or MNO/biometric integration is claimed. The LIVE transports activate once partner sandbox credentials exist (audit §2.2).",
     endpoints: [
@@ -52,11 +52,18 @@ export async function GET() {
       { method: "POST", path: "/api/v1/reputation/flags/:id/appeal", auth: "session", description: "Stage 7: subject appeals a CONFIRMED flag (once, 14-day window)" },
       { method: "GET", path: "/api/v1/reputation/review", auth: "session+reviewer", description: "Stage 7: HUMAN review queue (REVIEWER role — operational grant)" },
       { method: "POST", path: "/api/v1/reputation/review/:flagId/decision", auth: "session+reviewer", description: "Stage 7: reviewer decides CONFIRMED / UNFOUNDED / DISMISSED with published rationale" },
-      { method: "POST", path: "/api/v1/reputation/appeals/:id/decision", auth: "session+reviewer", description: "Stage 7: reviewer decides appeal UPHELD / OVERTURNED (overturn restores the score)" },
+      { method: "POST", path: "/api/v1/reputation/appeals/:id/decision", auth: "session+reviewer", description: "Stage 7: reviewer decides appeal UPHELD / OVERTURNED (overturn restores the score; decision lifts the fairness freeze)" },
+      { method: "GET", path: "/api/v1/engine/public", auth: "public", description: "Stage 8: PUBLIC trust-engine view — active scoring policy (rules, budgets), policy history, DPIA registry status, automated-decision gate" },
+      { method: "GET", path: "/api/v1/engine/me", auth: "session", description: "Stage 8: my score's lifecycle state (ACTIVE/STALE/FROZEN), policy provenance, gate state, freeze note" },
+      { method: "GET", path: "/api/v1/engine/admin/overview", auth: "session+admin", description: "Stage 8: admin console — snapshot-state distribution, policies, DPIA registry, gate" },
+      { method: "POST", path: "/api/v1/engine/admin/policies", auth: "session+admin", description: "Stage 8: create a DRAFT policy version (rules validated + clamped server-side; change summary published)" },
+      { method: "POST", path: "/api/v1/engine/admin/policies/:id/activate", auth: "session+admin", description: "Stage 8: activate a draft — REQUIRES a completed DPIA (NDPC gate); retires the previous version; scores recompute" },
+      { method: "POST", path: "/api/v1/engine/admin/dpia", auth: "session+admin", description: "Stage 8: record a DPIA assessment for a policy (completes only when every checklist item is done)" },
+      { method: "POST", path: "/api/v1/engine/admin/gate", auth: "session+admin", description: "Stage 8: toggle automated-significant-decisions (DPIA-gated + typed confirmation; disabling always allowed)" },
     ],
     roadmap: {
-      "8": "Trust Engine hardening (rules-first scoring policy, DPIA gate)",
       "9": "B2B platform (developer portal, API keys, Trust Decision API)",
+      "10": "Trust network (verified-interaction graph, shared signals)",
     },
   });
 }

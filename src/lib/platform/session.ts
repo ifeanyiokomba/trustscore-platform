@@ -15,7 +15,7 @@ export interface SessionUser {
   displayName: string;
   handle: string;
   status: string;
-  role: string; // USER | REVIEWER (Stage 7 — operational grant)
+  role: string; // USER | REVIEWER (Stage 7) | ADMIN (Stage 8 — operational grants)
   createdAt: Date;
 }
 

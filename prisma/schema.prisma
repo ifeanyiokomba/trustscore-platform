@@ -293,12 +293,63 @@ model LivenessSession {
 }
 
 // ---------------------------------------------------------------------------
+// Stage 8 — Trust Engine: rules-first, versioned, configurable scoring
+// policy (audit §4.2). Every snapshot names the policy that produced it;
+// policy changes are append-only (new version row) so old snapshots stay
+// explainable forever. A DPIA record must cover the ACTIVE policy before
+// automated significant decisions are allowed to ship (NDPC guidance gate).
+// ---------------------------------------------------------------------------
+
+model ScoringPolicy {
+  id            String   @id @default(cuid())
+  version       Int      @unique // 1, 2, 3 … append-only
+  status        String   @default("DRAFT") // DRAFT | ACTIVE | RETIRED
+  // Rules (all clamped at write time by the service — the engine never trusts
+  // un-validated config): component budgets, thresholds, windows, penalties.
+  rules         String // JSON: { assuranceBase, credentials, reputation, resolution, riskPenalty, statusThresholds, freshnessTtlHours … }
+  changeSummary String // human-readable — what changed vs the prior version
+  createdBy     String // admin handle/id (operational grant — never self-service)
+  activatedAt   DateTime?
+  createdAt     DateTime @default(now())
+
+  @@index([status])
+}
+
+// Platform-level key/value settings (DPIA gate, future engine switches).
+// Values are JSON strings; keys are engine-owned constants.
+model PlatformSetting {
+  key       String   @id
+  value     String // JSON value
+  updatedAt DateTime @updatedAt
+}
+
+// DPIA record — one per completed assessment. The ACTIVE scoring policy's
+// DPIA must be `COMPLETED` (and not superseded) for the automated-decision
+// gate to open. This is the NDPC-governance gate the audit demands.
+model DpiaRecord {
+  id            String   @id @default(cuid())
+  policyId      String // the ScoringPolicy this assessment covers
+  status        String   @default("IN_PROGRESS") // IN_PROGRESS | COMPLETED
+  summary       String // scope, risks, mitigations — human-readable registry entry
+  residualRisk  String   @default("MEDIUM") // LOW | MEDIUM | HIGH (post-mitigation)
+  checklist     String // JSON: [{id, label, done}] — governance evidence
+  completedAt   DateTime?
+  createdBy     String
+  createdAt     DateTime @default(now())
+
+  @@index([policyId])
+}
+
+// ---------------------------------------------------------------------------
 // Stage 5 — TrustScore snapshots (directive §35/§36 score contract).
 // Formula: Identity Assurance + Verified Reputation + Verified Credentials +
 // Resolution History − Confirmed Risk. Output: score, confidence, risk band,
 // human-readable explanation (NDPA §37 automated-decision transparency) and
 // freshness. Snapshots are immutable; a new row is written on material change
 // or TTL expiry (24h), and only the last 20 per user are retained.
+// Stage 8 adds the lifecycle: state (ACTIVE/STALE/FROZEN/RETIRED) + the
+// policy that produced the snapshot (every score stays explainable) +
+// freeze fields (appeal filed → frozen, appeal decided → recomputed).
 // ---------------------------------------------------------------------------
 
 model TrustScoreSnapshot {
@@ -315,6 +366,10 @@ model TrustScoreSnapshot {
   trigger     String // INITIAL | MATERIAL_CHANGE | PERIODIC
   computedAt  DateTime @default(now())
   expiresAt   DateTime // snapshot freshness horizon (24h)
+  state       String   @default("ACTIVE") // Stage 8: ACTIVE | STALE | FROZEN | RETIRED
+  policyId    String? // Stage 8: the ScoringPolicy version that produced this
+  frozenAt    DateTime?
+  frozenReason String? // e.g. APPEAL_PENDING
 
   user UserAccount @relation(fields: [userId], references: [id], onDelete: Cascade)
 

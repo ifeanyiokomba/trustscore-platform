@@ -75,7 +75,7 @@ export function Footer() {
           <p>© {new Date().getFullYear()} TrustScore. All rights reserved.</p>
           <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <span className="rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 font-semibold text-primary">
-              Stage 7 · Reputation (flags, human review, appeals)
+              Stage 8 · Trust Engine (rules-first policy, DPIA gate, freeze-on-appeal)
             </span>
             <span>Privacy-first · Consent-first · Explainable-by-design</span>
           </p>

@@ -248,6 +248,9 @@ async function buildAssessment(
       status: snapshot.status,
       riskBand: snapshot.riskBand,
       assuranceLevel: level,
+      // Stage 8 — lifecycle honesty: a frozen score is under human appeal
+      // review; a stale one is past its horizon. Neither is a negative claim.
+      state: (snapshot as { state?: string }).state ?? "ACTIVE",
     },
     signals,
     credentialsCount: credentials.filter(

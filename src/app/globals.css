@@ -492,3 +492,62 @@ li[data-status="confirmed"]::before {
     transform: none;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Stage 8 — Trust Engine utilities
+   Rail segments (budget visualization), policy version chips, DPIA checklist
+   rows, admin stamps. Emerald-family tones only (no indigo/blue).
+--------------------------------------------------------------------------- */
+
+.ts-rail-identity { background: color-mix(in oklch, var(--trust) 88%, black 12%); }
+.ts-rail-credentials { background: color-mix(in oklch, var(--trust) 72%, white 10%); }
+.ts-rail-reputation { background: color-mix(in oklch, var(--trust) 52%, white 22%); }
+.ts-rail-resolution { background: color-mix(in oklch, var(--trust) 34%, white 30%); }
+
+/* Rail segment hover — the legend dot and segment share the hue */
+.ts-rail-identity, .ts-rail-credentials, .ts-rail-reputation, .ts-rail-resolution {
+  transition: filter 150ms ease;
+}
+[data-testid]:has(> .ts-rail-identity):hover .ts-rail-identity,
+[data-testid]:has(> .ts-rail-credentials):hover .ts-rail-credentials,
+[data-testid]:has(> .ts-rail-reputation):hover .ts-rail-reputation,
+[data-testid]:has(> .ts-rail-resolution):hover .ts-rail-resolution {
+  filter: brightness(1.12);
+}
+
+/* Policy version rows — ACTIVE gets a quiet left rail; DRAFT gets amber */
+[data-testid="engine-admin"] li:has(> .flex .bg-primary\/15) {
+  border-left: 3px solid color-mix(in oklch, var(--trust) 55%, transparent);
+}
+[data-testid="engine-admin"] li:has(> .flex .bg-amber-500\/10) {
+  border-left: 3px solid color-mix(in oklch, #d97706 55%, transparent);
+}
+
+/* DPIA checklist rows — done state ticks emerald */
+label:has(> [data-state="checked"]) {
+  border-color: color-mix(in oklch, var(--trust) 40%, transparent);
+  background: color-mix(in oklch, var(--trust) 5%, transparent);
+}
+
+/* Frozen state accent (teal — emerald family, never blue) */
+.ts-frozen-accent {
+  border-color: color-mix(in oklch, #0d9488 40%, transparent);
+  background: color-mix(in oklch, #0d9488 5%, transparent);
+}
+
+/* Rule number inputs — tabular + focus ring in trust hue */
+[data-testid="engine-admin"] input[type="number"] {
+  font-variant-numeric: tabular-nums;
+}
+[data-testid="engine-admin"] input[type="number"]:focus-visible {
+  outline: 2px solid color-mix(in oklch, var(--trust) 65%, transparent);
+  outline-offset: 1px;
+}
+
+/* Reduced motion — Stage 8 (rail scaleX animations are framer-motion; CSS
+   layer keeps hovers static only) */
+@media (prefers-reduced-motion: reduce) {
+  .ts-rail-identity, .ts-rail-credentials, .ts-rail-reputation, .ts-rail-resolution {
+    transition: none;
+  }
+}

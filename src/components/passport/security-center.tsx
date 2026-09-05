@@ -76,6 +76,11 @@ const EVENT_LABELS: Record<string, string> = {
   FLAG_WITHDRAWN: "A flag against you was withdrawn",
   APPEAL_FILED: "You appealed a confirmed flag",
   APPEAL_DECIDED: "An appeal on your flag was decided",
+  // Stage 8 — Trust Engine
+  POLICY_DRAFTED: "A scoring-policy draft was created",
+  POLICY_ACTIVATED: "A new scoring policy version was activated",
+  DPIA_RECORDED: "A DPIA assessment was recorded",
+  ENGINE_GATE_TOGGLED: "The automated-decision gate was changed",
   DSR_EXPORT_REQUESTED: "Data export requested",
   DSR_EXPORT_COMPLETED: "Data export delivered",
   DSR_DELETE_REQUESTED: "Account deletion requested",

@@ -48,7 +48,12 @@ export type AuditAction =
   | "FLAG_RESPONSE"
   | "FLAG_RESOLUTION"
   | "APPEAL_FILED"
-  | "APPEAL_DECIDED";
+  | "APPEAL_DECIDED"
+  // Stage 8 — Trust Engine (policy lifecycle, DPIA, gate)
+  | "POLICY_DRAFTED"
+  | "POLICY_ACTIVATED"
+  | "DPIA_RECORDED"
+  | "ENGINE_GATE_TOGGLED";
 
 interface AuditInput {
   actorType: "USER" | "SYSTEM" | "ANONYMOUS";
@@ -101,6 +106,12 @@ const SAFE_METADATA_KEYS = new Set([
   // Stage 7 — non-PII labels / counters only (never flag text or rationale)
   "category",
   "evidenceCount",
+  // Stage 8 — trust-engine labels / counters only (never policy rationale text)
+  "policyVersion",
+  "enabled",
+  "residualRisk",
+  "status",
+  "warnings",
 ]);
 
 export async function recordAudit(input: AuditInput): Promise<void> {

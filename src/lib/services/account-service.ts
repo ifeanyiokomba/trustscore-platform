@@ -153,6 +153,10 @@ export async function recentAuditForUser(userId: string, limit = 10) {
         // in the Security Center timeline)
         { action: { startsWith: "FLAG_" } },
         { action: { startsWith: "APPEAL_" } },
+        // Stage 8 — Trust Engine administration (own actions)
+        { action: { startsWith: "POLICY_" } },
+        { action: { startsWith: "DPIA_" } },
+        { action: { startsWith: "ENGINE_" } },
       ],
     },
     orderBy: { createdAt: "desc" },

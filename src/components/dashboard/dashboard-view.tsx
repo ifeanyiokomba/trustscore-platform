@@ -21,6 +21,7 @@ import {
   ShieldEllipsis,
   ShieldQuestion,
   Landmark,
+  Cpu,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -36,6 +37,7 @@ import { PassportTab } from "@/components/passport/passport-view";
 import { PrivacyTab } from "@/components/passport/privacy-view";
 import { SafetyConsole } from "@/components/safety/safety-console";
 import { ReputationTab } from "@/components/reputation/reputation-view";
+import { EngineTab } from "@/components/engine/engine-view";
 import { useTrustStore } from "@/lib/store";
 import type { IdentityMe } from "@/lib/types";
 
@@ -82,7 +84,7 @@ export function DashboardView() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.2em] text-primary">
-            Stage 7 · Reputation
+            Stage 8 · Trust Engine
           </p>
           <h1 id="dash-heading" className="mt-1 text-3xl font-bold tracking-tight">
             Welcome back, {user.displayName.split(" ")[0]}
@@ -94,7 +96,7 @@ export function DashboardView() {
       </div>
 
       <Tabs defaultValue="overview" className="mt-8">
-        <TabsList aria-label="Dashboard sections" className="grid w-full max-w-3xl grid-cols-5">
+        <TabsList aria-label="Dashboard sections" className="grid w-full max-w-3xl grid-cols-3 sm:grid-cols-6">
           <TabsTrigger value="overview" className="gap-1.5">
             <LayoutDashboard className="h-3.5 w-3.5" aria-hidden="true" />
             <span className="hidden sm:inline">Overview</span>
@@ -113,6 +115,11 @@ export function DashboardView() {
             <Landmark className="h-3.5 w-3.5" aria-hidden="true" />
             <span className="hidden sm:inline">Reputation</span>
             <span className="sm:hidden">Reputation</span>
+          </TabsTrigger>
+          <TabsTrigger value="engine" className="gap-1.5">
+            <Cpu className="h-3.5 w-3.5" aria-hidden="true" />
+            <span className="hidden sm:inline">Trust Engine</span>
+            <span className="sm:hidden">Engine</span>
           </TabsTrigger>
           <TabsTrigger value="privacy" className="gap-1.5">
             <ShieldEllipsis className="h-3.5 w-3.5" aria-hidden="true" />
@@ -290,6 +297,10 @@ export function DashboardView() {
 
         <TabsContent value="reputation" className="mt-6">
           <ReputationTab />
+        </TabsContent>
+
+        <TabsContent value="engine" className="mt-6">
+          <EngineTab />
         </TabsContent>
 
         <TabsContent value="privacy" className="mt-6">

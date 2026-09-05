@@ -1,35 +1,33 @@
-// TrustScore Stage 5–7 — TrustScore engine (directive §35/§36 score contract).
+// TrustScore Stage 5–8 — TrustScore engine (directive §35/§36 score contract).
 //
 // Formula (directive §36):
 //   score = Identity Assurance + Verified Reputation + Verified Credentials
 //           + Resolution History − Confirmed Risk
 //
-// Component budgets (documented, versioned, explained — NDPA §37 requires
-// meaningful explanation of automated decisions, which the passport surfaces):
-//   identityAssurance   max 60  (L1 20 / L2 34 / L3 47 / L4 60, freshness-scaled)
-//   verifiedCredentials max 20  (6 per fresh ACTIVE credential)
-//   verifiedReputation  max 15  (Stage 7: verified interactions — +3 per distinct
-//                                L2+ verifier who ran a consent-backed check
-//                                on the subject in the last 90 days, cap 5)
-//   resolutionHistory   max 10  (Stage 7: +2 per human-reviewed cleared flag,
-//                                cap 5)
-//   confirmedRisk       penalty (−25 per confirmed flag, cap −50; flags arrive
-//                                Stage 7, outcomes are HUMAN decisions)
+// Stage 8 (Trust Engine): every budget/threshold/window now lives in a
+// versioned ScoringPolicy row (rules-first, append-only). This module keeps
+// the §36 math but reads its numbers from the ACTIVE policy — policy v1 is
+// byte-for-byte the budgets shipped in Stage 5–7, so scores are unchanged
+// until a new policy version is deliberately activated.
 //
 // Output contract: Score (0–100) + Confidence (0–100) + Risk Band
 // (LOW/MEDIUM/HIGH) + Status (NEW/VERIFIED/ESTABLISHED/CAUTION/HIGH_RISK/
-// REVIEW_REQUIRED) + Explanation[] + Freshness (computedAt → expiresAt 24h).
+// REVIEW_REQUIRED) + Explanation[] + Freshness (computedAt → expiresAt) +
+// State (ACTIVE/STALE/FROZEN/RETIRED) + policy version.
 //
 // Snapshots are immutable rows: a new one is written when inputs change
-// (inputsHash) or the 24h TTL lapses. Old snapshots beyond the latest 20 are
-// pruned. The engine NEVER says "this person is safe" (directive §50) — the
-// public card language is locked to "No confirmed adverse signals found".
+// (inputsHash incl. policy hash) or the TTL lapses. Old snapshots beyond the
+// latest 20 are pruned. The engine NEVER says "this person is safe"
+// (directive §50) — the public card language is locked to "No confirmed
+// adverse signals found".
+// While the latest snapshot is FROZEN (appeal pending), getScoreSnapshot
+// serves it verbatim — no recompute, no new rows (fairness guarantee).
 
 import { db } from "@/lib/db";
 import { sha256Hex } from "@/lib/platform/crypto";
+import { getActivePolicy, policyRulesHash, type PolicyRules } from "@/lib/services/policy-service";
 
 export const SCORE_VERSION = 1;
-export const SNAPSHOT_TTL_MS = 24 * 60 * 60 * 1000; // 24h freshness
 export const SNAPSHOT_RETAIN = 20; // last N snapshots kept per user
 
 export type ScoreStatus =
@@ -59,9 +57,14 @@ export interface ComputedScore {
   trigger: "INITIAL" | "MATERIAL_CHANGE" | "PERIODIC";
   computedAt: string; // ISO
   expiresAt: string; // ISO
+  policyVersion: number; // Stage 8: the rules that produced this score
 }
 
 const ASSURANCE_BASE: Record<number, number> = { 0: 0, 1: 20, 2: 34, 3: 47, 4: 60 };
+
+// Legacy constant kept for imports elsewhere (Stage 5–7 tests/docs) — the
+// live TTL now comes from the ACTIVE policy's snapshotTtlHours.
+export const SNAPSHOT_TTL_MS = 24 * 60 * 60 * 1000;
 
 interface ScoreInputs {
   identity: {
@@ -90,15 +93,22 @@ interface ScoreInputs {
   confirmedFlags: number; // human-confirmed flags (appeals upheld or none)
 }
 
-// Verified-interaction horizon: checks older than 90 days stop counting —
-// reputation must be earned continuously, not banked once.
+// Verified-interaction horizon: checks older than the policy window stop
+// counting — reputation must be earned continuously, not banked once.
 const INTERACTION_WINDOW_MS = 90 * 24 * 60 * 60 * 1000;
 
-async function collectReputationInputs(userId: string): Promise<{
+async function collectReputationInputs(
+  userId: string,
+  interactionWindowDays?: number
+): Promise<{
   verifiedInteractions: number;
   clearedFlags: number;
   confirmedFlags: number;
 }> {
+  const windowMs =
+    interactionWindowDays && interactionWindowDays > 0
+      ? interactionWindowDays * 24 * 60 * 60 * 1000
+      : INTERACTION_WINDOW_MS;
   const flags = await db.flag.findMany({
     where: { subjectId: userId },
     select: { status: true },
@@ -115,7 +125,7 @@ async function collectReputationInputs(userId: string): Promise<{
     where: {
       subjectId: userId,
       method: { in: ["HANDLE", "TRUST_LINK", "QR"] },
-      createdAt: { gte: new Date(Date.now() - INTERACTION_WINDOW_MS) },
+      createdAt: { gte: new Date(Date.now() - windowMs) },
     },
     select: { verifierId: true },
   });
@@ -137,7 +147,10 @@ async function collectReputationInputs(userId: string): Promise<{
   return { verifiedInteractions, clearedFlags, confirmedFlags };
 }
 
-async function collectInputs(userId: string): Promise<ScoreInputs> {
+async function collectInputs(
+  userId: string,
+  interactionWindowDays?: number
+): Promise<ScoreInputs> {
   const identity = await db.trustIdentity.findUnique({
     where: { userId },
     select: {
@@ -155,7 +168,7 @@ async function collectInputs(userId: string): Promise<ScoreInputs> {
     where: { userId },
     select: { id: true, type: true, status: true, expiresAt: true, manualRevoked: true },
   });
-  const reputation = await collectReputationInputs(userId);
+  const reputation = await collectReputationInputs(userId, interactionWindowDays);
   return {
     identity: identity
       ? {
@@ -199,7 +212,9 @@ function clamp(n: number, min: number, max: number): number {
 
 export function computeScoreFromInputs(
   inputs: ScoreInputs,
-  trigger: ComputedScore["trigger"]
+  trigger: ComputedScore["trigger"],
+  rules: PolicyRules,
+  ttlMs: number
 ): ComputedScore {
   const now = Date.now();
   const identityLive =
@@ -211,30 +226,36 @@ export function computeScoreFromInputs(
     inputs.identity.status === "VERIFIED" &&
     (inputs.identity.govExpiresAt?.getTime() ?? 0) <= now;
   const level = identityLive ? inputs.identity!.assuranceLevel : 0;
+  const ASSURANCE = { 0: rules.assuranceBase[0], 1: rules.assuranceBase[1], 2: rules.assuranceBase[2], 3: rules.assuranceBase[3], 4: rules.assuranceBase[4] };
 
-  // --- Identity Assurance (max 60) -----------------------------------------
+  // --- Identity Assurance (budget: assuranceBase[4]) ----------------------
   const govDaysLeft = identityLive
     ? Math.max(0, (inputs.identity!.govExpiresAt!.getTime() - now) / 86_400_000)
     : 0;
-  const freshnessFactor = !identityLive ? 0 : govDaysLeft >= 15 ? 1 : govDaysLeft >= 1 ? 0.9 : 0.75;
-  const assuranceValue = Math.round((ASSURANCE_BASE[clamp(level, 0, 4)] ?? 0) * freshnessFactor);
+  const freshnessFactor = !identityLive
+    ? 0
+    : govDaysLeft >= rules.freshnessFullDays
+      ? 1
+      : govDaysLeft >= 1
+        ? Math.max(rules.freshnessMinFactor, 0.9)
+        : rules.freshnessMinFactor;
+  const assuranceValue = Math.round((ASSURANCE[clamp(level, 0, 4)] ?? 0) * freshnessFactor);
 
-  // --- Verified Credentials (max 20) ---------------------------------------
+  // --- Verified Credentials (policy: credentialPoints/credentialMax) ------
   const freshCredentials = inputs.credentials.filter(
     (c) => c.status === "ACTIVE" && (c.expiresAt?.getTime() ?? Infinity) > now
   );
-  const credentialValue = clamp(freshCredentials.length * 6, 0, 20);
+  const credentialValue = clamp(freshCredentials.length * rules.credentialPoints, 0, rules.credentialMax);
 
-  // --- Verified Reputation (max 15) / Resolution History (max 10) ----------
-  // Stage 7: both components are REAL platform data (no provider involved).
-  // Verified interactions: distinct L2+ members who ran consent-backed
-  // checks on the subject in the last 90 days (+3 each, cap 5). Cleared
-  // flags: human-reviewed UNFOUNDED/DISMISSED (+2 each, cap 5).
-  const reputationValue = Math.min(5, inputs.verifiedInteractions) * 3;
-  const resolutionValue = Math.min(5, inputs.clearedFlags) * 2;
+  // --- Verified Reputation / Resolution History (policy-driven) ----------
+  const reputationValue = Math.min(rules.interactionMax, inputs.verifiedInteractions) * rules.interactionPoints;
+  const resolutionValue = Math.min(rules.clearedMax, inputs.clearedFlags) * rules.clearedPoints;
 
-  // --- Confirmed Risk (penalty) — human-confirmed flags (Stage 7) ---------
-  const riskPenalty = Math.min(2, inputs.confirmedFlags) * 25;
+  // --- Confirmed Risk (policy: riskPenaltyPer/riskMaxPenalty) ------------
+  const riskPenalty = Math.min(
+    Math.floor(rules.riskMaxPenalty / Math.max(1, rules.riskPenaltyPer)),
+    inputs.confirmedFlags
+  ) * rules.riskPenaltyPer;
 
   const score = clamp(
     assuranceValue + credentialValue + reputationValue + resolutionValue - riskPenalty,
@@ -256,7 +277,7 @@ export function computeScoreFromInputs(
   let status: ScoreStatus;
   let riskBand: "LOW" | "MEDIUM" | "HIGH";
   if (inputs.confirmedFlags > 0) {
-    status = inputs.confirmedFlags >= 2 ? "HIGH_RISK" : "REVIEW_REQUIRED";
+    status = inputs.confirmedFlags >= rules.riskHighAt ? "HIGH_RISK" : "REVIEW_REQUIRED";
     riskBand = "HIGH";
   } else if (identityStale) {
     status = "CAUTION";
@@ -264,7 +285,7 @@ export function computeScoreFromInputs(
   } else if (!inputs.identity || inputs.identity.status === "NONE" || level === 0) {
     status = "NEW";
     riskBand = "MEDIUM";
-  } else if (level >= 2) {
+  } else if (level >= rules.establishedMinLevel) {
     status = "ESTABLISHED";
     riskBand = "LOW";
   } else {
@@ -280,27 +301,27 @@ export function computeScoreFromInputs(
     );
   } else {
     explanation.push(
-      `Identity Assurance ${assuranceValue}/60: government record ${identityLive ? "verified" : identityStale ? "past its freshness horizon" : inputs.identity.status.toLowerCase()}, assurance level L${level}${identityLive ? `, ${Math.round(govDaysLeft)} days of freshness left` : ""}.`
+      `Identity Assurance ${assuranceValue}/${ASSURANCE[4]}: government record ${identityLive ? "verified" : identityStale ? "past its freshness horizon" : inputs.identity.status.toLowerCase()}, assurance level L${level}${identityLive ? `, ${Math.round(govDaysLeft)} days of freshness left` : ""}.`
     );
     explanation.push(
       freshCredentials.length > 0
-        ? `Verified Credentials ${credentialValue}/20: ${freshCredentials.length} active credential${freshCredentials.length === 1 ? "" : "s"} backed by live evidence (${freshCredentials.map((c) => c.type.replace("_VERIFIED", "").replace(/_/g, " ").toLowerCase()).join(", ")}).`
-        : "Verified Credentials 0/20: no active credentials — verify signals to earn them."
+        ? `Verified Credentials ${credentialValue}/${rules.credentialMax}: ${freshCredentials.length} active credential${freshCredentials.length === 1 ? "" : "s"} backed by live evidence (${freshCredentials.map((c) => c.type.replace("_VERIFIED", "").replace(/_/g, " ").toLowerCase()).join(", ")}).`
+        : `Verified Credentials 0/${rules.credentialMax}: no active credentials — verify signals to earn them.`
     );
     explanation.push(
       inputs.verifiedInteractions > 0
-        ? `Verified Reputation ${reputationValue}/15: ${inputs.verifiedInteractions} verified interaction${inputs.verifiedInteractions === 1 ? "" : "s"} with distinct verified members (consent-backed checks in the last 90 days, +3 each, capped at 5).`
-        : "Verified Reputation 0/15: no consent-backed checks by verified members in the last 90 days — an honest zero, not a negative signal."
+        ? `Verified Reputation ${reputationValue}/${rules.interactionMax * rules.interactionPoints}: ${inputs.verifiedInteractions} verified interaction${inputs.verifiedInteractions === 1 ? "" : "s"} with distinct verified members (consent-backed checks in the last ${rules.interactionWindowDays} days, +${rules.interactionPoints} each, capped at ${rules.interactionMax}).`
+        : `Verified Reputation 0/${rules.interactionMax * rules.interactionPoints}: no consent-backed checks by verified members in the last ${rules.interactionWindowDays} days — an honest zero, not a negative signal.`
     );
     explanation.push(
       inputs.clearedFlags > 0
-        ? `Resolution History ${resolutionValue}/10: ${inputs.clearedFlags} flag${inputs.clearedFlags === 1 ? " was" : "s were"} raised against you and cleared by human review (+2 each, capped at 5).`
-        : "Resolution History 0/10: no human-reviewed flag resolutions on record yet — an honest zero, not a negative signal."
+        ? `Resolution History ${resolutionValue}/${rules.clearedMax * rules.clearedPoints}: ${inputs.clearedFlags} flag${inputs.clearedFlags === 1 ? " was" : "s were"} raised against you and cleared by human review (+${rules.clearedPoints} each, capped at ${rules.clearedMax}).`
+        : `Resolution History 0/${rules.clearedMax * rules.clearedPoints}: no human-reviewed flag resolutions on record yet — an honest zero, not a negative signal.`
     );
     explanation.push(
       riskPenalty > 0
-        ? `Confirmed Risk −${riskPenalty}: ${inputs.confirmedFlags} confirmed flag${inputs.confirmedFlags === 1 ? "" : "s"} on record after human review. You can appeal a confirmation for 14 days.`
-        : "Confirmed Risk −0: no confirmed adverse signals found. This is a statement about recorded evidence only — never a guarantee that a person is safe to deal with."
+        ? `Confirmed Risk −${riskPenalty}: ${inputs.confirmedFlags} confirmed flag${inputs.confirmedFlags === 1 ? "" : "s"} on record after human review. You can appeal a confirmation for 14 days — while an appeal is pending, your score is frozen so it cannot move against you.`
+        : `Confirmed Risk −0: no confirmed adverse signals found. This is a statement about recorded evidence only — never a guarantee that a person is safe to deal with.`
     );
     explanation.push(
       `Confidence ${confidence}/100: based on ${freshEvidence.length} fresh evidence record${freshEvidence.length === 1 ? "" : "s"}${allFresh ? " with all signals inside their freshness horizons" : " (some signals are stale)"}.`
@@ -320,7 +341,7 @@ export function computeScoreFromInputs(
         key: "identityAssurance",
         label: "Identity Assurance",
         value: assuranceValue,
-        max: 60,
+        max: ASSURANCE[4],
         note: identityLive
           ? `Government-verified, L${level}${freshnessFactor < 1 ? ", freshness-scaled" : ""}`
           : "No live government verification",
@@ -329,24 +350,24 @@ export function computeScoreFromInputs(
         key: "verifiedCredentials",
         label: "Verified Credentials",
         value: credentialValue,
-        max: 20,
-        note: `${freshCredentials.length} active, evidence-backed`,
+        max: rules.credentialMax,
+        note: `${freshCredentials.length} active, evidence-backed (+${rules.credentialPoints} each)`,
       },
       {
         key: "verifiedReputation",
         label: "Verified Reputation",
         value: reputationValue,
-        max: 15,
+        max: rules.interactionMax * rules.interactionPoints,
         note:
           inputs.verifiedInteractions > 0
-            ? `${inputs.verifiedInteractions} verified interaction${inputs.verifiedInteractions === 1 ? "" : "s"} (90-day window)`
-            : "No verified interactions in the last 90 days",
+            ? `${inputs.verifiedInteractions} verified interaction${inputs.verifiedInteractions === 1 ? "" : "s"} (${rules.interactionWindowDays}-day window)`
+            : `No verified interactions in the last ${rules.interactionWindowDays} days`,
       },
       {
         key: "resolutionHistory",
         label: "Resolution History",
         value: resolutionValue,
-        max: 10,
+        max: rules.clearedMax * rules.clearedPoints,
         note:
           inputs.clearedFlags > 0
             ? `${inputs.clearedFlags} flag${inputs.clearedFlags === 1 ? "" : "s"} cleared by human review`
@@ -359,15 +380,18 @@ export function computeScoreFromInputs(
         max: 0,
         note:
           inputs.confirmedFlags > 0
-            ? `${inputs.confirmedFlags} confirmed flag${inputs.confirmedFlags === 1 ? "" : "s"} (human-reviewed, appealable)`
-            : "No confirmed flags on record",
+            ? `${inputs.confirmedFlags} confirmed flag${inputs.confirmedFlags === 1 ? "" : "s"} (human-reviewed, appealable; −${rules.riskPenaltyPer} each, cap −${rules.riskMaxPenalty})`
+            : `No confirmed flags on record (−${rules.riskPenaltyPer} each when confirmed)`,
       },
     ],
     explanation,
-    inputsHash: inputsHashFor(inputs),
+    // Combined hash: inputs + the policy rules that interpreted them —
+    // a policy change invalidates every cached snapshot (Stage 8).
+    inputsHash: sha256Hex(inputsHashFor(inputs) + policyRulesHash(rules)),
     trigger,
     computedAt: new Date(now).toISOString(),
-    expiresAt: new Date(now + SNAPSHOT_TTL_MS).toISOString(),
+    expiresAt: new Date(now + ttlMs).toISOString(),
+    policyVersion: 0, // filled by the caller (persistSnapshot path)
   };
 }
 
@@ -383,7 +407,19 @@ function shapeSnapshot(row: {
   trigger: string;
   computedAt: Date;
   expiresAt: Date;
+  state?: string | null;
+  policyId?: string | null;
+  frozenAt?: Date | null;
+  frozenReason?: string | null;
 }) {
+  const state =
+    row.state === "FROZEN"
+      ? "FROZEN"
+      : row.state === "RETIRED"
+        ? "RETIRED"
+        : row.expiresAt.getTime() > Date.now()
+          ? "ACTIVE"
+          : "STALE";
   return {
     id: row.id,
     version: row.version,
@@ -397,10 +433,15 @@ function shapeSnapshot(row: {
     computedAt: row.computedAt.toISOString(),
     expiresAt: row.expiresAt.toISOString(),
     fresh: row.expiresAt.getTime() > Date.now(),
+    // Stage 8 — lifecycle + policy provenance
+    state,
+    policyId: row.policyId ?? null,
+    frozenAt: row.frozenAt?.toISOString() ?? null,
+    frozenReason: row.frozenReason ?? null,
   };
 }
 
-async function persistSnapshot(userId: string, computed: ComputedScore) {
+async function persistSnapshot(userId: string, computed: ComputedScore, policyId: string | null) {
   await db.trustScoreSnapshot.create({
     data: {
       userId,
@@ -414,6 +455,8 @@ async function persistSnapshot(userId: string, computed: ComputedScore) {
       inputsHash: computed.inputsHash,
       trigger: computed.trigger,
       expiresAt: new Date(computed.expiresAt),
+      state: "ACTIVE",
+      policyId,
     },
   });
   // Prune: keep the latest SNAPSHOT_RETAIN snapshots per user.
@@ -433,13 +476,31 @@ export async function getScoreSnapshot(userId: string): Promise<ReturnType<typeo
     where: { userId },
     orderBy: { computedAt: "desc" },
   });
-  const inputs = await collectInputs(userId);
-  const hash = inputsHashFor(inputs);
+
+  // Stage 8 — FREEZE (appeal pending): serve the frozen row verbatim.
+  // The score cannot move — up or down — until the human decision lands.
+  if (latest && latest.state === "FROZEN") {
+    return shapeSnapshot(latest);
+  }
+
+  // Stage 8 — the ACTIVE policy drives the numbers AND the inputsHash:
+  // a policy change recomputes every user (new snapshot names the policy).
+  const policy = await getActivePolicy();
+  const rules = policy?.rules;
+  if (!rules) {
+    // Unreachable in practice (seed guarantees v1) — guard for type safety.
+    if (latest) return shapeSnapshot(latest);
+    throw new Error("No active scoring policy");
+  }
+  const ttlMs = rules.snapshotTtlHours * 60 * 60 * 1000;
+  const inputs = await collectInputs(userId, rules.interactionWindowDays);
+  const hash = sha256Hex(inputsHashFor(inputs) + policyRulesHash(rules));
 
   if (
     latest &&
     latest.inputsHash === hash &&
-    latest.expiresAt.getTime() > Date.now()
+    latest.expiresAt.getTime() > Date.now() &&
+    latest.policyId === policy.id
   ) {
     return shapeSnapshot(latest);
   }
@@ -447,11 +508,12 @@ export async function getScoreSnapshot(userId: string): Promise<ReturnType<typeo
   const trigger =
     latest === undefined || latest === null
       ? "INITIAL"
-      : latest.inputsHash !== hash
+      : latest.inputsHash !== hash || latest.policyId !== policy.id
         ? "MATERIAL_CHANGE"
         : "PERIODIC";
-  const computed = computeScoreFromInputs(inputs, trigger);
-  await persistSnapshot(userId, computed);
+  const computed = computeScoreFromInputs(inputs, trigger, rules, ttlMs);
+  computed.policyVersion = policy.version;
+  await persistSnapshot(userId, computed, policy.id);
   const fresh = await db.trustScoreSnapshot.findFirst({
     where: { userId },
     orderBy: { computedAt: "desc" },

@@ -22,6 +22,7 @@ import {
   getCredentialsForUser,
 } from "@/lib/services/trustscore-service";
 import { getSessionUser } from "@/lib/platform/session";
+import { isAutomatedDecisionsEnabled } from "@/lib/services/engine-service";
 
 export const SHARE_SCOPES = ["PROFILE", "SIGNALS", "ATTRIBUTES", "SCORE"] as const;
 export type ShareScope = (typeof SHARE_SCOPES)[number];
@@ -542,7 +543,7 @@ export async function markNotificationsRead(userId: string, id?: string): Promis
 // ---------------------------------------------------------------------------
 
 async function buildExportPayload(userId: string): Promise<Record<string, unknown>> {
-  const [user, identity, consents, evidence, credentials, shareTokens, receipts, sessions, notifications, audit, dsr, phoneVerifications, livenessSessions, verificationSessions, safetyChecks, trustRequests, flags] =
+  const [user, identity, consents, evidence, credentials, shareTokens, receipts, sessions, notifications, audit, dsr, phoneVerifications, livenessSessions, verificationSessions, safetyChecks, trustRequests, flags, scoreSnapshots] =
     await Promise.all([
       db.userAccount.findUnique({ where: { id: userId } }),
       db.trustIdentity.findUnique({
@@ -581,6 +582,13 @@ async function buildExportPayload(userId: string): Promise<Record<string, unknow
           resolution: true,
           appeal: true,
         },
+      }),
+      // Stage 8 — score snapshots with policy provenance (which rules produced
+      // each score — the engine section below joins the policy summaries)
+      db.trustScoreSnapshot.findMany({
+        where: { userId },
+        orderBy: { computedAt: "desc" },
+        take: 20,
       }),
     ]);
 
@@ -713,6 +721,29 @@ async function buildExportPayload(userId: string): Promise<Record<string, unknow
               decidedAt: f.appeal.decidedAt,
             }
           : null,
+      })),
+    },
+    // Stage 8 — Trust Engine: every score you were ever shown, which policy
+    // version produced it, and its lifecycle state (frozen snapshots name the
+    // pending appeal). Automated-significant-decisions status at export time.
+    trustEngine: {
+      note: "Each score you were shown names the versioned scoring policy that produced it. Policies change only through a new version covered by a completed DPIA — never silently.",
+      automatedSignificantDecisions: await isAutomatedDecisionsEnabled(),
+      snapshots: scoreSnapshots.map((s) => ({
+        id: s.id,
+        status: s.status,
+        score: s.score,
+        confidence: s.confidence,
+        riskBand: s.riskBand,
+        state: s.state,
+        frozenReason: s.frozenReason,
+        frozenAt: s.frozenAt,
+        trigger: s.trigger,
+        policyId: s.policyId,
+        components: JSON.parse(s.components),
+        explanation: JSON.parse(s.explanation),
+        computedAt: s.computedAt,
+        expiresAt: s.expiresAt,
       })),
     },
   };

@@ -59,14 +59,14 @@ const STAGES: { id: string; title: string; status: StageStatus; detail: string }
   {
     id: "7",
     title: "Reputation",
-    status: "active",
+    status: "done",
     detail: "Flags with evidence, human-reviewed resolutions and appeals, verified interactions — anti-gaming by design (L2 reporters, quotas, masked identities).",
   },
   {
     id: "8",
     title: "Trust engine",
-    status: "planned",
-    detail: "Rules-first explainable scoring, score states, DPIA gate.",
+    status: "active",
+    detail: "Rules-first versioned scoring policy (public by design), score lifecycle with freeze-on-appeal, DPIA-gated automated decisions — the engine is inspectable.",
   },
   {
     id: "9",
