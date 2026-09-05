@@ -54,7 +54,19 @@ export type AuditAction =
   | "POLICY_ACTIVATED"
   | "POLICY_SIMULATED"
   | "DPIA_RECORDED"
-  | "ENGINE_GATE_TOGGLED";
+  | "ENGINE_GATE_TOGGLED"
+  // Stage 9 — B2B Platform (developer portal, API keys, webhooks, decisions)
+  | "DEV_CLIENT_CREATED"
+  | "DEV_CLIENT_LIVE_ENABLED"
+  | "DEV_PLAN_CHANGED"
+  | "API_KEY_MINTED"
+  | "API_KEY_REVOKED"
+  | "API_QUOTA_EXCEEDED"
+  | "WEBHOOK_CONFIGURED"
+  | "WEBHOOK_TEST_SENT"
+  | "DEV_TEAM_MEMBER_ADDED"
+  | "DEV_TEAM_MEMBER_REMOVED"
+  | "TRUST_DECISION_API";
 
 interface AuditInput {
   actorType: "USER" | "SYSTEM" | "ANONYMOUS";
@@ -117,6 +129,16 @@ const SAFE_METADATA_KEYS = new Set([
   "cohort",
   "frozenExcluded",
   "simulated",
+  // Stage 9 — B2B labels / counters only (never key material, URLs or inputs)
+  "environment",
+  "plan",
+  "keyPrefix",
+  "rotateSecret",
+  "event",
+  "role",
+  "attempts",
+  "statusCode",
+  "deliveryStatus",
 ]);
 
 export async function recordAudit(input: AuditInput): Promise<void> {

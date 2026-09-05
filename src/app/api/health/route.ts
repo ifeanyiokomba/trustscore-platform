@@ -3,8 +3,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 
-const STAGE = "8 — Trust Engine (rules-first versioned scoring policy, DPIA-gated automated decisions, score lifecycle with freeze-on-appeal)";
-const VERSION = "1.7.0";
+const STAGE = "9 — B2B Platform (developer portal, API keys, webhooks, team RBAC, Trust Decision API POST /v1/trust/check)";
+const VERSION = "1.8.0";
 const startedAt = Date.now();
 
 export async function GET(_req: NextRequest) {

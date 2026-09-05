@@ -1,0 +1,868 @@
+     1→// TrustScore Stage 6 — SafetyService (directive §2/§46 "Check Before You Deal").
+     2→//
+     3→// The VERIFIER-side product: a signed-in member runs a sanitized assessment
+     4→// on a counterparty before dealing with them. Four entry methods:
+     5→//   HANDLE        — @handle lookup, gated by the subject's standing
+     6→//                   SAFETY_CHECK consent (anti-enumeration: unknown handle
+     7→//                   and disabled checks return byte-identical responses)
+     8→//   PHONE         — consent-gated peppered-hash identifier match: the raw
+     9→//                   phone is fingerprinted server-side and discarded; it is
+    10→//                   never stored, logged or echoed (directive §38/§50)
+    11→//   TRUST_LINK/QR — an active Stage 5 share token (token scopes govern; the
+    12→//                   view is counted + receipted with the verifier's NAME)
+    13→//
+    14→// Every completed check is: consent-backed (per-check consent), receipted to
+    15→// the subject (TrustReceipt with a named viewer label), notified, audited,
+    16→// and snapshotted into SafetyCheck.assessment — exactly what was shown.
+    17→//
+    18→// Trust Requests: when a handle is not checkable, the verifier may ASK once
+    19→// (7-day expiry, one pending per pair). ACCEPT mints a scoped trust link and
+    20→// runs the assessment for the verifier; the subject keeps the link (their
+    21→// token, their control). DECLINE is final for that request.
+    22→//
+    23→// Red lines (directive §50/§59): the assessment NEVER says "this person is
+    24→// safe" — the locked language is "No confirmed adverse signals found" plus
+    25→// the not-a-guarantee disclaimer. No raw identifiers in any response, audit
+    26→// event, receipt or stored assessment.
+    27→
+    28→import { NextRequest } from "next/server";
+    29→import { db } from "@/lib/db";
+    30→import { randomBytes } from "crypto";
+    31→import { sha256Hex, hashIp } from "@/lib/platform/crypto";
+    32→import { recordAudit } from "@/lib/services/audit-service";
+    33→import { notifyUser } from "@/lib/services/notification-service";
+    34→import { getScoreSnapshot, getCredentialsForUser } from "@/lib/services/trustscore-service";
+    35→import { viewPublicCard } from "@/lib/services/passport-service";
+    36→import { normalizePhoneE164, phoneFingerprint } from "@/lib/providers/phone-provider";
+    37→import { CONSENT_POLICY_VERSION } from "@/lib/providers/ninauth";
+    38→
+    39→const SAFETY_REQUESTER = "TrustScore Safety Check";
+    40→const SAFETY_PURPOSE =
+    41→  "Allow verified TrustScore members to run a safety check on your handle or verified phone before dealing with you. Every check is receipted to you.";
+    42→export const SAFETY_SCOPE_KEYS = {
+    43→  status: "safety.status",
+    44→  profile: "safety.profile",
+    45→  signals: "safety.signals",
+    46→  phoneMatch: "safety.phone_match",
+    47→} as const;
+    48→
+    49→export const TRUST_REQUEST_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+    50→const CHECKS_RETAIN = 50;
+    51→const TOKEN_MAX_VIEWS = 10;
+    52→
+    53→// Locked card language — shared with the Stage 5 public viewer.
+    54→export const SAFETY_LANGUAGE = {
+    55→  adverse: "No confirmed adverse signals found",
+    56→  disclaimer:
+    57→    "A TrustScore summarizes recorded verification evidence. It is not a guarantee that a person is safe to deal with.",
+    58→} as const;
+    59→
+    60→// Status-derived headline. NEVER "safe" — only statements about evidence.
+    61→function headlineForStatus(status: string): string {
+    62→  switch (status) {
+    63→    case "HIGH_RISK":
+    64→      return "Confirmed risk signals on record — proceed only with human review";
+    65→    case "REVIEW_REQUIRED":
+    66→      return "Under review — proceed with care";
+    67→    case "CAUTION":
+    68→      return "Identity freshness has lapsed — proceed with care";
+    69→    case "ESTABLISHED":
+    70→    case "VERIFIED":
+    71→      return SAFETY_LANGUAGE.adverse;
+    72→    default:
+    73→      return "New profile — no confirmed adverse signals found";
+    74→  }
+    75→}
+    76→
+    77→export interface SafetySettings {
+    78→  enabled: boolean;
+    79→  includeProfile: boolean;
+    80→  includeSignals: boolean;
+    81→  allowPhoneMatch: boolean;
+    82→  consentId: string | null;
+    83→  grantedAt: string | null;
+    84→}
+    85→
+    86→// ---------------------------------------------------------------------------
+    87→// Standing SAFETY_CHECK consent (subject-side settings)
+    88→// ---------------------------------------------------------------------------
+    89→
+    90→interface SafetySettingsInput {
+    91→  enabled: boolean;
+    92→  includeProfile: boolean;
+    93→  includeSignals: boolean;
+    94→  allowPhoneMatch: boolean;
+    95→}
+    96→
+    97→async function findActiveSafetyConsent(userId: string) {
+    98→  const rows = await db.consent.findMany({
+    99→    where: { userId, requester: SAFETY_REQUESTER, withdrawnAt: null },
+   100→    orderBy: { grantedAt: "desc" },
+   101→  });
+   102→  return rows[0] ?? null;
+   103→}
+   104→
+   105→function scopesFor(input: SafetySettingsInput): string[] {
+   106→  const scopes: string[] = [SAFETY_SCOPE_KEYS.status];
+   107→  if (input.includeProfile) scopes.push(SAFETY_SCOPE_KEYS.profile);
+   108→  if (input.includeSignals) scopes.push(SAFETY_SCOPE_KEYS.signals);
+   109→  if (input.allowPhoneMatch) scopes.push(SAFETY_SCOPE_KEYS.phoneMatch);
+   110→  return scopes;
+   111→}
+   112→
+   113→export async function getSafetySettings(userId: string): Promise<SafetySettings> {
+   114→  const consent = await findActiveSafetyConsent(userId);
+   115→  if (!consent) {
+   116→    return {
+   117→      enabled: false,
+   118→      includeProfile: false,
+   119→      includeSignals: false,
+   120→      allowPhoneMatch: false,
+   121→      consentId: null,
+   122→      grantedAt: null,
+   123→    };
+   124→  }
+   125→  const granted = JSON.parse(consent.scopes) as string[];
+   126→  return {
+   127→    enabled: true,
+   128→    includeProfile: granted.includes(SAFETY_SCOPE_KEYS.profile),
+   129→    includeSignals: granted.includes(SAFETY_SCOPE_KEYS.signals),
+   130→    allowPhoneMatch: granted.includes(SAFETY_SCOPE_KEYS.phoneMatch),
+   131→    consentId: consent.id,
+   132→    grantedAt: consent.grantedAt.toISOString(),
+   133→  };
+   134→}
+   135→
+   136→export async function updateSafetySettings(
+   137→  userId: string,
+   138→  input: SafetySettingsInput
+   139→): Promise<SafetySettings> {
+   140→  if (!input.enabled) {
+   141→    // Withdraw any active standing consent — checks stop immediately.
+   142→    const consent = await findActiveSafetyConsent(userId);
+   143→    if (consent) {
+   144→      await db.consent.update({
+   145→        where: { id: consent.id },
+   146→        data: { withdrawnAt: new Date() },
+   147→      });
+   148→      await recordAudit({
+   149→        actorType: "USER",
+   150→        actorId: userId,
+   151→        action: "SAFETY_SETTINGS_UPDATED",
+   152→        subjectType: "Consent",
+   153→        subjectId: consent.id,
+   154→        metadata: { outcome: "disabled" },
+   155→      });
+   156→      await notifyUser(
+   157→        userId,
+   158→        "SECURITY",
+   159→        "Safety checks turned off",
+   160→        "Members can no longer run safety checks on your handle or phone number. The change is effective immediately and audited."
+   161→      );
+   162→    }
+   163→    return getSafetySettings(userId);
+   164→  }
+   165→
+   166→  const scopes = scopesFor(input);
+   167→  const existing = await findActiveSafetyConsent(userId);
+   168→  if (existing) {
+   169→    await db.consent.update({
+   170→      where: { id: existing.id },
+   171→      data: { scopes: JSON.stringify(scopes) },
+   172→    });
+   173→  } else {
+   174→    await db.consent.create({
+   175→      data: {
+   176→        userId,
+   177→        requester: SAFETY_REQUESTER,
+   178→        purpose: SAFETY_PURPOSE,
+   179→        scopes: JSON.stringify(scopes),
+   180→        policyVersion: CONSENT_POLICY_VERSION,
+   181→      },
+   182→    });
+   183→    await notifyUser(
+   184→      userId,
+   185→      "SECURITY",
+   186→      "Safety checks turned on",
+   187→      "Verified members can now run a safety check on your handle. You control what they see, every check is receipted, and you can turn this off at any time."
+   188→    );
+   189→  }
+   190→  await recordAudit({
+   191→    actorType: "USER",
+   192→    actorId: userId,
+   193→    action: "SAFETY_SETTINGS_UPDATED",
+   194→    subjectType: "Consent",
+   195→    metadata: { outcome: "enabled", scopes: scopes.length },
+   196→  });
+   197→  return getSafetySettings(userId);
+   198→}
+   199→
+   200→// ---------------------------------------------------------------------------
+   201→// Sanitized assessment builder
+   202→// ---------------------------------------------------------------------------
+   203→
+   204→interface AssessmentOptions {
+   205→  method: "HANDLE" | "PHONE" | "TRUST_LINK" | "QR";
+   206→  includeProfile: boolean;
+   207→  includeSignals: boolean;
+   208→  includeScore?: boolean; // token checks only (SCORE scope)
+   209→  attributes?: { key: string; value: string }[]; // token checks only (ATTRIBUTES scope)
+   210→}
+   211→
+   212→async function buildAssessment(
+   213→  subject: { id: string; displayName: string; handle: string },
+   214→  opts: AssessmentOptions
+   215→) {
+   216→  const [snapshot, identity, credentials] = await Promise.all([
+   217→    getScoreSnapshot(subject.id),
+   218→    db.trustIdentity.findUnique({
+   219→      where: { userId: subject.id },
+   220→      include: { identifiers: true },
+   221→    }),
+   222→    getCredentialsForUser(subject.id),
+   223→  ]);
+   224→
+   225→  const now = Date.now();
+   226→  const level =
+   227→    identity && identity.status === "VERIFIED" && (identity.expiresAt?.getTime() ?? 0) > now
+   228→      ? identity.assuranceLevel
+   229→      : 0;
+   230→
+   231→  const signals =
+   232→    opts.includeSignals && identity
+   233→      ? identity.identifiers
+   234→          .filter((i) => i.status === "ACTIVE" && (i.expiresAt?.getTime() ?? 0) > now)
+   235→          .map((i) => ({
+   236→            type: i.type,
+   237→            hint: i.hint,
+   238→            verifiedAt: i.verifiedAt.toISOString(),
+   239→            expiresAt: i.expiresAt?.toISOString() ?? null,
+   240→          }))
+   241→      : [];
+   242→
+   243→  const assessment: Record<string, unknown> = {
+   244→    method: opts.method,
+   245→    checkedAt: new Date().toISOString(),
+   246→    headline: headlineForStatus(snapshot.status),
+   247→    summary: {
+   248→      status: snapshot.status,
+   249→      riskBand: snapshot.riskBand,
+   250→      assuranceLevel: level,
+   251→      // Stage 8 — lifecycle honesty: a frozen score is under human appeal
+   252→      // review; a stale one is past its horizon. Neither is a negative claim.
+   253→      state: (snapshot as { state?: string }).state ?? "ACTIVE",
+   254→    },
+   255→    signals,
+   256→    credentialsCount: credentials.filter(
+   257→      (c) => c.status === "ACTIVE" && (c.expiresAt ? Date.parse(c.expiresAt) > now : true)
+   258→    ).length,
+   259→    freshness: {
+   260→      assessedAt: snapshot.computedAt,
+   261→      expiresAt: snapshot.expiresAt,
+   262→      fresh: Date.parse(snapshot.expiresAt) > now,
+   263→    },
+   264→    explanation: snapshot.explanation, // already redacted + honest (NDPA §37)
+   265→    language: SAFETY_LANGUAGE,
+   266→  };
+   267→  if (opts.includeProfile) {
+   268→    assessment.subject = { displayName: subject.displayName, handle: subject.handle };
+   269→  }
+   270→  if (opts.includeScore) {
+   271→    // Score number only via SCORE-scoped trust links — handle checks stay
+   272→    // band-level (no false precision on a counterparty's behalf).
+   273→    assessment.score = { score: snapshot.score, confidence: snapshot.confidence };
+   274→  }
+   275→  if (opts.attributes && opts.attributes.length > 0) {
+   276→    assessment.attributes = opts.attributes;
+   277→  }
+   278→  return assessment;
+   279→}
+   280→
+   281→// ---------------------------------------------------------------------------
+   282→// Run a safety check — POST /api/v1/safety/check
+   283→// ---------------------------------------------------------------------------
+   284→
+   285→export interface SafetyCheckInput {
+   286→  handle?: string;
+   287→  phone?: string;
+   288→  link?: string; // trust link URL or raw token
+   289→  qr?: string; // QR payload (trust link URL or raw token)
+   290→}
+   291→
+   292→export type SafetyCheckResult =
+   293→  | { outcome: "OK"; checkId: string; assessment: Record<string, unknown>; receipted: boolean }
+   294→  | {
+   295→      outcome: "SELF";
+   296→      checkId: string;
+   297→      message: string;
+   298→      assessment: Record<string, unknown>;
+   299→    }
+   300→  | { outcome: "UNAVAILABLE"; message: string } // anti-enumeration: identical shape
+   301→  | { outcome: "DEAD_LINK"; reason: "EXPIRED" | "REVOKED" | "VIEW_LIMIT" };
+   302→
+   303→function extractToken(input: string): string {
+   304→  const trimmed = input.trim();
+   305→  try {
+   306→    const url = new URL(trimmed);
+   307→    const trust = url.searchParams.get("trust");
+   308→    if (trust) return trust;
+   309→  } catch {
+   310→    /* not a URL — treat as a raw token */
+   311→  }
+   312→  return trimmed;
+   313→}
+   314→
+   315→function verifierIpHash(req: NextRequest): string | null {
+   316→  return hashIp(
+   317→    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+   318→      req.headers.get("x-real-ip")
+   319→  );
+   320→}
+   321→
+   322→export async function runSafetyCheck(
+   323→  verifier: { id: string; displayName: string; handle: string },
+   324→  input: SafetyCheckInput,
+   325→  req: NextRequest
+   326→): Promise<SafetyCheckResult> {
+   327→  const provided = [input.handle, input.phone, input.link, input.qr].filter(
+   328→    (v) => v !== undefined && v !== ""
+   329→  ).length;
+   330→  if (provided !== 1) {
+   331→    return { outcome: "UNAVAILABLE", message: "Provide exactly one of: handle, phone, link or qr." };
+   332→  }
+   333→
+   334→  // ----- TRUST_LINK / QR (token scopes govern; named, receipted, counted) ----
+   335→  if (input.link !== undefined || input.qr !== undefined) {
+   336→    const method: "TRUST_LINK" | "QR" = input.qr !== undefined ? "QR" : "TRUST_LINK";
+   337→    const raw = extractToken((input.qr ?? input.link) as string);
+   338→    const view = await viewPublicCard(raw, req, {
+   339→      id: verifier.id,
+   340→      displayName: verifier.displayName,
+   341→      handle: verifier.handle,
+   342→    });
+   343→    if (view.outcome !== "OK") {
+   344→      // Dead links are honest about WHY (the verifier was handed the token by
+   345→      // the subject) — mirrors the public viewer's 410 semantics.
+   346→      if (view.outcome === "EXPIRED") return { outcome: "DEAD_LINK", reason: view.reason };
+   347→      return { outcome: "DEAD_LINK", reason: "REVOKED" };
+   348→    }
+   349→    const assessment = await buildAssessment(view.subject, {
+   350→      method,
+   351→      includeProfile: view.scopes.includes("PROFILE"),
+   352→      includeSignals: view.scopes.includes("SIGNALS"),
+   353→      includeScore: view.scopes.includes("SCORE"),
+   354→      attributes: view.attributes,
+   355→    });
+   356→    const row = await db.safetyCheck.create({
+   357→      data: {
+   358→        verifierId: verifier.id,
+   359→        subjectId: view.subject.id,
+   360→        method,
+   361→        assessment: JSON.stringify(assessment),
+   362→        shareTokenId: view.shareTokenId,
+   363→        ipHash: verifierIpHash(req),
+   364→      },
+   365→    });
+   366→    await notifyUser(
+   367→      view.subject.id,
+   368→      "SECURITY",
+   369→      "A member ran a safety check on you",
+   370→      `@${verifier.handle} checked your Trust Card via ${method === "QR" ? "a QR Trust Card scan" : "a trust link"}. The assessment they saw is recorded in your safety-check receipts.`
+   371→    );
+   372→    await recordAudit({
+   373→      actorType: "USER",
+   374→      actorId: verifier.id,
+   375→      action: "SAFETY_CHECK_RUN",
+   376→      subjectType: "UserAccount",
+   377→      subjectId: view.subject.id,
+   378→      metadata: { method, outcome: "completed" },
+   379→    });
+   380→    return { outcome: "OK", checkId: row.id, assessment, receipted: true };
+   381→  }
+   382→
+   383→  // ----- PHONE (consent-gated peppered-hash match) ---------------------------
+   384→  if (input.phone !== undefined) {
+   385→    const e164 = normalizePhoneE164(input.phone);
+   386→    if (!e164) {
+   387→      return { outcome: "UNAVAILABLE", message: "Enter a valid Nigerian mobile number." };
+   388→    }
+   389→    const fingerprint = phoneFingerprint(e164); // raw phone discarded here — never stored
+   390→    const identifier = await db.identityIdentifier.findFirst({
+   391→      where: { type: "PHONE", hash: fingerprint, status: "ACTIVE" },
+   392→      include: { trustIdentity: { include: { user: true } } },
+   393→    });
+   394→    const subject =
+   395→      identifier &&
+   396→      (identifier.expiresAt?.getTime() ?? 0) > Date.now() &&
+   397→      identifier.trustIdentity.status === "VERIFIED" &&
+   398→      identifier.trustIdentity.user.status === "ACTIVE"
+   399→        ? identifier.trustIdentity.user
+   400→        : null;
+   401→    if (!subject || subject.id === verifier.id) {
+   402→      // Anti-enumeration: no match, stale match or self — identical response.
+   403→      return {
+   404→        outcome: "UNAVAILABLE",
+   405→        message: "No safety-check profile is available for this number.",
+   406→      };
+   407→    }
+   408→    const settings = await getSafetySettings(subject.id);
+   409→    if (!settings.enabled || !settings.allowPhoneMatch) {
+   410→      return {
+   411→        outcome: "UNAVAILABLE",
+   412→        message: "No safety-check profile is available for this number.",
+   413→      };
+   414→    }
+   415→    const assessment = await buildAssessment(
+   416→      { id: subject.id, displayName: subject.displayName, handle: subject.handle },
+   417→      {
+   418→        method: "PHONE",
+   419→        includeProfile: settings.includeProfile,
+   420→        includeSignals: settings.includeSignals,
+   421→      }
+   422→    );
+   423→    const row = await db.safetyCheck.create({
+   424→      data: {
+   425→        verifierId: verifier.id,
+   426→        subjectId: subject.id,
+   427→        method: "PHONE",
+   428→        assessment: JSON.stringify(assessment),
+   429→        consentId: settings.consentId,
+   430→        ipHash: verifierIpHash(req),
+   431→      },
+   432→    });
+   433→    await notifyUser(
+   434→      subject.id,
+   435→      "SECURITY",
+   436→      "A member ran a safety check on you",
+   437→      `@${verifier.handle} ran a safety check using your verified phone number. The assessment they saw is recorded in your safety-check receipts.`
+   438→    );
+   439→    await recordAudit({
+   440→      actorType: "USER",
+   441→      actorId: verifier.id,
+   442→      action: "SAFETY_CHECK_RUN",
+   443→      subjectType: "UserAccount",
+   444→      subjectId: subject.id,
+   445→      metadata: { method: "PHONE", outcome: "completed" },
+   446→    });
+   447→    return { outcome: "OK", checkId: row.id, assessment, receipted: true };
+   448→  }
+   449→
+   450→  // ----- HANDLE ----------------------------------------------------------------
+   451→  const handle = (input.handle ?? "").trim().replace(/^@/, "").toLowerCase();
+   452→  if (!/^[a-z0-9_]{3,24}$/.test(handle)) {
+   453→    return {
+   454→      outcome: "UNAVAILABLE",
+   455→      message: "Enter a valid handle (3–24 characters: a–z, 0–9, _).",
+   456→    };
+   457→  }
+   458→  const subject = await db.userAccount.findUnique({
+   459→    where: { handle },
+   460→    select: { id: true, displayName: true, handle: true, status: true },
+   461→  });
+   462→
+   463→  // Self-check: your own assessment, no standing consent needed (it's you).
+   464→  if (subject && subject.id === verifier.id) {
+   465→    const assessment = await buildAssessment(subject, {
+   466→      method: "HANDLE",
+   467→      includeProfile: true,
+   468→      includeSignals: true,
+   469→    });
+   470→    const row = await db.safetyCheck.create({
+   471→      data: {
+   472→        verifierId: verifier.id,
+   473→        subjectId: verifier.id,
+   474→        method: "HANDLE",
+   475→        assessment: JSON.stringify(assessment),
+   476→      },
+   477→    });
+   478→    await recordAudit({
+   479→      actorType: "USER",
+   480→      actorId: verifier.id,
+   481→      action: "SAFETY_CHECK_RUN",
+   482→      subjectType: "UserAccount",
+   483→      subjectId: verifier.id,
+   484→      metadata: { method: "HANDLE", outcome: "self" },
+   485→    });
+   486→    return {
+   487→      outcome: "SELF",
+   488→      checkId: row.id,
+   489→      message:
+   490→        "This is your own profile — the assessment below is what a member would see if you turn on safety checks (subject to your sharing settings).",
+   491→      assessment,
+   492→    };
+   493→  }
+   494→
+   495→  // Anti-enumeration: unknown handle and disabled checks are identical.
+   496→  const unavailable = {
+   497→    outcome: "UNAVAILABLE" as const,
+   498→    message: "No safety-check profile is available for this handle.",
+   499→  };
+   500→
+   501→  if (!subject || subject.status !== "ACTIVE") {
+   502→    return unavailable;
+   503→  }
+   504→  const settings = await getSafetySettings(subject.id);
+   505→  if (!settings.enabled) {
+   506→    return unavailable;
+   507→  }
+   508→  const assessment = await buildAssessment(subject, {
+   509→    method: "HANDLE",
+   510→    includeProfile: settings.includeProfile,
+   511→    includeSignals: settings.includeSignals,
+   512→  });
+   513→  const row = await db.safetyCheck.create({
+   514→    data: {
+   515→      verifierId: verifier.id,
+   516→      subjectId: subject.id,
+   517→      method: "HANDLE",
+   518→      assessment: JSON.stringify(assessment),
+   519→      consentId: settings.consentId,
+   520→      ipHash: verifierIpHash(req),
+   521→    },
+   522→  });
+   523→  await notifyUser(
+   524→    subject.id,
+   525→    "SECURITY",
+   526→    "A member ran a safety check on you",
+   527→    `@${verifier.handle} ran a safety check on your handle before dealing with you. The assessment they saw is recorded in your safety-check receipts.`
+   528→  );
+   529→  await recordAudit({
+   530→    actorType: "USER",
+   531→    actorId: verifier.id,
+   532→    action: "SAFETY_CHECK_RUN",
+   533→    subjectType: "UserAccount",
+   534→    subjectId: subject.id,
+   535→    metadata: { method: "HANDLE", outcome: "completed" },
+   536→  });
+   537→  await pruneSafetyChecks(subject.id);
+   538→  return { outcome: "OK", checkId: row.id, assessment, receipted: true };
+   539→}
+   540→
+   541→// ---------------------------------------------------------------------------
+   542→// Verifier read model — GET /api/v1/safety/checks
+   543→// ---------------------------------------------------------------------------
+   544→
+   545→export async function getChecksByVerifier(verifierId: string) {
+   546→  const [rows, requests] = await Promise.all([
+   547→    db.safetyCheck.findMany({
+   548→      where: { verifierId },
+   549→      orderBy: { createdAt: "desc" },
+   550→      take: 20,
+   551→      include: { subject: { select: { displayName: true, handle: true } } },
+   552→    }),
+   553→    db.trustRequest.findMany({
+   554→      where: { verifierId },
+   555→      orderBy: { createdAt: "desc" },
+   556→      take: 10,
+   557→      include: { subject: { select: { displayName: true, handle: true } } },
+   558→    }),
+   559→  ]);
+   560→  const now = Date.now();
+   561→  return {
+   562→    checks: rows.map((r) => {
+   563→      let a: Record<string, unknown> = {};
+   564→      try {
+   565→        a = JSON.parse(r.assessment) as Record<string, unknown>;
+   566→      } catch {
+   567→        a = {};
+   568→      }
+   569→      const summary = (a.summary ?? {}) as Record<string, unknown>;
+   570→      return {
+   571→        id: r.id,
+   572→        method: r.method,
+   573→        subject: r.subject
+   574→          ? { displayName: r.subject.displayName, handle: r.subject.handle }
+   575→          : null,
+   576→        status: summary.status ?? null,
+   577→        riskBand: summary.riskBand ?? null,
+   578→        headline: (a.headline as string) ?? null,
+   579→        checkedAt: r.createdAt.toISOString(),
+   580→        self: r.verifierId === r.subjectId,
+   581→      };
+   582→    }),
+   583→    requests: requests.map((r) => ({
+   584→      id: r.id,
+   585→      subject: r.subject
+   586→        ? { displayName: r.subject.displayName, handle: r.subject.handle }
+   587→        : null,
+   588→      status: r.status === "PENDING" && r.expiresAt.getTime() <= now ? "EXPIRED" : r.status,
+   589→      message: r.message,
+   590→      respondedAt: r.respondedAt?.toISOString() ?? null,
+   591→      expiresAt: r.expiresAt.toISOString(),
+   592→      createdAt: r.createdAt.toISOString(),
+   593→    })),
+   594→  };
+   595→}
+   596→
+   597→// ---------------------------------------------------------------------------
+   598→// Subject read model — GET /api/v1/safety/me
+   599→// ---------------------------------------------------------------------------
+   600→
+   601→export async function getSafetyMe(userId: string) {
+   602→  const [settings, checks, requests] = await Promise.all([
+   603→    getSafetySettings(userId),
+   604→    db.safetyCheck.findMany({
+   605→      where: { subjectId: userId },
+   606→      orderBy: { createdAt: "desc" },
+   607→      take: 20,
+   608→      include: { verifier: { select: { displayName: true, handle: true } } },
+   609→    }),
+   610→    db.trustRequest.findMany({
+   611→      where: { subjectId: userId },
+   612→      orderBy: { createdAt: "desc" },
+   613→      take: 10,
+   614→      include: { verifier: { select: { displayName: true, handle: true } } },
+   615→    }),
+   616→  ]);
+   617→  const now = Date.now();
+   618→  const weekAgo = now - 7 * 24 * 60 * 60 * 1000;
+   619→  const [total, last7] = await Promise.all([
+   620→    db.safetyCheck.count({ where: { subjectId: userId } }),
+   621→    db.safetyCheck.count({
+   622→      where: { subjectId: userId, createdAt: { gte: new Date(weekAgo) } },
+   623→    }),
+   624→  ]);
+   625→  return {
+   626→    settings,
+   627→    stats: {
+   628→      totalChecks: total,
+   629→      last7Days: last7,
+   630→      lastCheckAt: checks[0]?.createdAt.toISOString() ?? null,
+   631→    },
+   632→    checksReceived: checks.map((c) => {
+   633→      let shown: Record<string, unknown> = {};
+   634→      try {
+   635→        shown = JSON.parse(c.assessment) as Record<string, unknown>;
+   636→      } catch {
+   637→        shown = {};
+   638→      }
+   639→      return {
+   640→        id: c.id,
+   641→        verifier: c.verifier
+   642→          ? { displayName: c.verifier.displayName, handle: c.verifier.handle }
+   643→          : null,
+   644→        method: c.method,
+   645→        checkedAt: c.createdAt.toISOString(),
+   646→        shown: {
+   647→          headline: shown.headline ?? null,
+   648→          status: (shown.summary as Record<string, unknown> | undefined)?.status ?? null,
+   649→          signalsCount: Array.isArray(shown.signals) ? (shown.signals as unknown[]).length : 0,
+   650→        },
+   651→      };
+   652→    }),
+   653→    requestsReceived: requests.map((r) => ({
+   654→      id: r.id,
+   655→      verifier: r.verifier
+   656→        ? { displayName: r.verifier.displayName, handle: r.verifier.handle }
+   657→        : null,
+   658→      status: r.status === "PENDING" && r.expiresAt.getTime() <= now ? "EXPIRED" : r.status,
+   659→      message: r.message,
+   660→      expiresAt: r.expiresAt.toISOString(),
+   661→      respondedAt: r.respondedAt?.toISOString() ?? null,
+   662→      createdAt: r.createdAt.toISOString(),
+   663→    })),
+   664→    language: SAFETY_LANGUAGE,
+   665→  };
+   666→}
+   667→
+   668→// ---------------------------------------------------------------------------
+   669→// Trust Requests
+   670→// ---------------------------------------------------------------------------
+   671→
+   672→const TRUST_REQUEST_MESSAGE =
+   673→  "asks you to share your Trust Card before you deal — accept to mint a scoped, receipted trust link.";
+   674→
+   675→export async function sendTrustRequest(
+   676→  verifier: { id: string; handle: string },
+   677→  handleInput: string
+   678→): Promise<
+   679→  | { outcome: "OK"; requestId: string; expiresAt: string }
+   680→  | { outcome: "UNAVAILABLE"; message: string }
+   681→  | { outcome: "ALREADY_REQUESTED"; requestId: string }
+   682→  | { outcome: "SELF"; message: string }
+   683→> {
+   684→  const handle = handleInput.trim().replace(/^@/, "").toLowerCase();
+   685→  if (!/^[a-z0-9_]{3,24}$/.test(handle)) {
+   686→    return { outcome: "UNAVAILABLE", message: "Enter a valid handle." };
+   687→  }
+   688→  const subject = await db.userAccount.findUnique({
+   689→    where: { handle },
+   690→    select: { id: true, handle: true, displayName: true, status: true },
+   691→  });
+   692→  if (!subject || subject.status !== "ACTIVE") {
+   693→    return { outcome: "UNAVAILABLE", message: "No member found for this handle." };
+   694→  }
+   695→  if (subject.id === verifier.id) {
+   696→    return { outcome: "SELF", message: "That's your own handle — no request needed." };
+   697→  }
+   698→  const existing = await db.trustRequest.findFirst({
+   699→    where: { verifierId: verifier.id, subjectId: subject.id, status: "PENDING" },
+   700→  });
+   701→  if (existing && existing.expiresAt.getTime() > Date.now()) {
+   702→    return { outcome: "ALREADY_REQUESTED", requestId: existing.id };
+   703→  }
+   704→  const row = await db.trustRequest.create({
+   705→    data: {
+   706→      verifierId: verifier.id,
+   707→      subjectId: subject.id,
+   708→      message: `@${verifier.handle} ${TRUST_REQUEST_MESSAGE}`,
+   709→      expiresAt: new Date(Date.now() + TRUST_REQUEST_TTL_MS),
+   710→    },
+   711→  });
+   712→  await notifyUser(
+   713→    subject.id,
+   714→    "SYSTEM",
+   715→    "New trust request",
+   716→    `@${verifier.handle} asked you to share your Trust Card before you deal. Accept to mint a scoped, receipted trust link — or decline. The request expires in 7 days.`
+   717→  );
+   718→  await recordAudit({
+   719→    actorType: "USER",
+   720→    actorId: verifier.id,
+   721→    action: "TRUST_REQUEST_SENT",
+   722→    subjectType: "UserAccount",
+   723→    subjectId: subject.id,
+   724→    metadata: { outcome: "sent" },
+   725→  });
+   726→  return { outcome: "OK", requestId: row.id, expiresAt: row.expiresAt.toISOString() };
+   727→}
+   728→
+   729→export type TrustRequestResponse =
+   730→  | {
+   731→      outcome: "OK";
+   732→      decision: "ACCEPTED" | "DECLINED";
+   733→      token?: string; // raw token, returned exactly ONCE (the subject's to keep)
+   734→      linkPath?: string;
+   735→    }
+   736→  | { outcome: "NOT_FOUND" }
+   737→  | { outcome: "NOT_PENDING" }
+   738→  | { outcome: "EXPIRED" };
+   739→
+   740→export async function respondTrustRequest(
+   741→  subjectId: string,
+   742→  requestId: string,
+   743→  decision: "ACCEPT" | "DECLINE"
+   744→): Promise<TrustRequestResponse> {
+   745→  const row = await db.trustRequest.findUnique({ where: { id: requestId } });
+   746→  if (!row || row.subjectId !== subjectId) return { outcome: "NOT_FOUND" };
+   747→  if (row.status !== "PENDING") return { outcome: "NOT_PENDING" };
+   748→  if (row.expiresAt.getTime() <= Date.now()) {
+   749→    await db.trustRequest.update({ where: { id: row.id }, data: { status: "EXPIRED" } });
+   750→    return { outcome: "EXPIRED" };
+   751→  }
+   752→
+   753→  if (decision === "DECLINE") {
+   754→    await db.trustRequest.update({
+   755→      where: { id: row.id },
+   756→      data: { status: "DECLINED", respondedAt: new Date() },
+   757→    });
+   758→    await notifyUser(
+   759→      row.verifierId,
+   760→      "SYSTEM",
+   761→      "Trust request declined",
+   762→      "The member declined to share their Trust Card. Nothing was shared — no data left their account."
+   763→    );
+   764→    await recordAudit({
+   765→      actorType: "USER",
+   766→      actorId: subjectId,
+   767→      action: "TRUST_REQUEST_DECLINED",
+   768→      subjectType: "TrustRequest",
+   769→      subjectId: row.id,
+   770→      metadata: { outcome: "declined" },
+   771→    });
+   772→    return { outcome: "OK", decision: "DECLINED" };
+   773→  }
+   774→
+   775→  // ACCEPT: mint a scoped trust link (the subject's token, their control),
+   776→  // then run the named assessment FOR the verifier through it — counted,
+   777→  // receipted, snapshotted into the verifier's Safety Check history.
+   778→  const raw = `ts_${randomBytes(24).toString("base64url")}`;
+   779→  const expiresAt = new Date(Date.now() + TRUST_REQUEST_TTL_MS);
+   780→  const token = await db.shareToken.create({
+   781→    data: {
+   782→      userId: subjectId,
+   783→      tokenHash: sha256Hex(`share:${raw}`),
+   784→      scopes: JSON.stringify(["PROFILE", "SIGNALS", "SCORE"]),
+   785→      maxViews: TOKEN_MAX_VIEWS,
+   786→      expiresAt,
+   787→    },
+   788→  });
+   789→  await db.trustRequest.update({
+   790→    where: { id: row.id },
+   791→    data: { status: "ACCEPTED", respondedAt: new Date(), shareTokenId: token.id },
+   792→  });
+   793→  await recordAudit({
+   794→    actorType: "USER",
+   795→    actorId: subjectId,
+   796→    action: "TRUST_REQUEST_ACCEPTED",
+   797→    subjectType: "TrustRequest",
+   798→    subjectId: row.id,
+   799→    metadata: { outcome: "accepted", maxViews: TOKEN_MAX_VIEWS, scopes: 3 },
+   800→  });
+   801→
+   802→  const [subject, verifier] = await Promise.all([
+   803→    db.userAccount.findUnique({
+   804→      where: { id: subjectId },
+   805→      select: { id: true, displayName: true, handle: true },
+   806→    }),
+   807→    db.userAccount.findUnique({
+   808→      where: { id: row.verifierId },
+   809→      select: { id: true, displayName: true, handle: true },
+   810→    }),
+   811→  ]);
+   812→  if (subject && verifier) {
+   813→    // Named open: counts view #1, writes the receipt, notifies on first open.
+   814→    const view = await viewPublicCard(raw, undefined, {
+   815→      id: verifier.id,
+   816→      displayName: verifier.displayName,
+   817→      handle: verifier.handle,
+   818→    });
+   819→    if (view.outcome === "OK") {
+   820→      const assessment = await buildAssessment(view.subject, {
+   821→        method: "TRUST_LINK",
+   822→        includeProfile: view.scopes.includes("PROFILE"),
+   823→        includeSignals: view.scopes.includes("SIGNALS"),
+   824→        includeScore: view.scopes.includes("SCORE"),
+   825→        attributes: view.attributes,
+   826→      });
+   827→      await db.safetyCheck.create({
+   828→        data: {
+   829→          verifierId: verifier.id,
+   830→          subjectId: subject.id,
+   831→          method: "TRUST_LINK",
+   832→          assessment: JSON.stringify(assessment),
+   833→          shareTokenId: token.id,
+   834→        },
+   835→      });
+   836→    }
+   837→    await notifyUser(
+   838→      verifier.id,
+   839→      "SYSTEM",
+   840→      "Trust request accepted",
+   841→      `@${subject.handle} accepted your trust request. Their assessment is ready in your Safety Check history — and the trust link is theirs to share with you directly.`
+   842→    );
+   843→    await notifyUser(
+   844→      subjectId,
+   845→      "SECURITY",
+   846→      "Trust link minted",
+   847→      `A trust link was minted for @${verifier.handle} (10 opens, 7 days). Every open is receipted. Keep the link below — it is shown only once.`
+   848→    );
+   849→  }
+   850→  return { outcome: "OK", decision: "ACCEPTED", token: raw, linkPath: `/?trust=${raw}` };
+   851→}
+   852→
+   853→// ---------------------------------------------------------------------------
+   854→// Retention — keep the most recent CHECKS_RETAIN checks per subject
+   855→// ---------------------------------------------------------------------------
+   856→
+   857→export async function pruneSafetyChecks(userId: string) {
+   858→  const stale = await db.safetyCheck.findMany({
+   859→    where: { subjectId: userId },
+   860→    orderBy: { createdAt: "desc" },
+   861→    skip: CHECKS_RETAIN,
+   862→    select: { id: true },
+   863→  });
+   864→  if (stale.length > 0) {
+   865→    await db.safetyCheck.deleteMany({ where: { id: { in: stale.map((s) => s.id) } } });
+   866→  }
+   867→}
+   868→

@@ -786,3 +786,89 @@ export const DPIA_CHECKLIST_IDS = [
   "human",
   "retention",
 ] as const;
+
+// ---------------------------------------------------------------------------
+// Stage 9 — B2B Platform (developer portal, Trust Decision API)
+// ---------------------------------------------------------------------------
+
+export interface DevKey {
+  id: string;
+  name: string;
+  keyPrefix: string;
+  scope: string;
+  status: string;
+  totalRequests: number;
+  lastUsedAt: string | null;
+  expiresAt: string | null;
+  revokedAt: string | null;
+  createdAt: string;
+}
+
+export interface DevTeamMember {
+  id: string;
+  userId: string;
+  handle: string;
+  displayName: string;
+  role: "OWNER" | "DEVELOPER" | "VIEWER";
+  isYou: boolean;
+  createdAt: string;
+}
+
+export interface DevDelivery {
+  id: string;
+  event: string;
+  payload: Record<string, unknown>;
+  status: string;
+  attempts: number;
+  statusCode: number | null;
+  responseSnippet: string | null;
+  signature: string | null;
+  durationMs: number | null;
+  lastAttemptAt: string | null;
+  nextRetryAt: string | null;
+  deliveredAt: string | null;
+  createdAt: string;
+}
+
+export interface DevClient {
+  id: string;
+  name: string;
+  environment: string;
+  status: string;
+  plan: string;
+  role: "OWNER" | "DEVELOPER" | "VIEWER";
+  quota: { plan: number; usedToday: number; remaining: number };
+  usage: { day: string; checks: number; errors: number }[];
+  webhook: {
+    url: string | null;
+    hasSecret: boolean;
+    secretCreatedAt: string | null;
+    recentDeliveries: DevDelivery[];
+  };
+  keys: DevKey[];
+  team: DevTeamMember[];
+  decisionsCount: number;
+  createdAt: string;
+}
+
+export interface DevPortal {
+  you: { handle: string; displayName: string };
+  clients: DevClient[];
+  limits: { maxClients: number; plans: Record<string, { quota: number; keys: number }> };
+  honesty: string;
+}
+
+export interface DevDecision {
+  id: string;
+  method: string;
+  inputHint: string;
+  outcome: string;
+  requestId: string;
+  createdAt: string;
+  assessment: Record<string, unknown> | null;
+}
+
+export interface MintedKeyResponse {
+  key: DevKey & { rawKey: string };
+  warning: string;
+}

@@ -59,6 +59,9 @@ model UserAccount {
   flagsReceived       Flag[]            @relation("FlagsReceived")
   flagResolutions     FlagResolution[]  @relation("FlagResolutions")
   flagAppeals         FlagAppeal[]      @relation("FlagAppeals")
+  // Stage 9 — B2B developer portal
+  apiClientsOwned     ApiClient[]       @relation("ApiClientsOwned")
+  apiTeams            ApiTeamMember[]   @relation("ApiTeams")
 
   @@index([email])
   @@index([status])
@@ -673,4 +676,170 @@ model Notification {
   user UserAccount @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, readAt])
+}
+
+// ---------------------------------------------------------------------------
+// Stage 9 — B2B Platform (audit §4.2: developer portal, API keys, webhooks,
+// usage, team/RBAC, Trust Decision API POST /v1/trust/check).
+//
+// A member registers "API clients" (business apps). Each client has a
+// SANDBOX or LIVE environment (LIVE is an HONEST label — underlying identity
+// providers stay contract-first MOCK until partner credentials exist), a
+// mock-billing plan with REAL daily check quotas, API keys (raw key exists
+// only in the minting response; sha256 at rest — session-token discipline),
+// an optional webhook endpoint (HMAC-SHA256-signed deliveries, bounded
+// retries) and a team (OWNER / DEVELOPER / VIEWER — enforced server-side).
+//
+// Compliance carried over: the Trust Decision API is a CONSENT-GATED
+// assessment surface — subjects control API checks through the SAME standing
+// SAFETY_CHECK consent as member checks, every completed check is receipted
+// to the subject with the business's name, and responses are band-level
+// with the locked language (never "this person is safe" — directive §50).
+// ---------------------------------------------------------------------------
+
+model ApiClient {
+  id            String    @id @default(cuid())
+  ownerId       String
+  name          String // the business's public label (shown in subject receipts)
+  environment   String    @default("SANDBOX") // SANDBOX | LIVE (LIVE = typed-confirmation honesty label)
+  status        String    @default("ACTIVE") // ACTIVE | SUSPENDED
+  plan          String    @default("FREE") // FREE | STARTER — mock billing (no processor connected)
+  webhookUrl    String? // https://… (SANDBOX also allows http://localhost for self-tests)
+  webhookSecret String? // HMAC shared secret (whsec_…) — must stay readable to SIGN deliveries (industry-standard shared secret); shown once, rotatable. Not PII.
+  liveEnabledAt DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  owner      UserAccount       @relation("ApiClientsOwned", fields: [ownerId], references: [id], onDelete: Cascade)
+  team       ApiTeamMember[]
+  keys       ApiKey[]
+  decisions  TrustDecision[]
+  usageDays  ApiUsageDay[]
+  deliveries WebhookDelivery[]
+
+  @@index([ownerId])
+  @@index([status])
+}
+
+// API key — the raw key (tsk_<env>_<hex>) is returned EXACTLY ONCE at mint
+// time; at rest only sha256(raw) + a short identification prefix.
+model ApiKey {
+  id            String    @id @default(cuid())
+  clientId      String
+  name          String // developer-chosen label
+  keyPrefix     String // first ~14 chars of the raw key — identification only
+  keyHash       String    @unique // sha256(raw) — never the raw key
+  scope         String    @default("TRUST_CHECK") // TRUST_CHECK (single scope in v1)
+  status        String    @default("ACTIVE") // ACTIVE | REVOKED
+  totalRequests Int       @default(0)
+  lastUsedAt    DateTime?
+  expiresAt     DateTime? // mint + 365d (informational)
+  revokedAt     DateTime?
+  createdAt     DateTime  @default(now())
+
+  client ApiClient       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  usage  ApiUsageEvent[]
+  decisions TrustDecision[]
+
+  @@index([clientId, status])
+}
+
+// Team membership per client — RBAC enforced server-side on every portal
+// route. OWNER (creator) manages team + LIVE; DEVELOPER manages keys +
+// webhook; VIEWER is read-only. Membership is also the visibility grant:
+// a client appears in a member's portal ONLY through this table.
+model ApiTeamMember {
+  id        String   @id @default(cuid())
+  clientId  String
+  userId    String
+  role      String // OWNER | DEVELOPER | VIEWER
+  addedById String
+  createdAt DateTime @default(now())
+
+  client ApiClient  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  user   UserAccount @relation("ApiTeams", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([clientId, userId])
+}
+
+// One row per Trust Decision API call. Records exactly what the business
+// was shown (the assessment snapshot) with masked input hints — never raw
+// phone digits; a handle echo is the business's own request data. Anti-
+// enumeration is preserved in the RESPONSE (identical UNAVAILABLE shape);
+// this row is the business's own audit trail.
+model TrustDecision {
+  id           String   @id @default(cuid())
+  clientId     String
+  keyId        String
+  subjectId    String? // null when there is no consented match (probe record only)
+  method       String // HANDLE | PHONE | TRUST_LINK | QR
+  inputHint    String // masked: "@handle" | "verified phone (hashed)" | "trust link"
+  outcome      String // OK | UNAVAILABLE | DEAD_LINK
+  assessment   String? // JSON — exactly what was returned (band-level, no score number)
+  consentId    String? // standing SAFETY_CHECK consent that authorized a HANDLE/PHONE check
+  shareTokenId String? // governing token for TRUST_LINK/QR checks
+  requestId    String
+  createdAt    DateTime @default(now())
+
+  client ApiClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  key    ApiKey    @relation(fields: [keyId], references: [id], onDelete: Cascade)
+
+  @@index([clientId, createdAt])
+}
+
+// Daily usage rollup per key (90-day retention) — feeds quota enforcement
+// and the portal usage charts. Counts are non-PII.
+model ApiUsageDay {
+  id        String   @id @default(cuid())
+  keyId     String
+  clientId  String
+  day       String // "YYYY-MM-DD" (server date)
+  checks    Int      @default(0)
+  errors    Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  client ApiClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([keyId, day])
+}
+
+// Per-request usage events — bounded (last 100 per key, pruned on write).
+model ApiUsageEvent {
+  id         String   @id @default(cuid())
+  keyId      String
+  route      String
+  statusCode Int
+  outcome    String // OK | UNAVAILABLE | DEAD_LINK | REJECTED
+  latencyMs  Int
+  createdAt  DateTime @default(now())
+
+  key ApiKey @relation(fields: [keyId], references: [id], onDelete: Cascade)
+
+  @@index([keyId, createdAt])
+}
+
+// Webhook delivery — the exact payload + HMAC signature we sent, the
+// endpoint's response code/snippet, and the bounded retry schedule
+// (attempts at +0s, +60s, +5m, +25m, +2h; retries are processed lazily on
+// portal reads and subsequent API calls). Retention: last 50 per client.
+model WebhookDelivery {
+  id             String    @id @default(cuid())
+  clientId       String
+  event          String // TRUST_CHECK_COMPLETED | WEBHOOK_TEST
+  payload        String // JSON — exactly what was sent (band-level, masked inputs)
+  status         String    @default("PENDING") // PENDING | DELIVERED | RETRYING | EXHAUSTED
+  attempts       Int       @default(0)
+  statusCode     Int?
+  responseSnippet String? // first 200 chars of the endpoint response
+  signature      String? // last computed "t=…,v1=…" header value (verification aid)
+  durationMs     Int?
+  lastAttemptAt  DateTime?
+  nextRetryAt    DateTime?
+  deliveredAt    DateTime?
+  createdAt      DateTime  @default(now())
+
+  client ApiClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId, createdAt])
+  @@index([status, nextRetryAt])
 }

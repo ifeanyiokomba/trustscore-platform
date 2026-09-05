@@ -5,10 +5,10 @@ import { NextResponse } from "next/server";
 export async function GET() {
   return NextResponse.json({
     name: "TrustScore Platform API",
-    stage: "8 — Trust Engine (rules-first versioned scoring policy, DPIA-gated automated decisions, score lifecycle with freeze-on-appeal)",
-    version: "1.7.0",
+    stage: "9 — B2B Platform (developer portal, API keys, webhooks, team RBAC, Trust Decision API)",
+    version: "1.8.0",
     notice:
-      "NINAuth integration is implemented behind a contract-first MOCK provider adapter (OAuth 2.0 + PKCE + OIDC-style ID tokens). Phone (SMS OTP) and biometric (liveness) signals are likewise contract-first MOCK transports. No live government or MNO/biometric integration is claimed. The LIVE transports activate once partner sandbox credentials exist (audit §2.2).",
+      "NINAuth integration is implemented behind a contract-first MOCK provider adapter (OAuth 2.0 + PKCE + OIDC-style ID tokens). Phone (SMS OTP) and biometric (liveness) signals are likewise contract-first MOCK transports. No live government or MNO/biometric integration is claimed. The LIVE transports activate once partner sandbox credentials exist (audit §2.2). The B2B Trust Decision API and webhook deliveries are real integrations against that same MOCK-provider platform; plan billing is an honest mock-up (no payment processor is connected).",
     endpoints: [
       { method: "GET", path: "/api/health", auth: false, description: "Liveness + database readiness" },
       { method: "POST", path: "/api/v1/auth/register", auth: false, description: "Create an account (rate-limited)" },
@@ -61,9 +61,22 @@ export async function GET() {
       { method: "POST", path: "/api/v1/engine/admin/policies/:id/simulate", auth: "session+admin", description: "Stage 8: read-only impact dry-run — recompute the cohort under draft rules vs active; buckets, transitions, masked movers; nothing is written" },
       { method: "POST", path: "/api/v1/engine/admin/dpia", auth: "session+admin", description: "Stage 8: record a DPIA assessment for a policy (completes only when every checklist item is done)" },
       { method: "POST", path: "/api/v1/engine/admin/gate", auth: "session+admin", description: "Stage 8: toggle automated-significant-decisions (DPIA-gated + typed confirmation; disabling always allowed)" },
+      { method: "POST", path: "/api/v1/trust/check", auth: "X-API-Key", description: "Stage 9: Trust Decision API — exactly one of { handle, phone, link, qr }; consent-gated, band-level, receipted to the subject; NOT an automated decision (NDPA §37 note on every response)" },
+      { method: "GET", path: "/api/v1/dev/me", auth: "session", description: "Stage 9: developer portal — your API clients, keys (prefixes only), team, quota, 14-day usage, webhook config + deliveries" },
+      { method: "POST", path: "/api/v1/dev/clients", auth: "session", description: "Stage 9: register an API client (business app; SANDBOX default; max 3 owned)" },
+      { method: "POST", path: "/api/v1/dev/clients/:id/keys", auth: "session+team", description: "Stage 9: mint an API key — raw key returned ONCE, sha256 at rest (OWNER/DEVELOPER)" },
+      { method: "POST", path: "/api/v1/dev/keys/:id/revoke", auth: "session+team", description: "Stage 9: revoke an API key — immediate (OWNER/DEVELOPER)" },
+      { method: "POST", path: "/api/v1/dev/clients/:id/webhook", auth: "session+team", description: "Stage 9: set/rotate webhook URL + signing secret (secret shown once; LIVE requires https, no localhost)" },
+      { method: "POST", path: "/api/v1/dev/clients/:id/webhook/test", auth: "session+team", description: "Stage 9: send a signed WEBHOOK_TEST event and see the delivery result immediately" },
+      { method: "GET", path: "/api/v1/dev/clients/:id/decisions", auth: "session+team", description: "Stage 9: the business's decision history (masked inputs, last 50)" },
+      { method: "POST", path: "/api/v1/dev/clients/:id/team", auth: "session+owner", description: "Stage 9: add a team member by handle/email with role DEVELOPER or VIEWER" },
+      { method: "DELETE", path: "/api/v1/dev/clients/:id/team/:memberId", auth: "session+owner", description: "Stage 9: remove a team member (OWNER row immutable)" },
+      { method: "POST", path: "/api/v1/dev/clients/:id/live", auth: "session+owner", description: "Stage 9: switch environment to LIVE (typed confirm; honest MOCK-provider note)" },
+      { method: "POST", path: "/api/v1/dev/clients/:id/plan", auth: "session+owner", description: "Stage 9: change plan FREE/STARTER (quotas enforced for real; billing is a mock-up)" },
+      { method: "POST", path: "/api/v1/dev/webhook-sink", auth: "public", description: "Stage 9: sandbox self-test webhook sink — echoes headers + body; point your webhook at it to watch deliveries land" },
     ],
     roadmap: {
-      "9": "B2B platform (developer portal, API keys, Trust Decision API)",
+      "9": "B2B platform — SHIPPED (developer portal, API keys, webhooks, Trust Decision API)",
       "10": "Trust network (verified-interaction graph, shared signals)",
     },
   });

@@ -65,14 +65,14 @@ const STAGES: { id: string; title: string; status: StageStatus; detail: string }
   {
     id: "8",
     title: "Trust engine",
-    status: "active",
-    detail: "Rules-first versioned scoring policy (public by design), score lifecycle with freeze-on-appeal, DPIA-gated automated decisions — the engine is inspectable.",
+    status: "done",
+    detail: "Rules-first versioned scoring policy (public by design), score lifecycle with freeze-on-appeal, DPIA-gated automated decisions, impact simulation — the engine is inspectable.",
   },
   {
     id: "9",
     title: "B2B platform",
-    status: "planned",
-    detail: "Developer portal, API keys, webhooks, Trust Decision API.",
+    status: "active",
+    detail: "Developer portal, API keys (shown once, hashed at rest), HMAC-signed webhooks with retries, team RBAC, quotas, and the consent-gated Trust Decision API — assessments, never auto-decisions.",
   },
   {
     id: "10",

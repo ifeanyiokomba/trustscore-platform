@@ -289,6 +289,10 @@ export interface NamedViewer {
   id: string;
   displayName: string;
   handle: string;
+  // Stage 9 — B2B API clients open trust links through the Trust Decision
+  // API. Receipts then say the BUSINESS checked (channel API_CHECK), not a
+  // member handle — who-checked-you stays precise.
+  kind?: "MEMBER" | "API_CLIENT";
 }
 
 export async function viewPublicCard(
@@ -342,8 +346,12 @@ export async function viewPublicCard(
     data: {
       userId: user.id,
       shareTokenId: row.id,
-      viewerLabel: viewer ? `Safety Check by @${viewer.handle}` : "Trust link viewer",
-      channel: viewer ? "SAFETY_CHECK" : "TRUST_LINK",
+      viewerLabel: viewer
+        ? viewer.kind === "API_CLIENT"
+          ? `Trust API check by ${viewer.displayName}`
+          : `Safety Check by @${viewer.handle}`
+        : "Trust link viewer",
+      channel: viewer ? (viewer.kind === "API_CLIENT" ? "API_CHECK" : "SAFETY_CHECK") : "TRUST_LINK",
       cardShown: JSON.stringify(shown),
       ipHash: req
         ? hashIp(
@@ -371,7 +379,9 @@ export async function viewPublicCard(
       "SECURITY",
       "Your Trust Card was viewed",
       viewer
-        ? `@${viewer.handle} opened your trust link for the first time (Safety Check). The check is recorded in your trust receipts.`
+        ? viewer.kind === "API_CLIENT"
+          ? `${viewer.displayName} (an integrated business) opened your trust link for the first time via the Trust Decision API. The check is recorded in your trust receipts.`
+          : `@${viewer.handle} opened your trust link for the first time (Safety Check). The check is recorded in your trust receipts.`
         : "Someone opened your trust link for the first time. The check is recorded in your trust receipts."
     );
   }
@@ -543,7 +553,7 @@ export async function markNotificationsRead(userId: string, id?: string): Promis
 // ---------------------------------------------------------------------------
 
 async function buildExportPayload(userId: string): Promise<Record<string, unknown>> {
-  const [user, identity, consents, evidence, credentials, shareTokens, receipts, sessions, notifications, audit, dsr, phoneVerifications, livenessSessions, verificationSessions, safetyChecks, trustRequests, flags, scoreSnapshots] =
+  const [user, identity, consents, evidence, credentials, shareTokens, receipts, sessions, notifications, audit, dsr, phoneVerifications, livenessSessions, verificationSessions, safetyChecks, trustRequests, flags, scoreSnapshots, apiClientsOwnedOrTeamed, myApiMemberships, myApiUsageDays] =
     await Promise.all([
       db.userAccount.findUnique({ where: { id: userId } }),
       db.trustIdentity.findUnique({
@@ -590,6 +600,19 @@ async function buildExportPayload(userId: string): Promise<Record<string, unknow
         orderBy: { computedAt: "desc" },
         take: 20,
       }),
+      // Stage 9 — B2B developer-portal footprint: owned clients, teams you
+      // sit on, keys (prefixes — raw keys were never stored), webhook config
+      // (URL only; the signing secret is regenerable, not exportable) and
+      // usage counters.
+      db.apiClient.findMany({
+        where: { OR: [{ ownerId: userId }, { team: { some: { userId } } }] },
+        include: {
+          keys: true,
+          team: { include: { user: { select: { handle: true } } } },
+        },
+      }),
+      db.apiTeamMember.findMany({ where: { userId }, include: { client: true } }),
+      db.apiUsageDay.findMany({ where: { client: { ownerId: userId } } }),
     ]);
 
   return {
@@ -745,6 +768,38 @@ async function buildExportPayload(userId: string): Promise<Record<string, unknow
         computedAt: s.computedAt,
         expiresAt: s.expiresAt,
       })),
+    },
+    // Stage 9 — B2B developer-portal footprint. Raw API keys were NEVER
+    // stored (sha256 at rest) and the webhook signing secret is excluded —
+    // it is regenerable from the portal, not exportable. Decisions made
+    // ABOUT you via the Trust Decision API appear in trustReceipts above
+    // (channel API_CHECK).
+    apiPlatform: {
+      note: "Your developer-portal footprint: API clients you own or sit on (team), key metadata (prefixes only — raw keys were never stored), webhook configuration and daily usage counters. Trust checks businesses ran on you are in trustReceipts (channel API_CHECK).",
+      clients: apiClientsOwnedOrTeamed.map((c) => ({
+        id: c.id,
+        name: c.name,
+        environment: c.environment,
+        status: c.status,
+        plan: c.plan,
+        yourRole:
+          myApiMemberships.find((m) => m.clientId === c.id)?.role ??
+          (c.ownerId === userId ? "OWNER" : null),
+        webhookUrl: c.webhookUrl,
+        liveEnabledAt: c.liveEnabledAt,
+        createdAt: c.createdAt,
+        keys: c.keys.map((k) => ({
+          name: k.name,
+          keyPrefix: k.keyPrefix,
+          status: k.status,
+          scope: k.scope,
+          totalRequests: k.totalRequests,
+          lastUsedAt: k.lastUsedAt,
+          createdAt: k.createdAt,
+        })),
+        team: c.team.map((m) => ({ handle: m.user.handle, role: m.role, createdAt: m.createdAt })),
+      })),
+      usage: myApiUsageDays.map((d) => ({ day: d.day, checks: d.checks, errors: d.errors })),
     },
   };
 }

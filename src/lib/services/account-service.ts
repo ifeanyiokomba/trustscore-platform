@@ -157,6 +157,12 @@ export async function recentAuditForUser(userId: string, limit = 10) {
         { action: { startsWith: "POLICY_" } },
         { action: { startsWith: "DPIA_" } },
         { action: { startsWith: "ENGINE_" } },
+        // Stage 9 — B2B developer-portal actions (own actions; the
+        // TRUST_DECISION_API actor is the client owner)
+        { action: { startsWith: "DEV_" } },
+        { action: { startsWith: "API_" } },
+        { action: { startsWith: "WEBHOOK_" } },
+        { action: "TRUST_DECISION_API" },
       ],
     },
     orderBy: { createdAt: "desc" },

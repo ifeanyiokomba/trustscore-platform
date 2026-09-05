@@ -209,7 +209,7 @@ interface AssessmentOptions {
   attributes?: { key: string; value: string }[]; // token checks only (ATTRIBUTES scope)
 }
 
-async function buildAssessment(
+export async function buildAssessment(
   subject: { id: string; displayName: string; handle: string },
   opts: AssessmentOptions
 ) {
