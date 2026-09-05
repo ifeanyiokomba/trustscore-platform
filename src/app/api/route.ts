@@ -5,8 +5,8 @@ import { NextResponse } from "next/server";
 export async function GET() {
   return NextResponse.json({
     name: "TrustScore Platform API",
-    stage: "5 — Trust Passport (TrustScore snapshots, credentials, QR trust card, share tokens/trust link, security center, trust receipts, DSR)",
-    version: "1.4.0",
+    stage: "6 — Safety Check (verifier-side checks by handle/phone-hash/trust-link/QR, sanitized assessments, per-check consent + receipts, trust requests)",
+    version: "1.5.0",
     notice:
       "NINAuth integration is implemented behind a contract-first MOCK provider adapter (OAuth 2.0 + PKCE + OIDC-style ID tokens). Phone (SMS OTP) and biometric (liveness) signals are likewise contract-first MOCK transports. No live government or MNO/biometric integration is claimed. The LIVE transports activate once partner sandbox credentials exist (audit §2.2).",
     endpoints: [
@@ -39,10 +39,16 @@ export async function GET() {
       { method: "GET", path: "/api/v1/passport/notifications", auth: "session", description: "Stage 5: notification feed (change alerts)" },
       { method: "POST", path: "/api/v1/passport/notifications", auth: "session", description: "Stage 5: mark notifications read ({id} or {all:true})" },
       { method: "POST", path: "/api/v1/security/sessions/:id/revoke", auth: "session", description: "Stage 5: remote sign-out of another active session" },
+      { method: "POST", path: "/api/v1/safety/check", auth: "session", description: "Stage 6: run a Safety Check — exactly one of { handle, phone, link, qr }; anti-enumeration UNAVAILABLE shape; receipted + audited" },
+      { method: "GET", path: "/api/v1/safety/checks", auth: "session", description: "Stage 6: verifier's check history + sent trust requests" },
+      { method: "GET", path: "/api/v1/safety/me", auth: "session", description: "Stage 6: subject's safety settings, checks received (named), trust requests received" },
+      { method: "POST", path: "/api/v1/safety/settings", auth: "session", description: "Stage 6: update standing SAFETY_CHECK consent (enable/disable + scope toggles)" },
+      { method: "POST", path: "/api/v1/safety/request", auth: "session", description: "Stage 6: send a trust request to an uncheckable member (7-day expiry, one pending per pair)" },
+      { method: "POST", path: "/api/v1/safety/request/:id/respond", auth: "session", description: "Stage 6: subject ACCEPT (mints scoped trust link + runs named assessment) or DECLINE" },
     ],
     roadmap: {
-      "6": "Safety Check + Trust Requests (verifier-side, hash-lookup matches)",
       "7": "Resolution + Appeals (flags, disputes, human review)",
+      "8": "Trust Engine hardening (rules-first scoring policy, DPIA gate)",
     },
   });
 }

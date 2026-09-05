@@ -54,6 +54,8 @@ export async function GET(
     );
   }
   if (result.outcome === "OK") {
+    // Strip the internal Safety-Check context (subject id, token id, scopes)
+    // — anonymous viewers only ever see the public card contract.
     return NextResponse.json({ card: result.card }, { status: 200 });
   }
   return jsonError(429, "RATE_LIMITED", "Too many checks. Try again shortly.", requestId);

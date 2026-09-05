@@ -12,6 +12,7 @@ import {
   QrCode,
   ArrowRight,
   Lock,
+  Search,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -52,6 +53,11 @@ const FLOW_STEPS = [
     title: "6 · You carry a Trust Passport",
     body: "A live TrustScore with an NDPA-explained breakdown, credentials, and a QR Trust Card you can share as a scoped, expiring link. Every open is receipted — you always know who checked you.",
   },
+  {
+    icon: Search,
+    title: "7 · Others check before they deal",
+    body: "A member can run a consent-gated safety check — by your handle, a trust link, or a QR scan — and see a sanitized assessment: “No confirmed adverse signals found”, never “safe”. You control it, and every check is receipted with their name.",
+  },
 ];
 
 export function HowItWorks() {
@@ -76,7 +82,7 @@ export function HowItWorks() {
           </p>
         </div>
 
-        <ol className="mt-12 grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+        <ol className="mt-12 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           {FLOW_STEPS.map((step, i) => (
             <motion.li
               key={step.title}

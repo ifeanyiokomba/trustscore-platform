@@ -60,7 +60,7 @@ $AB eval "JSON.stringify({
   identityCard: !!document.querySelector('[data-testid=identity-card], .grid'),
   hasIdentity: document.body.textContent.includes('Government identity verified') || document.body.textContent.includes('Level 1'),
   tabs: Array.from(document.querySelectorAll('[role=tab]')).map(t=>t.textContent.trim()),
-  stage5Badge: document.body.textContent.includes('Stage 5 · Trust Passport'),
+  stage6Badge: document.body.textContent.includes('Stage 6 · Safety Check'),
 })" 2>&1 | tail -1
 
 # ---------- 3. wrong password ----------

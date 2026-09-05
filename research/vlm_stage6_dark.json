@@ -1,0 +1,28 @@
+{
+  "choices": [
+    {
+      "finish_reason": "stop",
+      "index": 0,
+      "message": {
+        "content": "**PASS**\n\n*   **Contrast:** All text (headings, body, labels) and UI elements (chips, icons, toggles) maintain high contrast against the dark background. The primary green (`#00E699` approx.) is vibrant and legible.\n*   **Band Visibility:** The \"Stage 6\" header chip and the \"10 receipts\" badge are clearly defined with distinct borders/fills.\n*   **Washed-out Elements:** None detected. Secondary text (e.g., descriptions, timestamps) uses a light grey that remains readable without blending into the background.\n*   **Accessibility Note:** The toggle switch for \"Safety Check consent\" appears to be in the 'On' position (green), which aligns with the descriptive text below it stating consent is active.",
+        "role": "assistant"
+      }
+    }
+  ],
+  "created": 1788569994,
+  "id": "20260905085950be0c9a09cce44b0a",
+  "model": "glm-5v-turbo",
+  "object": "chat.completion",
+  "request_id": "20260905085950be0c9a09cce44b0a",
+  "usage": {
+    "completion_tokens": 163,
+    "completion_tokens_details": {
+      "reasoning_tokens": 0
+    },
+    "prompt_tokens": 1276,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    },
+    "total_tokens": 1439
+  }
+}

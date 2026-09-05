@@ -11,6 +11,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { DsrCard } from "@/components/passport/dsr-card";
 import { SecurityCenter } from "@/components/passport/security-center";
 import { ReceiptsCard } from "@/components/passport/receipts-card";
+import { SafetySettingsCard } from "@/components/safety/safety-settings-card";
 import { usePassportData } from "@/components/passport/passport-view";
 import { useTrustStore } from "@/lib/store";
 
@@ -41,6 +42,9 @@ export function PrivacyTab() {
 
   return (
     <div className="grid min-w-0 gap-6 lg:grid-cols-3">
+      {/* Stage 6 — Safety Check consent + received checks */}
+      <SafetySettingsCard />
+
       {/* DSR rights */}
       <div className="min-w-0 lg:col-span-2">
         <DsrCard

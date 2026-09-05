@@ -120,8 +120,8 @@ TrustScore: 782 · LOW RISK`}
                   &ldquo;No confirmed adverse signals found.&rdquo;
                 </p>
               </div>
-              <Badge variant="outline" className="text-xs text-muted-foreground">
-                Ships Stage 6
+              <Badge variant="outline" className="border-primary/30 bg-primary/5 text-xs text-primary">
+                Live now (Stage 6)
               </Badge>
             </CardContent>
           </Card>

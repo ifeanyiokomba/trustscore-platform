@@ -47,14 +47,14 @@ const STAGES: { id: string; title: string; status: StageStatus; detail: string }
   {
     id: "5",
     title: "Trust Passport",
-    status: "active",
+    status: "done",
     detail: "TrustScore snapshots + NDPA §37 explanations, credentials, QR trust card, scoped share links with receipts, security center, DSR self-service.",
   },
   {
     id: "6",
     title: "Safety Check",
-    status: "planned",
-    detail: "Check before you deal — QR / link / username, sanitized assessments.",
+    status: "active",
+    detail: "Check before you deal — handle / phone-hash / trust link / QR assessments, per-check consent, named receipts, trust requests.",
   },
   {
     id: "7",

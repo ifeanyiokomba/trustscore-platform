@@ -65,6 +65,10 @@ const EVENT_LABELS: Record<string, string> = {
   SHARE_TOKEN_REVOKED: "Trust link revoked",
   SHARE_TOKEN_BLOCKED: "Blocked trust-link open",
   SESSION_REVOKED: "Session revoked",
+  // Stage 6 — Safety Check
+  SAFETY_CHECK_RUN: "A member ran a safety check on you",
+  SAFETY_SETTINGS_UPDATED: "Safety-check settings updated",
+  TRUST_REQUEST_SENT: "Trust request received",
   DSR_EXPORT_REQUESTED: "Data export requested",
   DSR_EXPORT_COMPLETED: "Data export delivered",
   DSR_DELETE_REQUESTED: "Account deletion requested",

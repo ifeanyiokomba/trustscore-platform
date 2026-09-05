@@ -372,3 +372,45 @@
     animation: none;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Stage 6 — Safety Check utilities
+--------------------------------------------------------------------------- */
+
+/* Assessment headline band — subtle emerald wash, like a stamped verdict */
+.ts-assessment-band {
+  background:
+    radial-gradient(110% 140% at 0% 0%, color-mix(in oklch, var(--trust) 12%, transparent) 0%, transparent 55%),
+    color-mix(in oklch, var(--trust) 4%, transparent);
+}
+
+/* Method selector triggers — active state carries the trust color */
+[data-slot="tabs-trigger"][data-state="active"][data-testid^="safety-method-"] {
+  box-shadow: inset 0 -2px 0 color-mix(in oklch, var(--trust) 55%, transparent);
+}
+
+/* Assessment reveal glow — a soft stamp around the verdict panel */
+.ts-assessment-band + div {
+  position: relative;
+}
+[data-testid="safety-assessment"] {
+  box-shadow:
+    0 1px 2px oklch(0 0 0 / 0.06),
+    0 8px 24px -12px color-mix(in oklch, var(--trust) 35%, transparent);
+}
+
+/* Small numeric stat blocks (subject-side check counters) */
+.ts-stat-block {
+  transition: transform 150ms ease, border-color 150ms ease;
+}
+.ts-stat-block:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in oklch, var(--trust) 40%, transparent);
+}
+
+/* Focus-visible polish for safety inline actions */
+[data-testid="safety-assessment"] button:focus-visible,
+[data-testid="safety-consent-state"] + * button:focus-visible {
+  outline: 2px solid color-mix(in oklch, var(--trust) 65%, transparent);
+  outline-offset: 2px;
+}

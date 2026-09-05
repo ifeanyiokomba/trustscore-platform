@@ -464,6 +464,45 @@ export async function confirmPhoneOtp(
     data: { status: "VERIFIED", verifiedAt: now },
   });
 
+  // Stage 6 — hash-lookup unambiguity: a phone number belongs to exactly one
+  // verified identity at a time. If another identity holds an ACTIVE
+  // identifier with this fingerprint (number re-verified by its new owner,
+  // or a sandbox duplicate), the older binding is SUPERSEDED — its evidence
+  // lapses and the ladder de-escalates for that user.
+  const collisions = await db.identityIdentifier.findMany({
+    where: {
+      type: "PHONE",
+      hash: row.phoneHash,
+      status: "ACTIVE",
+      NOT: { trustIdentityId: identity.id },
+    },
+    select: { id: true, trustIdentityId: true },
+  });
+  for (const c of collisions) {
+    await db.identityIdentifier.update({
+      where: { id: c.id },
+      data: { status: "SUPERSEDED" },
+    });
+    await db.evidence.updateMany({
+      where: { trustIdentityId: c.trustIdentityId, type: "PHONE_OTP", status: "ACTIVE" },
+      data: { status: "REVOKED" },
+    });
+    const oldIdentity = await db.trustIdentity.findUnique({
+      where: { id: c.trustIdentityId },
+      select: { userId: true },
+    });
+    if (oldIdentity) {
+      await recomputeAssuranceLevel(oldIdentity.userId);
+      await markMaterialChange(oldIdentity.userId, "PHONE_SUPERSEDED");
+      await notifyUser(
+        oldIdentity.userId,
+        "SECURITY",
+        "Phone number re-verified elsewhere",
+        "The phone number linked to your identity was just verified by a different TrustScore account, so your phone signal was superseded. If this wasn't you, contact support immediately."
+      );
+    }
+  }
+
   await db.identityIdentifier.upsert({
     where: { trustIdentityId_type: { trustIdentityId: identity.id, type: "PHONE" } },
     create: {

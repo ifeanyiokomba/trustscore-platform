@@ -145,6 +145,9 @@ export async function recentAuditForUser(userId: string, limit = 10) {
         { action: { startsWith: "DSR_" } },
         { action: { startsWith: "SESSION_" } },
         { action: "SCORE_SNAPSHOT" },
+        // Stage 6 — Safety Check + Trust Requests
+        { action: { startsWith: "SAFETY_" } },
+        { action: { startsWith: "TRUST_REQUEST" } },
       ],
     },
     orderBy: { createdAt: "desc" },

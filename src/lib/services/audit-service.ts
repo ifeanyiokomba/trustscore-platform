@@ -35,7 +35,13 @@ export type AuditAction =
   | "DSR_EXPORT_REQUESTED"
   | "DSR_EXPORT_COMPLETED"
   | "DSR_DELETE_REQUESTED"
-  | "DSR_DELETE_COMPLETED";
+  | "DSR_DELETE_COMPLETED"
+  // Stage 6 — Safety Check + Trust Requests
+  | "SAFETY_CHECK_RUN"
+  | "SAFETY_SETTINGS_UPDATED"
+  | "TRUST_REQUEST_SENT"
+  | "TRUST_REQUEST_ACCEPTED"
+  | "TRUST_REQUEST_DECLINED";
 
 interface AuditInput {
   actorType: "USER" | "SYSTEM" | "ANONYMOUS";
@@ -83,6 +89,8 @@ const SAFE_METADATA_KEYS = new Set([
   "requests",
   "deleted",
   "current",
+  // Stage 6 — non-PII labels only
+  "method",
 ]);
 
 export async function recordAudit(input: AuditInput): Promise<void> {

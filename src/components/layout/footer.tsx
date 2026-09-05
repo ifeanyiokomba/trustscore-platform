@@ -75,7 +75,7 @@ export function Footer() {
           <p>© {new Date().getFullYear()} TrustScore. All rights reserved.</p>
           <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <span className="rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 font-semibold text-primary">
-              Stage 5 · Trust Passport (mock providers)
+              Stage 6 · Safety Check (mock providers)
             </span>
             <span>Privacy-first · Consent-first · Explainable-by-design</span>
           </p>

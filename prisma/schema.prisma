@@ -47,6 +47,10 @@ model UserAccount {
   shareTokens          ShareToken[]
   trustReceipts        TrustReceipt[]
   dsrRequests          DsrRequest[]
+  safetyChecksMade     SafetyCheck[]     @relation("SafetyChecksMade")
+  safetyChecksReceived SafetyCheck[]     @relation("SafetyChecksReceived")
+  trustRequestsSent    TrustRequest[]    @relation("TrustRequestsSent")
+  trustRequestsReceived TrustRequest[]   @relation("TrustRequestsReceived")
 
   @@index([email])
   @@index([status])
@@ -400,6 +404,66 @@ model DsrRequest {
   user UserAccount @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, requestedAt])
+}
+
+// ---------------------------------------------------------------------------
+// Stage 6 — Safety Check (directive §2/§46 "Check Before You Deal").
+// A signed-in VERIFIER runs a sanitized assessment on a subject via:
+//   HANDLE        — the subject's @handle (requires their standing safety
+//                   consent; anti-enumeration: "no such handle" and "checks
+//                   disabled" are byte-identical responses)
+//   PHONE         — consent-gated peppered-hash match against the subject's
+//                   PHONE identifier (the raw phone is hashed and discarded;
+//                   it is NEVER stored, logged or echoed)
+//   TRUST_LINK/QR — an active Stage 5 share token / QR Trust Card payload
+//                   (token scopes govern; the view is counted and receipted
+//                   with the verifier's NAME — a named check)
+// Every completed check writes a SafetyCheck row (the snapshot the verifier
+// saw), a receipt + notification for the subject, and an audit event.
+// The assessment NEVER says "this person is safe" (directive §50).
+// ---------------------------------------------------------------------------
+
+model SafetyCheck {
+  id           String    @id @default(cuid())
+  verifierId   String
+  subjectId    String
+  method       String // HANDLE | PHONE | TRUST_LINK | QR
+  assessment   String // JSON snapshot of exactly what the verifier saw (sanitized, no raw identifiers)
+  consentId    String? // standing SAFETY_CHECK consent that authorized a HANDLE/PHONE check
+  shareTokenId String? // governing token for TRUST_LINK/QR checks
+  ipHash       String? // salted — abuse dedupe only
+  createdAt    DateTime  @default(now())
+
+  verifier UserAccount @relation("SafetyChecksMade", fields: [verifierId], references: [id], onDelete: Cascade)
+  subject  UserAccount @relation("SafetyChecksReceived", fields: [subjectId], references: [id], onDelete: Cascade)
+
+  @@index([verifierId, createdAt])
+  @@index([subjectId, createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Stage 6 — Trust Requests (verifier-side ask). When a handle is not
+// checkable (no standing consent), the verifier can ASK once: the subject
+// accepts (a scoped trust link is minted and the assessment runs) or
+// declines. Requests expire after 7 days; one pending request per pair.
+// ---------------------------------------------------------------------------
+
+model TrustRequest {
+  id           String    @id @default(cuid())
+  verifierId   String
+  subjectId    String
+  status       String    @default("PENDING") // PENDING | ACCEPTED | DECLINED | EXPIRED
+  message      String // short preset ask — no free-text PII surface
+  shareTokenId String? // minted on ACCEPT
+  expiresAt    DateTime
+  respondedAt  DateTime?
+  createdAt    DateTime  @default(now())
+
+  verifier UserAccount @relation("TrustRequestsSent", fields: [verifierId], references: [id], onDelete: Cascade)
+  subject  UserAccount @relation("TrustRequestsReceived", fields: [subjectId], references: [id], onDelete: Cascade)
+
+  @@index([subjectId, status])
+  @@index([verifierId, createdAt])
 }
 
 model Session {

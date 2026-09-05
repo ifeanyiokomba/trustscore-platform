@@ -104,7 +104,8 @@ export async function getPassportForUser(userId: string, currentToken?: string) 
   });
 
   // Security events: the user's own actions PLUS anonymous viewer events on
-  // their share tokens (subject linkage — the owner sees who-checked-when).
+  // their share tokens PLUS Stage 6 named safety checks + trust requests
+  // (subject linkage — the owner sees who-checked-when).
   const securityEvents = await db.auditEvent.findMany({
     where: {
       OR: [
@@ -113,6 +114,12 @@ export async function getPassportForUser(userId: string, currentToken?: string) 
           AND: [
             { action: { in: ["SHARE_TOKEN_VIEWED", "SHARE_TOKEN_BLOCKED"] } },
             { subjectType: "ShareToken", subjectId: { in: shareTokens.map((t) => t.id) } },
+          ],
+        },
+        {
+          AND: [
+            { action: { in: ["SAFETY_CHECK_RUN", "TRUST_REQUEST_SENT"] } },
+            { subjectType: "UserAccount", subjectId: userId },
           ],
         },
       ],
@@ -260,14 +267,32 @@ export async function revokeShareToken(userId: string, tokenId: string): Promise
 // ---------------------------------------------------------------------------
 
 export type PublicViewResult =
-  | { outcome: "OK"; card: Record<string, unknown> }
+  | {
+      outcome: "OK";
+      card: Record<string, unknown>;
+      // Internal fields (never returned by the anonymous public route):
+      subject: { id: string; displayName: string; handle: string };
+      shareTokenId: string;
+      scopes: string[];
+      attributes: { key: string; value: string }[];
+    }
   | { outcome: "NOT_FOUND" }
   | { outcome: "EXPIRED"; reason: "EXPIRED" | "REVOKED" | "VIEW_LIMIT" }
   | { outcome: "RATE_LIMITED" };
 
+// A NAMED viewer (Stage 6 Safety Check): an authenticated member opening the
+// trust link through the verifier console. The receipt + audit record WHO
+// checked (their handle), not just that someone did.
+export interface NamedViewer {
+  id: string;
+  displayName: string;
+  handle: string;
+}
+
 export async function viewPublicCard(
   rawToken: string,
-  req: NextRequest
+  req?: NextRequest,
+  viewer?: NamedViewer
 ): Promise<PublicViewResult> {
   if (!/^ts_[A-Za-z0-9_-]{20,60}$/.test(rawToken)) {
     return { outcome: "NOT_FOUND" };
@@ -315,13 +340,15 @@ export async function viewPublicCard(
     data: {
       userId: user.id,
       shareTokenId: row.id,
-      viewerLabel: "Trust link viewer",
-      channel: "TRUST_LINK",
+      viewerLabel: viewer ? `Safety Check by @${viewer.handle}` : "Trust link viewer",
+      channel: viewer ? "SAFETY_CHECK" : "TRUST_LINK",
       cardShown: JSON.stringify(shown),
-      ipHash: hashIp(
-        req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-          req.headers.get("x-real-ip")
-      ),
+      ipHash: req
+        ? hashIp(
+            req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+              req.headers.get("x-real-ip")
+          )
+        : null,
     },
   });
   // Prune receipts: keep the most recent RECEIPTS_RETAIN per user.
@@ -341,11 +368,14 @@ export async function viewPublicCard(
       user.id,
       "SECURITY",
       "Your Trust Card was viewed",
-      "Someone opened your trust link for the first time. The check is recorded in your trust receipts."
+      viewer
+        ? `@${viewer.handle} opened your trust link for the first time (Safety Check). The check is recorded in your trust receipts.`
+        : "Someone opened your trust link for the first time. The check is recorded in your trust receipts."
     );
   }
   await recordAudit({
-    actorType: "ANONYMOUS",
+    actorType: viewer ? "USER" : "ANONYMOUS",
+    actorId: viewer?.id,
     action: "SHARE_TOKEN_VIEWED",
     subjectType: "ShareToken",
     subjectId: row.id,
@@ -402,7 +432,16 @@ export async function viewPublicCard(
   card.credentialsCount = credentials.filter(
     (c) => c.status === "ACTIVE" && (c.expiresAt ? Date.parse(c.expiresAt) > now2 : true)
   ).length;
-  return { outcome: "OK", card };
+  return {
+    outcome: "OK",
+    card,
+    // Internal context for the Safety Check service (Stage 6). The anonymous
+    // public route strips these before responding.
+    subject: { id: user.id, displayName: user.displayName, handle: user.handle },
+    shareTokenId: row.id,
+    scopes,
+    attributes: (card.attributes as { key: string; value: string }[] | undefined) ?? [],
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -502,7 +541,7 @@ export async function markNotificationsRead(userId: string, id?: string): Promis
 // ---------------------------------------------------------------------------
 
 async function buildExportPayload(userId: string): Promise<Record<string, unknown>> {
-  const [user, identity, consents, evidence, credentials, shareTokens, receipts, sessions, notifications, audit, dsr, phoneVerifications, livenessSessions, verificationSessions] =
+  const [user, identity, consents, evidence, credentials, shareTokens, receipts, sessions, notifications, audit, dsr, phoneVerifications, livenessSessions, verificationSessions, safetyChecks, trustRequests] =
     await Promise.all([
       db.userAccount.findUnique({ where: { id: userId } }),
       db.trustIdentity.findUnique({
@@ -521,6 +560,14 @@ async function buildExportPayload(userId: string): Promise<Record<string, unknow
       db.phoneVerification.findMany({ where: { userId } }),
       db.livenessSession.findMany({ where: { userId } }),
       db.verificationSession.findMany({ where: { userId }, include: { events: true } }),
+      db.safetyCheck.findMany({
+        where: { OR: [{ verifierId: userId }, { subjectId: userId }] },
+        orderBy: { createdAt: "desc" },
+      }),
+      db.trustRequest.findMany({
+        where: { OR: [{ verifierId: userId }, { subjectId: userId }] },
+        orderBy: { createdAt: "desc" },
+      }),
     ]);
 
   return {
@@ -599,6 +646,21 @@ async function buildExportPayload(userId: string): Promise<Record<string, unknow
       createdAt: v.createdAt,
       completedAt: v.completedAt,
       events: v.events.map((e) => ({ eventType: e.eventType, createdAt: e.createdAt })),
+    })),
+    safetyChecks: safetyChecks.map((c) => ({
+      id: c.id,
+      role: c.verifierId === userId ? "verifier" : "subject",
+      method: c.method,
+      assessment: JSON.parse(c.assessment),
+      createdAt: c.createdAt,
+    })),
+    trustRequests: trustRequests.map((r) => ({
+      id: r.id,
+      role: r.verifierId === userId ? "verifier" : "subject",
+      status: r.status,
+      message: r.message,
+      createdAt: r.createdAt,
+      respondedAt: r.respondedAt,
     })),
   };
 }

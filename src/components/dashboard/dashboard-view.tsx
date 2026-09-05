@@ -19,6 +19,7 @@ import {
   LayoutDashboard,
   BookCheck,
   ShieldEllipsis,
+  ShieldQuestion,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -32,6 +33,7 @@ import { PhoneVerifyModal } from "@/components/auth/phone-modal";
 import { LivenessModal } from "@/components/auth/liveness-modal";
 import { PassportTab } from "@/components/passport/passport-view";
 import { PrivacyTab } from "@/components/passport/privacy-view";
+import { SafetyConsole } from "@/components/safety/safety-console";
 import { useTrustStore } from "@/lib/store";
 import type { IdentityMe } from "@/lib/types";
 
@@ -78,7 +80,7 @@ export function DashboardView() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.2em] text-primary">
-            Stage 5 · Trust Passport
+            Stage 6 · Safety Check
           </p>
           <h1 id="dash-heading" className="mt-1 text-3xl font-bold tracking-tight">
             Welcome back, {user.displayName.split(" ")[0]}
@@ -90,18 +92,25 @@ export function DashboardView() {
       </div>
 
       <Tabs defaultValue="overview" className="mt-8">
-        <TabsList aria-label="Dashboard sections" className="grid w-full max-w-xl grid-cols-3">
+        <TabsList aria-label="Dashboard sections" className="grid w-full max-w-2xl grid-cols-4">
           <TabsTrigger value="overview" className="gap-1.5">
             <LayoutDashboard className="h-3.5 w-3.5" aria-hidden="true" />
             <span className="hidden sm:inline">Overview</span>
           </TabsTrigger>
           <TabsTrigger value="passport" className="gap-1.5">
             <BookCheck className="h-3.5 w-3.5" aria-hidden="true" />
-            Trust Passport
+            <span className="hidden sm:inline">Trust Passport</span>
+            <span className="sm:hidden">Passport</span>
+          </TabsTrigger>
+          <TabsTrigger value="safety" className="gap-1.5">
+            <ShieldQuestion className="h-3.5 w-3.5" aria-hidden="true" />
+            <span className="hidden sm:inline">Safety Check</span>
+            <span className="sm:hidden">Safety</span>
           </TabsTrigger>
           <TabsTrigger value="privacy" className="gap-1.5">
             <ShieldEllipsis className="h-3.5 w-3.5" aria-hidden="true" />
-            <span className="hidden sm:inline">Privacy &amp; Security</span>
+            <span className="hidden lg:inline">Privacy &amp; Security</span>
+            <span className="lg:hidden">Privacy</span>
           </TabsTrigger>
         </TabsList>
 
@@ -266,6 +275,10 @@ export function DashboardView() {
 
         <TabsContent value="passport" className="mt-6">
           <PassportTab identity={identityData} identityLoading={identityLoading} />
+        </TabsContent>
+
+        <TabsContent value="safety" className="mt-6">
+          <SafetyConsole />
         </TabsContent>
 
         <TabsContent value="privacy" className="mt-6">

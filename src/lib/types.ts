@@ -424,3 +424,98 @@ export interface PublicTrustCard {
   attributes?: { key: string; value: string }[];
   credentialsCount: number;
 }
+
+// ---------------------------------------------------------------------------
+// Stage 6 — Safety Check + Trust Requests (mirror /api/v1/safety/* responses)
+// ---------------------------------------------------------------------------
+
+export interface SafetySettings {
+  enabled: boolean;
+  includeProfile: boolean;
+  includeSignals: boolean;
+  allowPhoneMatch: boolean;
+  consentId: string | null;
+  grantedAt: string | null;
+}
+
+export interface SafetyAssessment {
+  method: "HANDLE" | "PHONE" | "TRUST_LINK" | "QR";
+  checkedAt: string;
+  headline: string;
+  summary: {
+    status: string;
+    riskBand: string;
+    assuranceLevel: number;
+  };
+  subject?: { displayName: string; handle: string } | null;
+  signals?: { type: string; hint: string; verifiedAt: string; expiresAt: string | null }[];
+  credentialsCount: number;
+  score?: { score: number; confidence: number };
+  attributes?: { key: string; value: string }[];
+  freshness: { assessedAt: string; expiresAt: string; fresh: boolean };
+  explanation: string[];
+  language: { adverse: string; disclaimer: string };
+}
+
+export interface SafetyCheckRunResponse {
+  outcome: "OK" | "SELF" | "UNAVAILABLE" | "DEAD_LINK";
+  checkId?: string;
+  message?: string;
+  reason?: string;
+  receipted?: boolean;
+  assessment?: SafetyAssessment;
+}
+
+export interface SafetyCheckHistoryItem {
+  id: string;
+  method: string;
+  subject: { displayName: string; handle: string } | null;
+  status: string | null;
+  riskBand: string | null;
+  headline: string | null;
+  checkedAt: string;
+  self: boolean;
+}
+
+export interface TrustRequestInfo {
+  id: string;
+  subject?: { displayName: string; handle: string } | null; // sent requests
+  verifier?: { displayName: string; handle: string } | null; // received requests
+  status: "PENDING" | "ACCEPTED" | "DECLINED" | "EXPIRED";
+  message: string;
+  respondedAt: string | null;
+  expiresAt: string;
+  createdAt: string;
+}
+
+export interface SafetyChecksResponse {
+  checks: SafetyCheckHistoryItem[];
+  requests: TrustRequestInfo[];
+}
+
+export interface SafetyCheckReceived {
+  id: string;
+  verifier: { displayName: string; handle: string } | null;
+  method: string;
+  checkedAt: string;
+  shown: {
+    headline: string | null;
+    status: string | null;
+    signalsCount: number;
+  };
+}
+
+export interface SafetyMe {
+  settings: SafetySettings;
+  stats: { totalChecks: number; last7Days: number; lastCheckAt: string | null };
+  checksReceived: SafetyCheckReceived[];
+  requestsReceived: TrustRequestInfo[];
+  language: { adverse: string; disclaimer: string };
+}
+
+export interface TrustRequestAcceptResponse {
+  outcome: "OK";
+  decision: "ACCEPTED" | "DECLINED";
+  token?: string;
+  linkPath?: string;
+}
