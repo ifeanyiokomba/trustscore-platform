@@ -23,6 +23,7 @@ import {
   Landmark,
   Cpu,
   Code2,
+  Waypoints,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -40,6 +41,7 @@ import { SafetyConsole } from "@/components/safety/safety-console";
 import { ReputationTab } from "@/components/reputation/reputation-view";
 import { EngineTab } from "@/components/engine/engine-view";
 import { DevTab } from "@/components/dev/dev-view";
+import { NetworkTab } from "@/components/network/network-view";
 import { useTrustStore } from "@/lib/store";
 import type { IdentityMe } from "@/lib/types";
 
@@ -86,7 +88,7 @@ export function DashboardView() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.2em] text-primary">
-            Stage 9 · B2B Platform
+            Stage 10 · Trust Network
           </p>
           <h1 id="dash-heading" className="mt-1 text-3xl font-bold tracking-tight">
             Welcome back, {user.displayName.split(" ")[0]}
@@ -98,40 +100,49 @@ export function DashboardView() {
       </div>
 
       <Tabs defaultValue="overview" className="mt-8">
-        <TabsList aria-label="Dashboard sections" className="grid w-full max-w-3xl grid-cols-4 sm:grid-cols-7">
+        {/* 8 stage surfaces: 2 rows of 4 up to lg, one compact row of 8 at lg+.
+            Full accessible names stay via sr-only (screen readers + E2E),
+            visible labels are compact so the row never wraps. */}
+        <TabsList aria-label="Dashboard sections" className="grid w-full max-w-4xl grid-cols-4 lg:grid-cols-8">
           <TabsTrigger value="overview" className="gap-1.5">
             <LayoutDashboard className="h-3.5 w-3.5" aria-hidden="true" />
-            <span className="hidden sm:inline">Overview</span>
+            <span className="sr-only">Overview</span>
+            <span aria-hidden="true">Overview</span>
           </TabsTrigger>
           <TabsTrigger value="passport" className="gap-1.5">
             <BookCheck className="h-3.5 w-3.5" aria-hidden="true" />
-            <span className="hidden sm:inline">Trust Passport</span>
-            <span className="sm:hidden">Passport</span>
+            <span className="sr-only">Trust Passport</span>
+            <span aria-hidden="true">Passport</span>
           </TabsTrigger>
           <TabsTrigger value="safety" className="gap-1.5">
             <ShieldQuestion className="h-3.5 w-3.5" aria-hidden="true" />
-            <span className="hidden sm:inline">Safety Check</span>
-            <span className="sm:hidden">Safety</span>
+            <span className="sr-only">Safety Check</span>
+            <span aria-hidden="true">Safety</span>
           </TabsTrigger>
           <TabsTrigger value="reputation" className="gap-1.5">
             <Landmark className="h-3.5 w-3.5" aria-hidden="true" />
-            <span className="hidden sm:inline">Reputation</span>
-            <span className="sm:hidden">Reputation</span>
+            <span className="sr-only">Reputation</span>
+            <span aria-hidden="true">Reputation</span>
           </TabsTrigger>
           <TabsTrigger value="engine" className="gap-1.5">
             <Cpu className="h-3.5 w-3.5" aria-hidden="true" />
-            <span className="hidden sm:inline">Trust Engine</span>
-            <span className="sm:hidden">Engine</span>
+            <span className="sr-only">Trust Engine</span>
+            <span aria-hidden="true">Engine</span>
           </TabsTrigger>
           <TabsTrigger value="developers" className="gap-1.5">
             <Code2 className="h-3.5 w-3.5" aria-hidden="true" />
-            <span className="hidden sm:inline">Developers</span>
-            <span className="sm:hidden">Dev</span>
+            <span className="sr-only">Developers</span>
+            <span aria-hidden="true">Developers</span>
+          </TabsTrigger>
+          <TabsTrigger value="network" className="gap-1.5">
+            <Waypoints className="h-3.5 w-3.5" aria-hidden="true" />
+            <span className="sr-only">Trust Network</span>
+            <span aria-hidden="true">Network</span>
           </TabsTrigger>
           <TabsTrigger value="privacy" className="gap-1.5">
             <ShieldEllipsis className="h-3.5 w-3.5" aria-hidden="true" />
-            <span className="hidden lg:inline">Privacy &amp; Security</span>
-            <span className="lg:hidden">Privacy</span>
+            <span className="sr-only">Privacy &amp; Security</span>
+            <span aria-hidden="true">Privacy</span>
           </TabsTrigger>
         </TabsList>
 
@@ -311,6 +322,10 @@ export function DashboardView() {
         </TabsContent>
         <TabsContent value="developers" className="mt-6">
           <DevTab />
+        </TabsContent>
+
+        <TabsContent value="network" className="mt-6">
+          <NetworkTab />
         </TabsContent>
 
         <TabsContent value="privacy" className="mt-6">

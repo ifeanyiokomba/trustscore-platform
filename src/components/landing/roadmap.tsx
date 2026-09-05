@@ -71,14 +71,14 @@ const STAGES: { id: string; title: string; status: StageStatus; detail: string }
   {
     id: "9",
     title: "B2B platform",
-    status: "active",
+    status: "done",
     detail: "Developer portal, API keys (shown once, hashed at rest), HMAC-signed webhooks with retries, team RBAC, quotas, and the consent-gated Trust Decision API — assessments, never auto-decisions.",
   },
   {
     id: "10",
     title: "Trust network",
-    status: "planned",
-    detail: "Verified interactions network — the long-term moat.",
+    status: "active",
+    detail: "Verified-interaction graph (mutual attestations feeding Verified Reputation), FraudNet-class k-anonymized shared signals with the flag appeal path as the dispute route, and a pan-African provider registry — the long-term moat.",
   },
 ];
 

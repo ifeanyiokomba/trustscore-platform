@@ -29,6 +29,7 @@ import { db } from "@/lib/db";
 import { recordAudit } from "@/lib/services/audit-service";
 import { freezeScoresFor, unfreezeScoresFor } from "@/lib/services/engine-service";
 import { notifyUser } from "@/lib/services/notification-service";
+import { mintSignalFromFlag, retractSignalsForFlag } from "@/lib/services/network-service";
 
 export const FLAG_WINDOW_MS = 7 * 24 * 60 * 60 * 1000; // rolling reporter quota window
 export const FLAG_WINDOW_MAX = 3; // max flags per reporter per window
@@ -348,14 +349,13 @@ function isReviewer(user: ReviewerContext): boolean {
 export async function getReviewQueue(reviewer: ReviewerContext) {
   if (!isReviewer(reviewer)) return null;
 
+  // Dangling-FK tolerant (see getReputationMe): handles resolve post-query.
   const flags = await db.flag.findMany({
     where: { status: { in: ["UNDER_REVIEW", "OPEN"] } },
     orderBy: [{ status: "desc" }, { createdAt: "asc" }], // responded cases first, oldest first
     take: FLAGS_RETAIN,
     include: {
       evidence: { orderBy: { createdAt: "asc" } },
-      reporter: { select: { id: true, handle: true, displayName: true } },
-      subject: { select: { id: true, handle: true, displayName: true } },
       appeal: true,
     },
   });
@@ -367,20 +367,27 @@ export async function getReviewQueue(reviewer: ReviewerContext) {
       flag: {
         include: {
           evidence: { orderBy: { createdAt: "asc" } },
-          reporter: { select: { id: true, handle: true, displayName: true } },
-          subject: { select: { id: true, handle: true, displayName: true } },
           resolution: true,
         },
       },
-      appellant: { select: { id: true, handle: true, displayName: true } },
     },
   });
 
-  const parties = [
-    ...flags.flatMap((f) => [f.reporter.id, f.subject.id]),
-    ...appeals.flatMap((a) => [a.flag.reporter.id, a.flag.subject.id]),
+  const partyIds = [
+    ...new Set([
+      ...flags.flatMap((f) => [f.reporterId, f.subjectId]),
+      ...appeals.flatMap((a) => [a.flag.reporterId, a.flag.subjectId, a.appellantId]),
+    ]),
   ];
-  const levels = await assuranceLevelsFor(parties);
+  const parties = partyIds.length
+    ? await db.userAccount.findMany({
+        where: { id: { in: partyIds } },
+        select: { id: true, handle: true, displayName: true },
+      })
+    : [];
+  const party = (id: string) =>
+    parties.find((p) => p.id === id) ?? { id, handle: "deleted-member", displayName: "Deleted member" };
+  const levels = await assuranceLevelsFor(partyIds);
 
   return {
     queue: flags.map((f) => ({
@@ -391,14 +398,14 @@ export async function getReviewQueue(reviewer: ReviewerContext) {
       createdAt: f.createdAt.toISOString(),
       subjectRespondedAt: f.subjectRespondedAt?.toISOString() ?? null,
       reporter: {
-        handle: f.reporter.handle,
-        displayName: f.reporter.displayName,
-        assuranceLevel: levels.get(f.reporter.id) ?? 0,
+        handle: party(f.reporterId).handle,
+        displayName: party(f.reporterId).displayName,
+        assuranceLevel: levels.get(f.reporterId) ?? 0,
       },
       subject: {
-        handle: f.subject.handle,
-        displayName: f.subject.displayName,
-        assuranceLevel: levels.get(f.subject.id) ?? 0,
+        handle: party(f.subjectId).handle,
+        displayName: party(f.subjectId).displayName,
+        assuranceLevel: levels.get(f.subjectId) ?? 0,
       },
       evidence: f.evidence.map((e) => ({
         id: e.id,
@@ -418,8 +425,8 @@ export async function getReviewQueue(reviewer: ReviewerContext) {
         description: a.flag.description,
         status: a.flag.status,
         createdAt: a.flag.createdAt.toISOString(),
-        reporter: { handle: a.flag.reporter.handle, displayName: a.flag.reporter.displayName },
-        subject: { handle: a.flag.subject.handle, displayName: a.flag.subject.displayName },
+        reporter: { handle: party(a.flag.reporterId).handle, displayName: party(a.flag.reporterId).displayName },
+        subject: { handle: party(a.flag.subjectId).handle, displayName: party(a.flag.subjectId).displayName },
         resolution: a.flag.resolution
           ? {
               outcome: a.flag.resolution.outcome,
@@ -476,6 +483,15 @@ export async function decideFlag(
     },
   });
   await db.flag.update({ where: { id: flag.id }, data: { status: newStatus } });
+
+  // Stage 10 — a human-confirmed adverse event also mints a k-anonymized
+  // shared signal for the network surface (idempotent per flag; the flag's
+  // 14-day appeal path is the dispute route).
+  if (input.outcome === "CONFIRMED") {
+    try {
+      await mintSignalFromFlag({ id: flag.id, subjectId: flag.subjectId, category: flag.category });
+    } catch { /* signal minting must never block the human decision */ }
+  }
 
   if (input.outcome === "CONFIRMED") {
     await notifyUser(
@@ -564,6 +580,10 @@ export async function decideAppeal(
       where: { id: appeal.flagId },
       data: { status: "RESOLVED_UNFOUNDED" },
     });
+    // Stage 10 — the shared signal minted from this flag retracts with it.
+    try {
+      await retractSignalsForFlag(appeal.flagId);
+    } catch { /* retraction must never block the human decision */ }
     await notifyUser(
       appeal.appellantId,
       "SYSTEM",
@@ -606,6 +626,10 @@ export async function decideAppeal(
 // ---------------------------------------------------------------------------
 
 export async function getReputationMe(userId: string) {
+  // Dangling-FK tolerance: flags may outlive a raw-SQL-deleted counterparty
+  // (test cleanups). Reporter/subject handles are resolved AFTER the flag
+  // query via a tolerant lookup — a Prisma relation include would throw
+  // "Inconsistent query result" on dangling rows.
   const [user, myLevel, flagsAgainst, flagsFiled] = await Promise.all([
     db.userAccount.findUnique({
       where: { id: userId },
@@ -620,7 +644,6 @@ export async function getReputationMe(userId: string) {
         evidence: { orderBy: { createdAt: "asc" } },
         resolution: true,
         appeal: true,
-        reporter: { select: { id: true, handle: true } },
       },
     }),
     db.flag.findMany({
@@ -630,13 +653,26 @@ export async function getReputationMe(userId: string) {
       include: {
         resolution: true,
         appeal: true,
-        subject: { select: { id: true, handle: true } },
       },
     }),
   ]);
 
+  const counterpartyIds = [
+    ...new Set([
+      ...flagsAgainst.map((f) => f.reporterId),
+      ...flagsFiled.map((f) => f.subjectId),
+    ]),
+  ];
+  const counterparties = counterpartyIds.length
+    ? await db.userAccount.findMany({
+        where: { id: { in: counterpartyIds } },
+        select: { id: true, handle: true },
+      })
+    : [];
+  const handleOf = (id: string) => counterparties.find((u) => u.id === id)?.handle ?? "deleted-member";
+
   const reporterLevels = await assuranceLevelsFor(
-    flagsAgainst.map((f) => f.reporter.id)
+    flagsAgainst.map((f) => f.reporterId)
   );
 
   const now = Date.now();
@@ -684,8 +720,8 @@ export async function getReputationMe(userId: string) {
         description: f.description,
         status: f.status,
         reporter: {
-          maskedHandle: maskHandle(f.reporter.handle),
-          assuranceLevel: reporterLevels.get(f.reporter.id) ?? 0,
+          maskedHandle: maskHandle(handleOf(f.reporterId)),
+          assuranceLevel: reporterLevels.get(f.reporterId) ?? 0,
         },
         evidence: f.evidence.filter((e) => e.role === "REPORTER").map(shapeEvidence),
         myResponse: response
@@ -716,7 +752,7 @@ export async function getReputationMe(userId: string) {
     }),
     flagsFiledByMe: flagsFiled.map((f) => ({
       id: f.id,
-      subjectHandle: f.subject.handle,
+      subjectHandle: handleOf(f.subjectId),
       category: f.category,
       categoryLabel: FLAG_CATEGORY_LABELS[f.category] ?? f.category,
       description: f.description,

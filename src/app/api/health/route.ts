@@ -3,8 +3,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 
-const STAGE = "9 — B2B Platform (developer portal, API keys, webhooks, team RBAC, Trust Decision API POST /v1/trust/check)";
-const VERSION = "1.8.0";
+const STAGE = "10 — Trust Network (verified-interaction graph, mutual attestations, k-anonymized shared signals, pan-African provider registry)";
+const VERSION = "1.9.0";
 const startedAt = Date.now();
 
 export async function GET(_req: NextRequest) {

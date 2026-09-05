@@ -5,8 +5,8 @@ import { NextResponse } from "next/server";
 export async function GET() {
   return NextResponse.json({
     name: "TrustScore Platform API",
-    stage: "9 — B2B Platform (developer portal, API keys, webhooks, team RBAC, Trust Decision API)",
-    version: "1.8.0",
+    stage: "10 — Trust Network (verified-interaction graph, mutual attestations, k-anonymized shared signals, pan-African provider registry)",
+    version: "1.9.0",
     notice:
       "NINAuth integration is implemented behind a contract-first MOCK provider adapter (OAuth 2.0 + PKCE + OIDC-style ID tokens). Phone (SMS OTP) and biometric (liveness) signals are likewise contract-first MOCK transports. No live government or MNO/biometric integration is claimed. The LIVE transports activate once partner sandbox credentials exist (audit §2.2). The B2B Trust Decision API and webhook deliveries are real integrations against that same MOCK-provider platform; plan billing is an honest mock-up (no payment processor is connected).",
     endpoints: [
@@ -74,10 +74,16 @@ export async function GET() {
       { method: "POST", path: "/api/v1/dev/clients/:id/live", auth: "session+owner", description: "Stage 9: switch environment to LIVE (typed confirm; honest MOCK-provider note)" },
       { method: "POST", path: "/api/v1/dev/clients/:id/plan", auth: "session+owner", description: "Stage 9: change plan FREE/STARTER (quotas enforced for real; billing is a mock-up)" },
       { method: "POST", path: "/api/v1/dev/webhook-sink", auth: "public", description: "Stage 9: sandbox self-test webhook sink — echoes headers + body; point your webhook at it to watch deliveries land" },
+      { method: "GET", path: "/api/v1/network/me", auth: "session", description: "Stage 10: my Trust Network — membership/consent, graph, pending interactions, standing, own shared signals, k-anonymity rules" },
+      { method: "POST", path: "/api/v1/network/membership", auth: "session", description: "Stage 10: join (NETWORK consent minted) or pause (edges stop counting immediately)" },
+      { method: "POST", path: "/api/v1/network/interactions", auth: "session", description: "Stage 10: propose a mutual verified interaction by handle (L2+ both sides, 3/7-day quota, 7-day expiry)" },
+      { method: "POST", path: "/api/v1/network/interactions/:id/respond", auth: "session", description: "Stage 10: accept or decline a proposal (accept = mutual attestation; both scores recompute)" },
+      { method: "POST", path: "/api/v1/network/interactions/:id/revoke", auth: "session", description: "Stage 10: cancel your proposal or revoke an active attestation (immediate, either side)" },
+      { method: "GET", path: "/api/v1/network/providers", auth: "public", description: "Stage 10: pan-African country-provider registry (honest MOCK_LIVE / PLANNED depth)" },
     ],
     roadmap: {
       "9": "B2B platform — SHIPPED (developer portal, API keys, webhooks, Trust Decision API)",
-      "10": "Trust network (verified-interaction graph, shared signals)",
+      "10": "Trust network — SHIPPED (verified-interaction graph, shared signals, provider registry)",
     },
   });
 }

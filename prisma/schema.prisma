@@ -11,6 +11,12 @@
 // Stage 7 adds the reputation layer: flags with evidence, human-reviewed
 // resolutions, appeals — anti-gaming by design (L2 reporter gate, one
 // open flag per pair, 3-per-7-day quota, mandatory evidence).
+// Stage 10 adds the Trust Network: opt-in membership (NETWORK consent
+// scope), mutual verified-interaction edges (TrustGraph — they feed the
+// SAME Verified Reputation score component as consented checks, never a
+// new hidden number), k-anonymized shared signals (FraudNet-class, band
+// level only), and a pan-African country-provider registry (honest
+// MOCK_LIVE / PLANNED labels).
 
 generator client {
   provider = "prisma-client-js"
@@ -62,6 +68,11 @@ model UserAccount {
   // Stage 9 — B2B developer portal
   apiClientsOwned     ApiClient[]       @relation("ApiClientsOwned")
   apiTeams            ApiTeamMember[]   @relation("ApiTeams")
+  // Stage 10 — Trust Network
+  networkMembership   NetworkMembership?
+  edgesA              TrustEdge[]       @relation("EdgesA")
+  edgesB              TrustEdge[]       @relation("EdgesB")
+  sharedSignals       SharedSignal[]
 
   @@index([email])
   @@index([status])
@@ -642,6 +653,101 @@ model FlagAppeal {
   flag      Flag        @relation(fields: [flagId], references: [id], onDelete: Cascade)
 
   @@index([status])
+}
+
+// ---------------------------------------------------------------------------
+// Stage 10 — Trust Network (audit §4.2: verified-interactions network,
+// FraudNet-class shared signals, cross-platform trust, pan-African
+// country-provider abstraction).
+//
+// Principles carried in:
+// - Membership is OPT-IN and consent-scoped (NDPA §31): joining creates a
+//   standing NETWORK consent; pausing withdraws it. Edges stop counting
+//   toward the score the moment either endpoint pauses.
+// - An edge is a MUTUAL attestation (request → accept), gated at L2+ on
+//   both sides (the same reporter gate the reputation layer uses),
+//   quota-limited (3 proposals / 7 days) and revocable by either party.
+//   Canonical ordering (aUserId < bUserId) keeps the pair unique in
+//   queries; history rows are kept for audit, only ACTIVE rows count.
+// - Shared signals are BAND-LEVEL ONLY: counts + platform attribution,
+//   never details, never raw identifiers. Real signals mint from
+//   human-confirmed flags (appeal path = the dispute path) and retract
+//   automatically when an appeal is overturned. Partner-platform rows in
+//   this sandbox are honest MOCK demo data.
+// - The country-provider registry is a read model (no verification-flow
+//   change): NG is contract-first MOCK_LIVE; the rest of the corridor is
+//   PLANNED until partners exist. No claims of live coverage.
+// ---------------------------------------------------------------------------
+
+model NetworkMembership {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  status    String   @default("ACTIVE") // ACTIVE | PAUSED (opt-out; edges stop counting)
+  consentId String? // the standing NETWORK consent backing membership
+  joinedAt  DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user UserAccount @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+}
+
+model TrustEdge {
+  id            String    @id @default(cuid())
+  // Canonical ordering: aUserId < bUserId (lexicographic) — set at write
+  // time by the service so a pair has exactly one row per lifecycle.
+  aUserId       String
+  bUserId       String
+  status        String    @default("PENDING") // PENDING | ACTIVE | DECLINED | EXPIRED | REVOKED
+  requestedById String // who proposed the attestation
+  requestedToId String // who must accept
+  requestedAt   DateTime  @default(now())
+  expiresAt     DateTime // pending requests expire after 7 days (lazy)
+  respondedAt   DateTime?
+  activatedAt   DateTime? // set on ACCEPT — the window for score input starts here
+  revokedAt     DateTime?
+  revokedById   String?
+  lastActiveAt  DateTime? // refreshed on any interaction evidence (reserved)
+
+  aUser UserAccount @relation("EdgesA", fields: [aUserId], references: [id], onDelete: Cascade)
+  bUser UserAccount @relation("EdgesB", fields: [bUserId], references: [id], onDelete: Cascade)
+
+  @@index([aUserId, status])
+  @@index([bUserId, status])
+  @@index([requestedById, requestedAt])
+}
+
+model SharedSignal {
+  id           String    @id @default(cuid())
+  subjectUserId String
+  kind         String // CONFIRMED_ADVERSE (from human-confirmed flags)
+  platform     String // "TrustScore (sandbox)" | partner label
+  platformMode String    @default("MOCK") // MOCK | LIVE — honesty on every row
+  severity     String    @default("MEDIUM") // LOW | MEDIUM | HIGH
+  windowDays   Int       @default(90)
+  note         String // subject-visible provenance (no third-party PII)
+  sourceType   String // PLATFORM_RESOLUTION | MOCK_PARTNER | DEMO_SEED
+  sourceId     String? // flag id for PLATFORM_RESOLUTION
+  createdAt    DateTime  @default(now())
+  expiresAt    DateTime
+  retractedAt  DateTime? // appeal overturned → signal withdrawn
+
+  user UserAccount @relation(fields: [subjectUserId], references: [id], onDelete: Cascade)
+
+  @@index([subjectUserId])
+  @@index([sourceType, sourceId])
+}
+
+model CountryProvider {
+  code           String @id // ISO 3166-1 alpha-2, e.g. "NG"
+  name           String
+  idTypeName     String // e.g. "National Identification Number (NINAuth)"
+  govDepth       Int    @default(0) // 0..3 — government-identity depth
+  phoneDepth     Int    @default(0) // 0..3 — phone/OTP signal depth
+  livenessDepth  Int    @default(0) // 0..3 — biometric/liveness depth
+  mode           String @default("PLANNED") // MOCK_LIVE | PLANNED — honest registry
+  note           String
+  sortOrder      Int    @default(0)
 }
 
 // ---------------------------------------------------------------------------

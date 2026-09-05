@@ -94,6 +94,10 @@ interface ScoreInputs {
   }[];
   // Stage 7 — reputation inputs (computed here so the engine owns its inputs)
   verifiedInteractions: number; // distinct L2+ verifiers, consent-backed checks, 90d
+  // Stage 10 — TrustGraph partners among those verifiers: mutual
+  // attestations (ACTIVE edges, both memberships ACTIVE) that were not
+  // already counted via a consent-backed check.
+  networkInteractions: number;
   clearedFlags: number; // human-reviewed UNFOUNDED / DISMISSED / OVERTURNED
   confirmedFlags: number; // human-confirmed flags (appeals upheld or none)
 }
@@ -107,6 +111,7 @@ async function collectReputationInputs(
   interactionWindowDays?: number
 ): Promise<{
   verifiedInteractions: number;
+  networkInteractions: number;
   clearedFlags: number;
   confirmedFlags: number;
 }> {
@@ -137,19 +142,58 @@ async function collectReputationInputs(
   const verifierIds = [...new Set(checks.map((c) => c.verifierId))].filter(
     (id) => id !== userId
   );
-  let verifiedInteractions = 0;
-  if (verifierIds.length > 0) {
-    const identities = await db.trustIdentity.findMany({
-      where: { userId: { in: verifierIds } },
-      select: { userId: true, status: true, assuranceLevel: true, expiresAt: true },
-    });
+
+  // Stage 10 — TrustGraph edges: mutual verified interactions with ACTIVE
+  // edges (activated within the window). They join the SAME distinct-verifier
+  // set — an edge partner who also ran a check is ONE verifier, never two.
+  // Counting requires: both memberships ACTIVE + partner identity live L2+.
+  const edges = await db.trustEdge.findMany({
+    where: { status: "ACTIVE", OR: [{ aUserId: userId }, { bUserId: userId }] },
+    select: { aUserId: true, bUserId: true, activatedAt: true },
+  });
+  const edgePartnerIds = edges
+    .filter((e) => (e.activatedAt?.getTime() ?? 0) >= Date.now() - windowMs)
+    .map((e) => (e.aUserId === userId ? e.bUserId : e.aUserId));
+
+  const candidateIds = [...new Set([...verifierIds, ...edgePartnerIds])];
+  // The subject's OWN membership gates their edges: a paused member's
+  // attestations stop counting immediately (checks still count — consent
+  // for those lives in the SAFETY_CHECK consent, not here).
+  const subjectMembership = await db.networkMembership.findUnique({
+    where: { userId },
+    select: { status: true },
+  });
+  const subjectActive = subjectMembership?.status === "ACTIVE";
+  if (candidateIds.length > 0) {
+    const [identities, memberships] = await Promise.all([
+      db.trustIdentity.findMany({
+        where: { userId: { in: candidateIds } },
+        select: { userId: true, status: true, assuranceLevel: true, expiresAt: true },
+      }),
+      db.networkMembership.findMany({
+        where: { userId: { in: candidateIds }, status: "ACTIVE" },
+        select: { userId: true },
+      }),
+    ]);
     const now = Date.now();
+    const memberIds = new Set(memberships.map((m) => m.userId));
+    // An edge counts only when BOTH endpoints hold ACTIVE memberships.
+    const countingEdgePartners = new Set(
+      subjectActive ? edgePartnerIds.filter((id) => memberIds.has(id)) : []
+    );
+    let verifiedInteractions = 0;
+    let networkInteractions = 0;
     for (const id of identities) {
       const live = id.status === "VERIFIED" && (id.expiresAt?.getTime() ?? 0) > now;
-      if (live && id.assuranceLevel >= 2) verifiedInteractions += 1;
+      if (!live || id.assuranceLevel < 2) continue;
+      const isCheckVerifier = verifierIds.includes(id.userId);
+      const isCountingEdge = countingEdgePartners.has(id.userId);
+      if (isCheckVerifier || isCountingEdge) verifiedInteractions += 1;
+      if (isCountingEdge && !isCheckVerifier) networkInteractions += 1;
     }
+    return { verifiedInteractions, networkInteractions, clearedFlags, confirmedFlags };
   }
-  return { verifiedInteractions, clearedFlags, confirmedFlags };
+  return { verifiedInteractions: 0, networkInteractions: 0, clearedFlags, confirmedFlags };
 }
 
 async function collectInputs(
@@ -192,6 +236,7 @@ async function collectInputs(
     })),
     credentials,
     verifiedInteractions: reputation.verifiedInteractions,
+    networkInteractions: reputation.networkInteractions,
     clearedFlags: reputation.clearedFlags,
     confirmedFlags: reputation.confirmedFlags,
   };
@@ -206,7 +251,7 @@ function inputsHashFor(inputs: ScoreInputs): string {
       .map((e) => [e.id, e.status ?? "ACTIVE", e.expiresAt?.getTime() ?? null])
       .sort(),
     c: inputs.credentials.map((c) => [c.type, c.status, c.manualRevoked]).sort(),
-    r: [inputs.confirmedFlags, inputs.clearedFlags, inputs.verifiedInteractions],
+    r: [inputs.confirmedFlags, inputs.clearedFlags, inputs.verifiedInteractions, inputs.networkInteractions],
   });
   return sha256Hex(canonical);
 }
@@ -315,8 +360,8 @@ export function computeScoreFromInputs(
     );
     explanation.push(
       inputs.verifiedInteractions > 0
-        ? `Verified Reputation ${reputationValue}/${rules.interactionMax * rules.interactionPoints}: ${inputs.verifiedInteractions} verified interaction${inputs.verifiedInteractions === 1 ? "" : "s"} with distinct verified members (consent-backed checks in the last ${rules.interactionWindowDays} days, +${rules.interactionPoints} each, capped at ${rules.interactionMax}).`
-        : `Verified Reputation 0/${rules.interactionMax * rules.interactionPoints}: no consent-backed checks by verified members in the last ${rules.interactionWindowDays} days — an honest zero, not a negative signal.`
+        ? `Verified Reputation ${reputationValue}/${rules.interactionMax * rules.interactionPoints}: ${inputs.verifiedInteractions} verified interaction${inputs.verifiedInteractions === 1 ? "" : "s"} with distinct verified members (consent-backed checks${inputs.networkInteractions > 0 ? ` plus ${inputs.networkInteractions} mutual Trust Network attestation${inputs.networkInteractions === 1 ? "" : "s"}` : ""} in the last ${rules.interactionWindowDays} days, +${rules.interactionPoints} each, capped at ${rules.interactionMax}).`
+        : `Verified Reputation 0/${rules.interactionMax * rules.interactionPoints}: no consent-backed checks or network attestations in the last ${rules.interactionWindowDays} days — an honest zero, not a negative signal.`
     );
     explanation.push(
       inputs.clearedFlags > 0
@@ -365,7 +410,7 @@ export function computeScoreFromInputs(
         max: rules.interactionMax * rules.interactionPoints,
         note:
           inputs.verifiedInteractions > 0
-            ? `${inputs.verifiedInteractions} verified interaction${inputs.verifiedInteractions === 1 ? "" : "s"} (${rules.interactionWindowDays}-day window)`
+            ? `${inputs.verifiedInteractions} verified interaction${inputs.verifiedInteractions === 1 ? "" : "s"} (${rules.interactionWindowDays}-day window)${inputs.networkInteractions > 0 ? `, incl. ${inputs.networkInteractions} network attestation${inputs.networkInteractions === 1 ? "" : "s"}` : ""}`
             : `No verified interactions in the last ${rules.interactionWindowDays} days`,
       },
       {

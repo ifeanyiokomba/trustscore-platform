@@ -66,7 +66,16 @@ export type AuditAction =
   | "WEBHOOK_TEST_SENT"
   | "DEV_TEAM_MEMBER_ADDED"
   | "DEV_TEAM_MEMBER_REMOVED"
-  | "TRUST_DECISION_API";
+  | "TRUST_DECISION_API"
+  // Stage 10 — Trust Network (labels/counters only — never partner identities)
+  | "NETWORK_JOINED"
+  | "NETWORK_PAUSED"
+  | "NETWORK_INTERACTION_PROPOSED"
+  | "NETWORK_INTERACTION_ACCEPTED"
+  | "NETWORK_INTERACTION_DECLINED"
+  | "NETWORK_INTERACTION_REVOKED"
+  | "NETWORK_SIGNAL_MINTED"
+  | "NETWORK_SIGNAL_RETRACTED";
 
 interface AuditInput {
   actorType: "USER" | "SYSTEM" | "ANONYMOUS";
@@ -139,6 +148,11 @@ const SAFE_METADATA_KEYS = new Set([
   "attempts",
   "statusCode",
   "deliveryStatus",
+  // Stage 10 — network labels / counters only (severity, window, degree)
+  "severity",
+  "windowDays",
+  "degree",
+  "signalCount",
 ]);
 
 export async function recordAudit(input: AuditInput): Promise<void> {

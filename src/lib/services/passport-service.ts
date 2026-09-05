@@ -553,7 +553,7 @@ export async function markNotificationsRead(userId: string, id?: string): Promis
 // ---------------------------------------------------------------------------
 
 async function buildExportPayload(userId: string): Promise<Record<string, unknown>> {
-  const [user, identity, consents, evidence, credentials, shareTokens, receipts, sessions, notifications, audit, dsr, phoneVerifications, livenessSessions, verificationSessions, safetyChecks, trustRequests, flags, scoreSnapshots, apiClientsOwnedOrTeamed, myApiMemberships, myApiUsageDays] =
+  const [user, identity, consents, evidence, credentials, shareTokens, receipts, sessions, notifications, audit, dsr, phoneVerifications, livenessSessions, verificationSessions, safetyChecks, trustRequests, flags, scoreSnapshots, apiClientsOwnedOrTeamed, myApiMemberships, myApiUsageDays, networkMembership, networkEdges, networkSignals] =
     await Promise.all([
       db.userAccount.findUnique({ where: { id: userId } }),
       db.trustIdentity.findUnique({
@@ -581,13 +581,13 @@ async function buildExportPayload(userId: string): Promise<Record<string, unknow
         orderBy: { createdAt: "desc" },
       }),
       // Stage 7 — full reputation record (reporter identities are unmasked in
-      // the export: NDPA access right beats the UI retaliation shield)
+      // the export: NDPA access right beats the UI retaliation shield).
+      // Dangling-FK tolerance: handles resolve post-query (raw-SQL test
+      // cleanups may have removed a counterparty).
       db.flag.findMany({
         where: { OR: [{ reporterId: userId }, { subjectId: userId }] },
         orderBy: { createdAt: "desc" },
         include: {
-          reporter: { select: { handle: true } },
-          subject: { select: { handle: true } },
           evidence: { orderBy: { createdAt: "asc" } },
           resolution: true,
           appeal: true,
@@ -613,7 +613,44 @@ async function buildExportPayload(userId: string): Promise<Record<string, unknow
       }),
       db.apiTeamMember.findMany({ where: { userId }, include: { client: true } }),
       db.apiUsageDay.findMany({ where: { client: { ownerId: userId } } }),
+      // Stage 10 — Trust Network: membership, every attestation you were part
+      // of (partner handles — your own data-subject record) and every shared
+      // signal ever held about you (including retracted ones — full honesty).
+      db.networkMembership.findUnique({ where: { userId } }),
+      db.trustEdge.findMany({
+        where: { OR: [{ aUserId: userId }, { bUserId: userId }] },
+        orderBy: { requestedAt: "desc" },
+      }),
+      db.sharedSignal.findMany({
+        where: { subjectUserId: userId },
+        orderBy: { createdAt: "desc" },
+      }),
     ]);
+
+  const networkPartnerIds = [
+    ...new Set(
+      networkEdges.map((e) => (e.aUserId === userId ? e.bUserId : e.aUserId))
+    ),
+  ];
+  const networkPartners = networkPartnerIds.length
+    ? await db.userAccount.findMany({
+        where: { id: { in: networkPartnerIds } },
+        select: { id: true, handle: true, displayName: true },
+      })
+    : [];
+  // Flag counterparty handles (tolerant of dangling rows — see the flag
+  // query note above).
+  const flagPartyIds = [
+    ...new Set(flags.flatMap((f) => [f.reporterId, f.subjectId])),
+  ];
+  const flagParties = flagPartyIds.length
+    ? await db.userAccount.findMany({
+        where: { id: { in: flagPartyIds } },
+        select: { id: true, handle: true },
+      })
+    : [];
+  const flagHandleOf = (id: string) =>
+    flagParties.find((u) => u.id === id)?.handle ?? "deleted-member";
 
   return {
     exportedAt: new Date().toISOString(),
@@ -715,8 +752,8 @@ async function buildExportPayload(userId: string): Promise<Record<string, unknow
         category: f.category,
         description: f.description,
         status: f.status,
-        reporterHandle: f.reporter.handle,
-        subjectHandle: f.subject.handle,
+        reporterHandle: flagHandleOf(f.reporterId),
+        subjectHandle: flagHandleOf(f.subjectId),
         createdAt: f.createdAt,
         subjectRespondedAt: f.subjectRespondedAt,
         evidence: f.evidence.map((e) => ({
@@ -800,6 +837,45 @@ async function buildExportPayload(userId: string): Promise<Record<string, unknow
         team: c.team.map((m) => ({ handle: m.user.handle, role: m.role, createdAt: m.createdAt })),
       })),
       usage: myApiUsageDays.map((d) => ({ day: d.day, checks: d.checks, errors: d.errors })),
+    },
+    // Stage 10 — Trust Network record: membership state (and the consent
+    // backing it — see consents above), every attestation lifecycle you were
+    // part of with partner identities, and your full shared-signal history
+    // (retracted rows included — your data-subject record is complete).
+    trustNetwork: {
+      note: "Your Trust Network record. Attestations are mutual and were accepted by both sides; revoked/declined rows are kept for your audit trail. Shared signals are k-anonymized counts in checks — here you see the complete rows, including retracted ones.",
+      membership: networkMembership
+        ? { status: networkMembership.status, joinedAt: networkMembership.joinedAt, consentId: networkMembership.consentId }
+        : null,
+      attestations: networkEdges.map((e) => {
+        const partnerId = e.aUserId === userId ? e.bUserId : e.aUserId;
+        const partner = networkPartners.find((p) => p.id === partnerId);
+        return {
+          id: e.id,
+          yourRole: e.requestedById === userId ? "requester" : "invited",
+          partnerHandle: partner?.handle ?? null,
+          partnerName: partner?.displayName ?? null,
+          status: e.status,
+          requestedAt: e.requestedAt,
+          respondedAt: e.respondedAt,
+          activatedAt: e.activatedAt,
+          revokedAt: e.revokedAt,
+          revokedByYou: e.revokedById === userId,
+          expiresAt: e.expiresAt,
+        };
+      }),
+      sharedSignals: networkSignals.map((s) => ({
+        id: s.id,
+        kind: s.kind,
+        platform: s.platform,
+        platformMode: s.platformMode,
+        severity: s.severity,
+        note: s.note,
+        sourceType: s.sourceType,
+        createdAt: s.createdAt,
+        expiresAt: s.expiresAt,
+        retractedAt: s.retractedAt,
+      })),
     },
   };
 }

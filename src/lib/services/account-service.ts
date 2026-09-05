@@ -163,6 +163,9 @@ export async function recentAuditForUser(userId: string, limit = 10) {
         { action: { startsWith: "API_" } },
         { action: { startsWith: "WEBHOOK_" } },
         { action: "TRUST_DECISION_API" },
+        // Stage 10 — Trust Network (own actions only; signal mint/retract
+        // are SYSTEM-actor events surfaced via the Security Center timeline)
+        { action: { startsWith: "NETWORK_" } },
       ],
     },
     orderBy: { createdAt: "desc" },

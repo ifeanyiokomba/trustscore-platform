@@ -872,3 +872,110 @@ export interface MintedKeyResponse {
   key: DevKey & { rawKey: string };
   warning: string;
 }
+
+// ---------------------------------------------------------------------------
+// Stage 10 — Trust Network
+// ---------------------------------------------------------------------------
+
+export interface NetworkMembershipView {
+  joined: boolean;
+  status: "ACTIVE" | "PAUSED" | null;
+  joinedAt: string | null;
+  consentId: string | null;
+}
+
+export interface NetworkGraphNode {
+  userId: string;
+  displayName: string;
+  handle: string;
+  level: number;
+  membership: "ACTIVE" | "PAUSED";
+  since: string;
+  lastActive: boolean;
+}
+
+export interface NetworkGraphEdge {
+  id: string;
+  to: string;
+  since: string;
+  status: string;
+}
+
+export interface NetworkPartnerRef {
+  displayName: string;
+  handle: string;
+}
+
+export interface NetworkInteractionIncoming {
+  id: string;
+  from: NetworkPartnerRef | null;
+  requestedAt: string;
+  expiresAt: string;
+}
+
+export interface NetworkInteractionOutgoing {
+  id: string;
+  to: NetworkPartnerRef | null;
+  requestedAt: string;
+  expiresAt: string;
+}
+
+export interface NetworkInteractionHistoryEntry {
+  id: string;
+  status: string;
+  direction: "OUTGOING" | "INCOMING";
+  partnerId: string;
+  partnerHandle: string | null;
+  partnerName: string | null;
+  at: string;
+}
+
+export interface NetworkSignalView {
+  id: string;
+  kind: string;
+  platform: string;
+  platformMode: string;
+  severity: string;
+  windowDays: number;
+  note: string;
+  sourceType: string;
+  createdAt: string;
+  expiresAt: string;
+  dispute: { route: string; note: string };
+}
+
+export interface NetworkMe {
+  membership: NetworkMembershipView;
+  standing: {
+    degree: number;
+    countingPartners: number;
+    businessChecks: number;
+    reputationNote: string;
+    quota: { used: number; max: number; windowDays: number };
+  };
+  graph: { nodes: NetworkGraphNode[]; edges: NetworkGraphEdge[] };
+  interactions: {
+    incoming: NetworkInteractionIncoming[];
+    outgoing: NetworkInteractionOutgoing[];
+    history: NetworkInteractionHistoryEntry[];
+  };
+  signals: NetworkSignalView[];
+  kAnonymity: { minK: number; windowDays: number; note: string };
+  honesty: { platformMode: string; note: string };
+  requestId?: string;
+}
+
+export interface ProviderRegistryEntry {
+  code: string;
+  name: string;
+  idTypeName: string;
+  depths: { gov: number; phone: number; liveness: number };
+  mode: "MOCK_LIVE" | "PLANNED";
+  note: string;
+}
+
+export interface ProviderRegistry {
+  providers: ProviderRegistryEntry[];
+  honesty: string;
+  requestId?: string;
+}

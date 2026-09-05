@@ -33,6 +33,7 @@ import { recordAudit } from "@/lib/services/audit-service";
 import { notifyUser } from "@/lib/services/notification-service";
 import { getScoreSnapshot, getCredentialsForUser } from "@/lib/services/trustscore-service";
 import { viewPublicCard } from "@/lib/services/passport-service";
+import { buildNetworkBlockFor } from "@/lib/services/network-service";
 import { normalizePhoneE164, phoneFingerprint } from "@/lib/providers/phone-provider";
 import { CONSENT_POLICY_VERSION } from "@/lib/providers/ninauth";
 
@@ -353,6 +354,10 @@ export async function runSafetyCheck(
       includeScore: view.scopes.includes("SCORE"),
       attributes: view.attributes,
     });
+    // Stage 10 — band-level network signals (counts only, k-anonymized).
+    // The B2B Trust Decision API surface (trustdecision-service) is NOT
+    // touched: its Stage 9 contract is frozen.
+    assessment.network = await buildNetworkBlockFor(view.subject.id);
     const row = await db.safetyCheck.create({
       data: {
         verifierId: verifier.id,
@@ -420,6 +425,7 @@ export async function runSafetyCheck(
         includeSignals: settings.includeSignals,
       }
     );
+    assessment.network = await buildNetworkBlockFor(subject.id);
     const row = await db.safetyCheck.create({
       data: {
         verifierId: verifier.id,
@@ -467,6 +473,7 @@ export async function runSafetyCheck(
       includeProfile: true,
       includeSignals: true,
     });
+    assessment.network = await buildNetworkBlockFor(subject.id);
     const row = await db.safetyCheck.create({
       data: {
         verifierId: verifier.id,
@@ -510,6 +517,7 @@ export async function runSafetyCheck(
     includeProfile: settings.includeProfile,
     includeSignals: settings.includeSignals,
   });
+  assessment.network = await buildNetworkBlockFor(subject.id);
   const row = await db.safetyCheck.create({
     data: {
       verifierId: verifier.id,
