@@ -40,6 +40,7 @@ import { cn } from "@/lib/utils";
 import type {
   PhoneStartResponse,
   PhoneConfirmResponse,
+  PhoneInboxResponse,
   ApiErrorBody,
 } from "@/lib/types";
 
@@ -71,6 +72,35 @@ export function PhoneVerifyModal({ open, onOpenChange, onVerified }: PhoneModalP
   const [expiryMs, setExpiryMs] = React.useState<number>(0);
   const [tick, setTick] = React.useState(0);
   const [confirmResult, setConfirmResult] = React.useState<PhoneConfirmResponse | null>(null);
+  // Stage 13 — sandbox SMS inbox (loopback posture: the code lives in the
+  // carrier's inbox, never echoed by the API — the LIVE delivery contract).
+  const [inbox, setInbox] = React.useState<PhoneInboxResponse | null>(null);
+  const [inboxBusy, setInboxBusy] = React.useState(false);
+  const loopback = startData?.delivery.mode === "LIVE";
+
+  async function loadInbox() {
+    setInboxBusy(true);
+    try {
+      const res = await fetch("/api/v1/identity/signals/phone/inbox", { cache: "no-store" });
+      const data = (await res.json().catch(() => ({}))) as PhoneInboxResponse & {
+        error?: { message?: string };
+      };
+      if (res.ok) {
+        setInbox(data);
+        toast.success("Sandbox inbox refreshed", {
+          description: `${data.messages.length} message${data.messages.length === 1 ? "" : "s"} received for ${data.phoneHint ?? "your number"}.`,
+        });
+      } else {
+        toast.error("Inbox unavailable", {
+          description: data.error?.message ?? "Could not read the sandbox inbox.",
+        });
+      }
+    } catch {
+      toast.error("Inbox unavailable", { description: "Network error." });
+    } finally {
+      setInboxBusy(false);
+    }
+  }
 
   // reset on open
   React.useEffect(() => {
@@ -84,6 +114,7 @@ export function PhoneVerifyModal({ open, onOpenChange, onVerified }: PhoneModalP
       setAttemptsLeft(null);
       setCooldownSec(30);
       setConfirmResult(null);
+      setInbox(null);
     }
   }, [open]);
 
@@ -186,7 +217,8 @@ export function PhoneVerifyModal({ open, onOpenChange, onVerified }: PhoneModalP
     onVerified();
   }
 
-  const previewCode = startData ? extractCode(startData.delivery.message) : "";
+  const previewCode = startData && !loopback ? extractCode(startData.delivery.message) : "";
+  const inboxCode = inbox?.messages?.[0] ? extractCode(inbox.messages[0].text) : "";
   const msLeft = expiryMs - tick * 1000;
 
   return (
@@ -306,36 +338,95 @@ export function PhoneVerifyModal({ open, onOpenChange, onVerified }: PhoneModalP
               </div>
             </div>
 
-            {/* MOCK delivery panel — honestly labeled sandbox test surface */}
-            <div className="rounded-lg border border-primary/30 bg-primary/5 p-3">
+            {/* Delivery panel — honestly labeled per posture:
+                MOCK echoes the message (sandbox test surface);
+                loopback/LIVE never echo the code — the sandbox SMS inbox
+                holds what the carrier received (Stage 13). */}
+            <div className="rounded-lg border border-primary/30 bg-primary/5 p-3" data-testid="delivery-panel">
               <div className="flex items-center justify-between gap-2">
                 <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-primary">
                   <MessageSquare className="h-3.5 w-3.5" aria-hidden="true" />
-                  Simulated SMS
+                  {loopback ? "Sandbox carrier" : "Simulated SMS"}
                 </span>
                 <Badge variant="outline" className="border-primary/40 text-[10px] text-primary">
                   {startData.delivery.provider} · {startData.delivery.mode}
                 </Badge>
               </div>
-              <p className="mt-2 rounded-md bg-background/80 px-3 py-2 font-mono text-xs leading-relaxed">
+              <p className="mt-2 rounded-md bg-background/80 px-3 py-2 text-xs leading-relaxed">
                 {startData.delivery.message}
               </p>
-              <p className="mt-2 text-[11px] leading-snug text-muted-foreground">
-                In sandbox the code is surfaced here for testing. In LIVE mode it is only delivered to your
-                handset — never shown in the app.
-              </p>
-              {previewCode && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="mt-1 h-7 text-xs text-primary"
-                  onClick={() => {
-                    setCode(previewCode);
-                    toast.info("Code filled from the simulated SMS");
-                  }}
-                >
-                  <ChevronRight className="mr-1 h-3 w-3" /> Use this code
-                </Button>
+
+              {loopback ? (
+                <div className="mt-2.5 space-y-2" data-testid="sandbox-inbox">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 w-full gap-1.5 text-xs"
+                    onClick={loadInbox}
+                    disabled={inboxBusy}
+                  >
+                    {inboxBusy ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                    ) : (
+                      <MessageSquare className="h-3.5 w-3.5" aria-hidden="true" />
+                    )}
+                    Open sandbox SMS inbox
+                  </Button>
+                  {inbox && (
+                    <div className="space-y-1.5">
+                      {inbox.messages.length === 0 ? (
+                        <p className="text-[11px] leading-snug text-muted-foreground">
+                          No messages yet — the carrier should have received one for {inbox.phoneHint}.
+                        </p>
+                      ) : (
+                        inbox.messages.slice(0, 2).map((m) => (
+                          <div
+                            key={m.id}
+                            className="rounded-md border border-border bg-background px-3 py-2 font-mono text-[11px] leading-relaxed"
+                          >
+                            {m.text}
+                          </div>
+                        ))
+                      )}
+                      <p className="text-[11px] leading-snug text-muted-foreground">
+                        {inbox.note}
+                      </p>
+                      {inboxCode && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 text-xs text-primary"
+                          onClick={() => {
+                            setCode(inboxCode);
+                            toast.info("Code filled from the sandbox inbox");
+                          }}
+                        >
+                          <ChevronRight className="mr-1 h-3 w-3" /> Use the code from the inbox
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <>
+                  <p className="mt-2 text-[11px] leading-snug text-muted-foreground">
+                    In sandbox the code is surfaced here for testing. In LIVE mode it is only delivered to your
+                    handset — never shown in the app.
+                  </p>
+                  {previewCode && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="mt-1 h-7 text-xs text-primary"
+                      onClick={() => {
+                        setCode(previewCode);
+                        toast.info("Code filled from the simulated SMS");
+                      }}
+                    >
+                      <ChevronRight className="mr-1 h-3 w-3" /> Use this code
+                    </Button>
+                  )}
+                </>
               )}
             </div>
 

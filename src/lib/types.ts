@@ -245,9 +245,17 @@ export interface PhoneStartResponse {
     expiresAt: string;
     provider: string;
     providerMode: string;
+    posture?: string;
   };
   consent: { id: string; purpose: string };
   delivery: { mode: string; channel: string; provider: string; message: string };
+}
+
+export interface PhoneInboxResponse {
+  posture: string;
+  phoneHint: string | null;
+  messages: Array<{ id: string; to: string; text: string; receivedAt: string }>;
+  note: string;
 }
 
 export interface PhoneConfirmResponse {
@@ -266,6 +274,7 @@ export interface LivenessStartResponse {
     expiresAt: string;
     provider: string;
     providerMode: string;
+    posture?: string;
     instructions: string[];
   };
   consent: { id: string; purpose: string };
@@ -847,6 +856,68 @@ export interface EngineAdminOverview {
   policies: PolicyInfo[];
   dpia: DpiaAdminRecord[];
   snapshots: { total: number; byState: Record<string, number> };
+}
+
+// Stage 13 — provider posture console (admin read model of /engine/admin/providers)
+export interface ProviderTransportStatus {
+  circuit: "CLOSED" | "OPEN" | "HALF_OPEN";
+  circuitSince: number | null;
+  consecutiveFailures: number;
+  calls: number;
+  errors: number;
+  errorRate: number;
+  p50: number | null;
+  p95: number | null;
+  lastLatencyMs: number | null;
+  lastError: string | null;
+  lastErrorAt: string | null;
+  lastOkAt: string | null;
+}
+
+export interface VaultEntryInfo {
+  id: string;
+  provider: string;
+  keyId: string;
+  hint: string;
+  status: string;
+  note: string | null;
+  lastUsedAt: string | null;
+  createdAt: string;
+  retiredAt: string | null;
+}
+
+export interface ProviderAdminEntry {
+  key: string;
+  title: string;
+  role: string;
+  providerName: string;
+  mode: string;
+  transport: ProviderTransportStatus;
+  credential: VaultEntryInfo | null;
+}
+
+export interface EngineAdminProviders {
+  posture: string;
+  postureNote: string;
+  liveAvailable: boolean;
+  providers: ProviderAdminEntry[];
+  vault: VaultEntryInfo[];
+  simulator: {
+    reachable: boolean;
+    port: number;
+    fault: string | null;
+    uptimeSec: number | null;
+    detail?: string;
+  };
+  vaultDefaultKey: boolean;
+  constants: {
+    requestTimeoutMs: number;
+    retries: number;
+    backoffMs: number[];
+    circuitThreshold: number;
+    circuitOpenMs: number;
+  };
+  requestId?: string;
 }
 
 export const DPIA_CHECKLIST_IDS = [

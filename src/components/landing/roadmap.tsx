@@ -89,8 +89,14 @@ const STAGES: { id: string; title: string; status: StageStatus; detail: string }
   {
     id: "12",
     title: "Transparency & alerting",
-    status: "active",
+    status: "done",
     detail: "The live scoring policy explained publicly on the landing page (no mystery numbers), material score-drop receipt notifications the moment they happen, and a timer-driven webhook retry worker — production hardening.",
+  },
+  {
+    id: "13",
+    title: "Live-ready providers",
+    status: "active",
+    detail: "The real provider transport layer — HMAC-signed calls, timeouts, retries, per-provider circuit breakers and latency metrics — proven end-to-end against a local loopback simulator, plus an encrypted write-only credential vault. LIVE partners flip on credentials, nothing else changes.",
   },
 ];
 

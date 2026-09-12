@@ -949,3 +949,24 @@ model WebhookDelivery {
   @@index([clientId, createdAt])
   @@index([status, nextRetryAt])
 }
+
+// Stage 13 — provider credential vault. Holds the LIVE-posture credentials
+// (client secrets, signing keys) for the verification providers, encrypted
+// at rest with AES-256-GCM under a platform master key (env VAULT_MASTER_KEY).
+// The plaintext secret is NEVER returned by any API — reads surface only a
+// masked hint. One ACTIVE credential per provider; revocation is immediate.
+model ProviderCredential {
+  id          String    @id @default(cuid())
+  provider    String // ninauth | phone | liveness
+  keyId       String // partner-issued key identifier (rotatable)
+  secretCipher String // AES-256-GCM blob: v1.<iv>.<tag>.<ciphertext> (base64url parts)
+  hint        String // masked display hint — never the secret
+  status      String    @default("ACTIVE") // ACTIVE | RETIRED
+  note        String? // operator note (provenance)
+  lastUsedAt  DateTime?
+  createdBy   String // admin handle
+  createdAt   DateTime  @default(now())
+  retiredAt   DateTime?
+
+  @@index([provider, status])
+}

@@ -7,6 +7,7 @@ import { db } from "@/lib/db";
 import {
   NINAUTH_MODE,
   NINAUTH_PROVIDER_NAME,
+  NINAUTH_CLIENT_ID,
   SESSION_TTL_MS,
   IDENTITY_FRESHNESS_DAYS,
   CORE_SCOPES,
@@ -21,6 +22,7 @@ import {
   generateShareCode,
   authorizationUrlFor,
   issueAuthorizationCode,
+  hashCode,
   codeMatches,
   mockTokenExchange,
   validateIdToken,
@@ -35,8 +37,44 @@ import {
 import { recordAudit } from "@/lib/services/audit-service";
 import { notifyUser } from "@/lib/services/notification-service";
 import { markMaterialChange } from "@/lib/services/trustscore-service";
+import { LOOPBACK_TRUST } from "@/lib/providers/ninauth";
+import { providerCall, ProviderTransportError } from "@/lib/providers/transport";
+import {
+  getProviderPosture,
+  providerNameFor,
+  type ProviderPosture,
+} from "@/lib/providers/provider-posture";
 
 const TERMINAL_STATUSES = new Set(["COMPLETED", "FAILED", "CONSENT_DENIED", "EXPIRED"]);
+
+// Stage 13 — posture-aware provider labeling (MOCK stays the default and the
+// existing matrices keep their labels; loopback honestly renames the provider).
+export class IdentityProviderError extends Error {
+  constructor(
+    public transportCode: string,
+    message: string
+  ) {
+    super(message);
+    this.name = "IdentityProviderError";
+  }
+}
+
+function ninauthLabels(posture: ProviderPosture): {
+  providerName: string;
+  providerMode: "MOCK" | "LIVE";
+} {
+  return {
+    providerName: providerNameFor("ninauth", posture),
+    providerMode: posture === "mock" ? "MOCK" : "LIVE",
+  };
+}
+
+async function transportFailure(err: ProviderTransportError): Promise<never> {
+  throw new IdentityProviderError(
+    err.code,
+    `The NINAuth provider transport failed (${err.code}: ${err.detail}). Nothing was written — try again when the provider recovers.`
+  );
+}
 
 // Assurance ladder (directive §30): L1 government (NINAuth, Stage 2–3),
 // L2 phone, L3 biometric, L4 cross-signal consistency — L2–L4 live in Stage 4.
@@ -143,11 +181,36 @@ export async function createVerificationSession(
   const state = generateState();
   const shareCode = generateShareCode();
 
+  // Stage 13 — loopback posture: register the session with the provider over
+  // the REAL transport (signed, timed out, retried, circuit-brokened) BEFORE
+  // anything is written. A transport failure leaves zero rows behind.
+  const posture = await getProviderPosture();
+  const labels = ninauthLabels(posture);
+  let authorizationUrl = authorizationUrlFor(state, challenge);
+  if (posture === "loopback") {
+    try {
+      const { data } = await providerCall<{ sessionRef: string; authorizeUrl: string }>(
+        "ninauth",
+        "/v1/ninauth/session",
+        {
+          clientId: NINAUTH_CLIENT_ID,
+          state,
+          codeChallenge: challenge,
+          scopes: scopes.join(" "),
+        }
+      );
+      authorizationUrl = data.authorizeUrl ?? authorizationUrl;
+    } catch (err) {
+      if (err instanceof ProviderTransportError) await transportFailure(err);
+      throw err;
+    }
+  }
+
   const session = await db.verificationSession.create({
     data: {
       userId,
-      provider: NINAUTH_PROVIDER_NAME,
-      providerMode: NINAUTH_MODE,
+      provider: labels.providerName,
+      providerMode: labels.providerMode,
       flow: input.flow === "SHARE_CODE" ? "SHARE_CODE" : "QR",
       status: "AWAITING_CONSENT",
       state,
@@ -157,7 +220,7 @@ export async function createVerificationSession(
       purpose,
       policyVersion: CONSENT_POLICY_VERSION,
       shareCode,
-      authorizationUrl: authorizationUrlFor(state, challenge),
+      authorizationUrl,
       expiresAt: new Date(Date.now() + SESSION_TTL_MS),
     },
   });
@@ -173,7 +236,11 @@ export async function createVerificationSession(
     subjectType: "VerificationSession",
     subjectId: session.id,
     requestId,
-    metadata: { scope: "ninauth_mock", outcome: "created" },
+    metadata: {
+      scope: posture === "mock" ? "ninauth_mock" : "ninauth_loopback",
+      outcome: "created",
+      posture,
+    },
   });
 
   return session;
@@ -222,7 +289,16 @@ export async function getSessionForUser(userId: string, sessionId: string) {
 
 export type ConsentResult =
   | { ok: true; code: string; state: string; grantedScopes: string[] }
-  | { ok: false; code: "SESSION_NOT_FOUND" | "NOT_PENDING" | "EXPIRED" | "DENIED" | "SCOPE_INVALID" };
+  | {
+      ok: false;
+      code:
+        | "SESSION_NOT_FOUND"
+        | "NOT_PENDING"
+        | "EXPIRED"
+        | "DENIED"
+        | "SCOPE_INVALID"
+        | "PROVIDER_UNAVAILABLE";
+    };
 
 export async function applyConsentDecision(
   userId: string,
@@ -287,22 +363,59 @@ export async function applyConsentDecision(
     finalScopes = grantedScopes;
   }
 
-  // GRANT: the mock NINAuth app issues a one-time authorization code (60s TTL).
-  const { code, codeHash, expiresAt } = issueAuthorizationCode();
+  // GRANT: the NINAuth side issues a one-time authorization code (60s TTL).
+  // Stage 13 — in loopback posture the code is issued by the provider over the
+  // REAL transport (signed call, retries, circuit breaker); in mock posture
+  // it is issued in-process exactly as before. Either way we store only the
+  // timing-safe hash + expiry.
+  let code: string;
+  let codeExpiresAt: Date;
+  const posture = await getProviderPosture();
+  if (posture === "loopback") {
+    try {
+      const { data } = await providerCall<{ code: string; expiresInSec: number }>(
+        "ninauth",
+        "/v1/ninauth/authorize",
+        {
+          state: session.state,
+          maskedSubject: maskedSubjectFor(userId),
+        }
+      );
+      code = data.code;
+      codeExpiresAt = new Date(Date.now() + (data.expiresInSec ?? 60) * 1000);
+    } catch (err) {
+      if (err instanceof ProviderTransportError) {
+        // Honest failure — nothing was written; the session stays AWAITING_CONSENT.
+        await recordEvent(session.id, "CONSENT_PROVIDER_UNAVAILABLE", {
+          reason: err.code,
+        });
+        return { ok: false, code: "PROVIDER_UNAVAILABLE" };
+      }
+      throw err;
+    }
+  } else {
+    const issued = issueAuthorizationCode();
+    code = issued.code;
+    codeExpiresAt = issued.expiresAt;
+  }
+  const codeHash = hashCode(code);
   await db.verificationSession.update({
     where: { id: session.id },
     data: {
       status: "CONSENT_GRANTED",
       scopes: JSON.stringify(finalScopes),
       authorizationCodeHash: codeHash,
-      authorizationCodeExp: expiresAt,
+      authorizationCodeExp: codeExpiresAt,
     },
   });
   await recordEvent(session.id, "CONSENT_GRANTED", {
     scope: finalScopes.join(" "),
     policyVersion: session.policyVersion,
   });
-  await recordEvent(session.id, "CODE_ISSUED", { reason: "one_time_60s" });
+  await recordEvent(session.id, "CODE_ISSUED", {
+    reason: "one_time_60s",
+    posture,
+  });
   await recordAudit({
     actorType: "USER",
     actorId: userId,
@@ -310,7 +423,11 @@ export async function applyConsentDecision(
     subjectType: "VerificationSession",
     subjectId: session.id,
     requestId,
-    metadata: { outcome: "granted", scope: "ninauth_mock", scopes: finalScopes.length },
+    metadata: {
+      outcome: "granted",
+      scope: posture === "mock" ? "ninauth_mock" : "ninauth_loopback",
+      scopes: finalScopes.length,
+    },
   });
 
   return { ok: true, code, state: session.state, grantedScopes: finalScopes };
@@ -371,33 +488,62 @@ export async function completeCallback(
   }
 
   // Token exchange (PKCE verified inside) + ID token validation.
+  // Stage 13 — loopback: the exchange happens over the REAL transport against
+  // the provider simulator; the returned ID token is validated against the
+  // loopback trust config (same signature/issuer/audience/exp/nonce checks).
+  // Mock: the in-process exchange exactly as before. Everything downstream —
+  // consent record, TrustIdentity, evidence, identifiers, attributes — is
+  // posture-independent: the claims are the provider's, never ours to invent.
   const scopes = JSON.parse(session.scopes) as string[];
-  const profileClaims: ProfileClaims = mockProfileFor(userId);
+  const posture = await getProviderPosture();
+  const labels = ninauthLabels(posture);
   let idToken: string;
   try {
-    const tokens = mockTokenExchange({
-      code: input.code,
-      storedCodeHash: session.authorizationCodeHash,
-      codeExpiresAt: session.authorizationCodeExp ?? new Date(0),
-      codeVerifier: session.codeVerifier,
-      codeChallenge: session.codeChallenge,
-      nonce: session.state,
-      maskedSubject: maskedSubjectFor(userId),
-      scopes,
-      profile: profileClaims,
-    });
-    idToken = tokens.id_token;
+    if (posture === "loopback") {
+      const { data } = await providerCall<{
+        access_token: string;
+        token_type: string;
+        expires_in: number;
+        id_token: string;
+      }>("ninauth", "/v1/ninauth/token", {
+        code: input.code,
+        codeVerifier: session.codeVerifier,
+        nonce: session.state,
+        clientId: NINAUTH_CLIENT_ID,
+      });
+      idToken = data.id_token;
+    } else {
+      const profileClaims: ProfileClaims = mockProfileFor(userId);
+      const tokens = mockTokenExchange({
+        code: input.code,
+        storedCodeHash: session.authorizationCodeHash,
+        codeExpiresAt: session.authorizationCodeExp ?? new Date(0),
+        codeVerifier: session.codeVerifier,
+        codeChallenge: session.codeChallenge,
+        nonce: session.state,
+        maskedSubject: maskedSubjectFor(userId),
+        scopes,
+        profile: profileClaims,
+      });
+      idToken = tokens.id_token;
+    }
   } catch (err) {
+    if (err instanceof ProviderTransportError) {
+      await failSession(session.id, `transport_${err.code}`, userId, requestId);
+      return { ok: false, code: "EXCHANGE_FAILED", reason: `transport_${err.code}` };
+    }
     const reason = err instanceof TokenValidationError ? err.code : "exchange_error";
     await failSession(session.id, reason, userId, requestId);
     return { ok: false, code: "EXCHANGE_FAILED", reason };
   }
 
-  await recordEvent(session.id, "CODE_EXCHANGED", { reason: "pkce_ok" });
+  await recordEvent(session.id, "CODE_EXCHANGED", {
+    reason: posture === "loopback" ? "pkce_ok_provider_transport" : "pkce_ok",
+  });
 
   let claims;
   try {
-    claims = validateIdToken(idToken, session.state);
+    claims = validateIdToken(idToken, session.state, posture === "loopback" ? LOOPBACK_TRUST : undefined);
   } catch (err) {
     const reason = err instanceof TokenValidationError ? err.code : "validation_error";
     await failSession(session.id, `token_${reason}`, userId, requestId);
@@ -429,8 +575,8 @@ export async function completeCallback(
       userId,
       status: "VERIFIED",
       assuranceLevel: 1,
-      provider: NINAUTH_PROVIDER_NAME,
-      providerMode: NINAUTH_MODE,
+      provider: labels.providerName,
+      providerMode: labels.providerMode,
       providerIdentityRef: claims.sub,
       establishingConsentId: consent.id,
       verifiedAt: now,
@@ -439,8 +585,8 @@ export async function completeCallback(
     update: {
       status: "VERIFIED",
       assuranceLevel: 1,
-      provider: NINAUTH_PROVIDER_NAME,
-      providerMode: NINAUTH_MODE,
+      provider: labels.providerName,
+      providerMode: labels.providerMode,
       providerIdentityRef: claims.sub,
       establishingConsentId: consent.id,
       verifiedAt: now,
@@ -457,9 +603,12 @@ export async function completeCallback(
       sessionId: session.id,
       consentId: consent.id,
       type: "NINAUTH_ID_TOKEN",
-      provider: NINAUTH_PROVIDER_NAME,
-      providerMode: NINAUTH_MODE,
-      summary: "Government identity verified via NINAuth ID token (signature, issuer, audience, nonce validated).",
+      provider: labels.providerName,
+      providerMode: labels.providerMode,
+      summary:
+        posture === "loopback"
+          ? "Government identity verified via NINAuth ID token over the sandbox loopback transport (HMAC-signed calls; signature, issuer, audience, nonce validated)."
+          : "Government identity verified via NINAuth ID token (signature, issuer, audience, nonce validated).",
       confidence: 100,
       status: "ACTIVE",
       collectedAt: now,
@@ -504,7 +653,7 @@ export async function completeCallback(
         scope: key === "given_name" || key === "family_name" ? "profile.name" : "profile.demographics",
         consentId: consent.id,
         status: "ACTIVE",
-        source: NINAUTH_PROVIDER_NAME,
+        source: labels.providerName,
         assertedAt: now,
         expiresAt,
       },
@@ -513,6 +662,7 @@ export async function completeCallback(
         scope: key === "given_name" || key === "family_name" ? "profile.name" : "profile.demographics",
         consentId: consent.id,
         status: "ACTIVE",
+        source: labels.providerName,
         assertedAt: now,
         expiresAt,
       },
@@ -537,15 +687,21 @@ export async function completeCallback(
     subjectType: "TrustIdentity",
     subjectId: identity.id,
     requestId,
-    metadata: { outcome: "level_1", scope: "ninauth_mock", attributes: attributeCount },
+    metadata: {
+      outcome: "level_1",
+      scope: posture === "mock" ? "ninauth_mock" : "ninauth_loopback",
+      posture,
+      attributes: attributeCount,
+    },
   });
+  const providerLabel = posture === "mock" ? "mock provider" : "sandbox loopback transport";
   await notifyUser(
     userId,
     "VERIFICATION",
     "Trust Identity established",
     attributeCount > 0
-      ? `Your government identity was verified through NINAuth (mock provider). Assurance Level 1, valid for 90 days — ${attributeCount} consent-scoped attributes added to your profile.`
-      : "Your government identity was verified through NINAuth (mock provider). Assurance Level 1, valid for 90 days. A consent record has been added to your history."
+      ? `Your government identity was verified through NINAuth (${providerLabel}). Assurance Level 1, valid for 90 days — ${attributeCount} consent-scoped attributes added to your profile.`
+      : `Your government identity was verified through NINAuth (${providerLabel}). Assurance Level 1, valid for 90 days. A consent record has been added to your history.`
   );
   // Stage 5: material change — recompute the TrustScore snapshot + sync
   // credentials so the passport reflects the new identity immediately.

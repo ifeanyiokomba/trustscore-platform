@@ -14,8 +14,6 @@
 
 import { db } from "@/lib/db";
 import {
-  PHONE_PROVIDER_NAME,
-  PHONE_MODE,
   OTP_TTL_MS,
   MAX_OTP_ATTEMPTS,
   MAX_RESENDS,
@@ -33,8 +31,6 @@ import {
   type DeliveryInfo,
 } from "@/lib/providers/phone-provider";
 import {
-  LIVENESS_PROVIDER_NAME,
-  LIVENESS_MODE,
   LIVENESS_TTL_MS,
   LIVENESS_FRESHNESS_DAYS,
   createLivenessJob,
@@ -48,6 +44,16 @@ import { CONSENT_POLICY_VERSION } from "@/lib/providers/ninauth";
 import { recordAudit } from "@/lib/services/audit-service";
 import { notifyUser } from "@/lib/services/notification-service";
 import { markMaterialChange } from "@/lib/services/trustscore-service";
+import {
+  providerCall,
+  providerGet,
+  ProviderTransportError,
+  type ProviderKey,
+} from "@/lib/providers/transport";
+import {
+  getProviderPosture,
+  providerNameFor,
+} from "@/lib/providers/provider-posture";
 
 // ---------------------------------------------------------------------------
 // Errors → mapped to HTTP by the routes
@@ -65,7 +71,8 @@ export class SignalError extends Error {
       | "COOLDOWN"
       | "RESEND_LIMIT"
       | "OTP_INVALID"
-      | "REASON_INVALID",
+      | "REASON_INVALID"
+      | "PROVIDER_UNAVAILABLE",
     public httpStatus: number,
     message: string,
     public extra?: Record<string, unknown>
@@ -240,6 +247,44 @@ export async function recomputeAssuranceLevel(userId: string): Promise<number> {
 // Phone verification — start
 // ---------------------------------------------------------------------------
 
+// Stage 13 — loopback delivery: the OTP message goes out over the REAL
+// transport (signed, timed out, retried, circuit-brokened) to the sandbox SMS
+// carrier. The carrier knows only the MASKED hint (privacy discipline holds
+// across processes); the code itself is never echoed back — LIVE contract.
+async function deliverOtpViaTransport(
+  phoneHint: string,
+  code: string
+): Promise<{ messageId: string; latencyMs: number }> {
+  const text = `TrustScore: your verification code is ${code}. It expires in 5 minutes. Never share this code.`;
+  try {
+    const { data, latencyMs } = await providerCall<{ messageId: string; segments: number }>(
+      "phone",
+      "/v1/phone/messages",
+      { to: phoneHint, text }
+    );
+    return { messageId: data.messageId, latencyMs };
+  } catch (err) {
+    if (err instanceof ProviderTransportError) {
+      throw new SignalError(
+        "PROVIDER_UNAVAILABLE",
+        503,
+        `The SMS carrier transport failed (${err.code}). Nothing was sent and nothing was stored — try again when the carrier recovers.`
+      );
+    }
+    throw err;
+  }
+}
+
+function providerLabels(key: ProviderKey, posture: string): {
+  providerName: string;
+  providerMode: "MOCK" | "LIVE";
+} {
+  return {
+    providerName: providerNameFor(key, posture === "mock" ? "mock" : posture === "loopback" ? "loopback" : "live"),
+    providerMode: posture === "mock" ? "MOCK" : "LIVE",
+  };
+}
+
 export async function startPhoneVerification(
   userId: string,
   input: { phone: string; simSwapRisk?: SimSwapRisk },
@@ -256,6 +301,22 @@ export async function startPhoneVerification(
     );
   }
 
+  const posture = await getProviderPosture();
+  const labels = providerLabels("phone", posture);
+  const hint = maskPhoneHint(e164);
+
+  const { code, otpHash } = issueOtp();
+  const fingerprint = phoneFingerprint(e164);
+  const risk = simSwapRiskFor(fingerprint, input.simSwapRisk);
+
+  // Loopback: deliver through the transport FIRST — a failure leaves zero
+  // rows behind (honest 503). Mock: the code surfaces in the delivery panel.
+  let transportMessageId: string | null = null;
+  if (posture === "loopback") {
+    const sent = await deliverOtpViaTransport(hint, code);
+    transportMessageId = sent.messageId;
+  }
+
   const consent = await db.consent.create({
     data: {
       userId,
@@ -266,15 +327,11 @@ export async function startPhoneVerification(
     },
   });
 
-  const { code, otpHash } = issueOtp();
-  const fingerprint = phoneFingerprint(e164);
-  const risk = simSwapRiskFor(fingerprint, input.simSwapRisk);
-
   const verification = await db.phoneVerification.create({
     data: {
       userId,
       phoneHash: fingerprint,
-      phoneHint: maskPhoneHint(e164),
+      phoneHint: hint,
       status: "PENDING",
       otpHash,
       simSwapRisk: risk,
@@ -290,10 +347,26 @@ export async function startPhoneVerification(
     subjectType: "PhoneVerification",
     subjectId: verification.id,
     requestId,
-    metadata: { outcome: "started", scope: "phone_otp", providerMode: PHONE_MODE },
+    metadata: {
+      outcome: "started",
+      scope: "phone_otp",
+      providerMode: labels.providerMode,
+      posture,
+      transportMessageId,
+    },
   });
 
-  const delivery: DeliveryInfo = mockDelivery(code);
+  // Delivery contract: MOCK echoes the message (sandbox test surface, labeled);
+  // loopback/LIVE never echo the code — the sandbox inbox holds the message.
+  const delivery: DeliveryInfo =
+    posture === "mock"
+      ? mockDelivery(code)
+      : {
+          mode: "LIVE",
+          channel: "sms",
+          provider: labels.providerName,
+          message: `Code sent to ${hint} through the signed sandbox carrier transport (message ${transportMessageId}). Open the sandbox SMS inbox to read it — LIVE responses never echo codes.`,
+        };
 
   return {
     verification: {
@@ -303,11 +376,12 @@ export async function startPhoneVerification(
       attemptsLeft: MAX_OTP_ATTEMPTS,
       resendsLeft: MAX_RESENDS,
       expiresAt: verification.expiresAt.toISOString(),
-      provider: PHONE_PROVIDER_NAME,
-      providerMode: PHONE_MODE,
+      provider: labels.providerName,
+      providerMode: labels.providerMode,
+      posture,
     },
     consent: { id: consent.id, purpose: PHONE_CONSENT_PURPOSE },
-    delivery, // MOCK: includes the code for sandbox testing (honestly labeled)
+    delivery,
   };
 }
 
@@ -348,6 +422,17 @@ export async function resendPhoneOtp(
   }
 
   const { code, otpHash } = issueOtp();
+  const posture = await getProviderPosture();
+  const labels = providerLabels("phone", posture);
+
+  // Loopback: send the new code through the transport BEFORE updating the
+  // row — a failure leaves the previous code intact (honest 503).
+  let transportMessageId: string | null = null;
+  if (posture === "loopback") {
+    const sent = await deliverOtpViaTransport(row.phoneHint, code);
+    transportMessageId = sent.messageId;
+  }
+
   await db.phoneVerification.update({
     where: { id: row.id },
     data: {
@@ -365,8 +450,18 @@ export async function resendPhoneOtp(
     subjectType: "PhoneVerification",
     subjectId: row.id,
     requestId,
-    metadata: { outcome: "resent", scope: "phone_otp" },
+    metadata: { outcome: "resent", scope: "phone_otp", posture, transportMessageId },
   });
+
+  const delivery: DeliveryInfo =
+    posture === "mock"
+      ? mockDelivery(code)
+      : {
+          mode: "LIVE",
+          channel: "sms",
+          provider: labels.providerName,
+          message: `New code sent to ${row.phoneHint} through the signed sandbox carrier transport (message ${transportMessageId}). Open the sandbox SMS inbox to read it — the previous code is no longer valid.`,
+        };
 
   return {
     verification: {
@@ -376,11 +471,59 @@ export async function resendPhoneOtp(
       attemptsLeft: MAX_OTP_ATTEMPTS,
       resendsLeft: MAX_RESENDS - (row.resends + 1),
       expiresAt: new Date(Date.now() + OTP_TTL_MS).toISOString(),
-      provider: PHONE_PROVIDER_NAME,
-      providerMode: PHONE_MODE,
+      provider: labels.providerName,
+      providerMode: labels.providerMode,
+      posture,
     },
-    delivery: mockDelivery(code),
+    delivery,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Stage 13 — Sandbox SMS inbox (loopback posture only). The member reads the
+// messages the sandbox carrier "delivered" for THEIR OWN pending verification
+// (filtered to that verification's masked hint — nothing cross-user).
+// ---------------------------------------------------------------------------
+
+export async function getSandboxSmsInbox(userId: string, requestId: string) {
+  const posture = await getProviderPosture();
+  if (posture !== "loopback") {
+    throw new SignalError(
+      "PROVIDER_UNAVAILABLE",
+      409,
+      "The sandbox SMS inbox exists only in the loopback provider posture (MOCK surfaces the code in the delivery panel; LIVE delivers to real handsets)."
+    );
+  }
+
+  const pending = await db.phoneVerification.findFirst({
+    where: { userId, status: "PENDING" },
+    orderBy: { createdAt: "desc" },
+  });
+  const hint = pending?.phoneHint ?? null;
+
+  try {
+    const { data } = await providerGet<{ messages: Array<{ id: string; to: string; text: string; receivedAt: string }> }>(
+      "phone",
+      hint ? `/v1/phone/inbox?to=${encodeURIComponent(hint)}` : "/v1/phone/inbox"
+    );
+    return {
+      posture,
+      phoneHint: hint,
+      messages: data.messages ?? [],
+      note:
+        "Sandbox SMS inbox — messages the loopback carrier received for your masked number. In LIVE posture codes are delivered to real handsets and never appear here.",
+      requestId,
+    };
+  } catch (err) {
+    if (err instanceof ProviderTransportError) {
+      throw new SignalError(
+        "PROVIDER_UNAVAILABLE",
+        503,
+        `The sandbox SMS carrier is unreachable (${err.code}). Try again shortly.`
+      );
+    }
+    throw err;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -526,6 +669,8 @@ export async function confirmPhoneOtp(
   });
 
   const risk = row.simSwapRisk as SimSwapRisk;
+  const confirmPosture = await getProviderPosture();
+  const phoneLabels = providerLabels("phone", confirmPosture);
   await db.evidence.create({
     data: {
       userId,
@@ -533,9 +678,9 @@ export async function confirmPhoneOtp(
       sessionId: row.id,
       consentId: row.consentId,
       type: "PHONE_OTP",
-      provider: PHONE_PROVIDER_NAME,
-      providerMode: PHONE_MODE,
-      summary: `Phone bound to identity via SMS OTP (${PHONE_MODE} provider). SIM-swap risk: ${risk}.`,
+      provider: phoneLabels.providerName,
+      providerMode: phoneLabels.providerMode,
+      summary: `Phone bound to identity via SMS OTP (${phoneLabels.providerName} — ${phoneLabels.providerMode} transport). SIM-swap risk: ${risk}.`,
       confidence: confidenceForSimSwap(risk),
       status: "ACTIVE",
       collectedAt: now,
@@ -553,7 +698,13 @@ export async function confirmPhoneOtp(
     subjectType: "IdentityIdentifier",
     subjectId: identity.id,
     requestId,
-    metadata: { outcome: "verified", level, simSwap: risk, providerMode: PHONE_MODE },
+    metadata: {
+      outcome: "verified",
+      level,
+      simSwap: risk,
+      providerMode: phoneLabels.providerMode,
+      posture: confirmPosture,
+    },
   });
   await notifyUser(
     userId,
@@ -591,6 +742,35 @@ export async function startLiveness(
 ) {
   const identity = await requireFreshIdentity(userId);
 
+  const posture = await getProviderPosture();
+  const labels = providerLabels("liveness", posture);
+
+  // Stage 13 — loopback: the job is created by the provider over the REAL
+  // transport (jobId issued by the partner, not by us). A failure leaves
+  // zero rows behind (honest 503). Mock: the in-process job exactly as before.
+  let jobId: string;
+  if (posture === "loopback") {
+    try {
+      const { data } = await providerCall<{ jobId: string; uploadUrl: string }>(
+        "liveness",
+        "/v1/liveness/jobs",
+        {}
+      );
+      jobId = data.jobId;
+    } catch (err) {
+      if (err instanceof ProviderTransportError) {
+        throw new SignalError(
+          "PROVIDER_UNAVAILABLE",
+          503,
+          `The liveness partner transport failed (${err.code}). No session was created — try again when the partner recovers.`
+        );
+      }
+      throw err;
+    }
+  } else {
+    jobId = createLivenessJob().jobId;
+  }
+
   const consent = await db.consent.create({
     data: {
       userId,
@@ -601,7 +781,6 @@ export async function startLiveness(
     },
   });
 
-  const { jobId } = createLivenessJob();
   const session = await db.livenessSession.create({
     data: {
       userId,
@@ -620,7 +799,12 @@ export async function startLiveness(
     subjectType: "LivenessSession",
     subjectId: session.id,
     requestId,
-    metadata: { outcome: "started", scope: "biometric_liveness", providerMode: LIVENESS_MODE },
+    metadata: {
+      outcome: "started",
+      scope: "biometric_liveness",
+      providerMode: labels.providerMode,
+      posture,
+    },
   });
 
   return {
@@ -629,8 +813,9 @@ export async function startLiveness(
       jobId: session.jobId,
       status: session.status,
       expiresAt: session.expiresAt.toISOString(),
-      provider: LIVENESS_PROVIDER_NAME,
-      providerMode: LIVENESS_MODE,
+      provider: labels.providerName,
+      providerMode: labels.providerMode,
+      posture,
       instructions: captureInstructions(),
     },
     consent: { id: consent.id, purpose: LIVENESS_CONSENT_PURPOSE },
@@ -669,11 +854,66 @@ export async function completeLiveness(
     throw new SignalError("IDENTITY_REQUIRED", 409, "Government identity is no longer active.");
   }
 
-  const verdict: LivenessVerdict = evaluateLiveness({
-    jobId: row.jobId,
-    maskedSubject: identity.providerIdentityRef,
-    simulate: input.simulate,
-  });
+  const posture = await getProviderPosture();
+  const labels = providerLabels("liveness", posture);
+
+  // Stage 13 — loopback: the capture is submitted to the partner over the
+  // REAL transport and the verdict comes back from the partner (deterministic
+  // seeded scores — the simulator's "model"). Mock: in-process evaluation.
+  let verdict: LivenessVerdict;
+  if (posture === "loopback") {
+    try {
+      const { data } = await providerCall<LivenessVerdict>(
+        "liveness",
+        `/v1/liveness/jobs/${encodeURIComponent(row.jobId)}/submit`,
+        {
+          simulate: input.simulate ?? "ok",
+          maskedSubject: identity.providerIdentityRef,
+        }
+      );
+      // Shape validation — the verdict is the partner's ANSWER, but we still
+      // enforce our own contract on it (never trust blindly).
+      if (
+        typeof data.passed !== "boolean" ||
+        typeof data.livenessScore !== "number" ||
+        typeof data.faceMatchScore !== "number" ||
+        typeof data.reason !== "string"
+      ) {
+        throw new SignalError(
+          "PROVIDER_UNAVAILABLE",
+          502,
+          "The liveness partner returned a malformed verdict — rejected. No biometric signal was added."
+        );
+      }
+      verdict = data;
+    } catch (err) {
+      if (err instanceof SignalError) throw err;
+      if (err instanceof ProviderTransportError) {
+        // Honest failure — the session stays PENDING (retryable).
+        await recordAudit({
+          actorType: "USER",
+          actorId: userId,
+          action: "SIGNAL_LIVENESS_TRANSPORT_FAILED",
+          subjectType: "LivenessSession",
+          subjectId: row.id,
+          requestId,
+          metadata: { outcome: "transport_error", code: err.code, posture },
+        });
+        throw new SignalError(
+          "PROVIDER_UNAVAILABLE",
+          503,
+          `The liveness partner transport failed (${err.code}). Your capture window is still open — retry when the partner recovers.`
+        );
+      }
+      throw err;
+    }
+  } else {
+    verdict = evaluateLiveness({
+      jobId: row.jobId,
+      maskedSubject: identity.providerIdentityRef,
+      simulate: input.simulate,
+    });
+  }
 
   const now = new Date();
   const resultJson = JSON.stringify({
@@ -702,7 +942,7 @@ export async function completeLiveness(
       subjectType: "LivenessSession",
       subjectId: row.id,
       requestId,
-      metadata: { outcome: "failed", reason: verdict.reason, providerMode: LIVENESS_MODE },
+      metadata: { outcome: "failed", reason: verdict.reason, providerMode: labels.providerMode, posture },
     });
     await notifyUser(
       userId,
@@ -750,9 +990,9 @@ export async function completeLiveness(
       sessionId: row.id,
       consentId: row.consentId,
       type: "LIVENESS",
-      provider: LIVENESS_PROVIDER_NAME,
-      providerMode: LIVENESS_MODE,
-      summary: `Selfie liveness passed and matched the government record (${LIVENESS_MODE} provider). No biometric data stored — verdict only.`,
+      provider: labels.providerName,
+      providerMode: labels.providerMode,
+      summary: `Selfie liveness passed and matched the government record (${labels.providerName} — ${labels.providerMode} transport). No biometric data stored — verdict only.`,
       confidence: verdict.confidence,
       status: "ACTIVE",
       collectedAt: now,
@@ -774,7 +1014,8 @@ export async function completeLiveness(
       level,
       liveness: verdict.livenessScore,
       faceMatch: verdict.faceMatchScore,
-      providerMode: LIVENESS_MODE,
+      providerMode: labels.providerMode,
+      posture,
     },
   });
   await notifyUser(
@@ -851,6 +1092,12 @@ export async function getSignalsForUser(userId: string) {
 
   const crossSignal = await computeCrossSignalState(userId);
 
+  // Stage 13 — the providers block reflects the CURRENT posture (honest,
+  // live-configured provider names; evidence rows carry bind-time names).
+  const postureNow = await getProviderPosture();
+  const phoneNow = providerLabels("phone", postureNow);
+  const livenessNow = providerLabels("liveness", postureNow);
+
   return {
     phone: {
       status: identifierStatus(phoneIdentifier),
@@ -881,8 +1128,8 @@ export async function getSignalsForUser(userId: string) {
     },
     crossSignal,
     providers: {
-      phone: { name: PHONE_PROVIDER_NAME, mode: PHONE_MODE },
-      liveness: { name: LIVENESS_PROVIDER_NAME, mode: LIVENESS_MODE },
+      phone: { name: phoneNow.providerName, mode: phoneNow.providerMode },
+      liveness: { name: livenessNow.providerName, mode: livenessNow.providerMode },
     },
   };
 }

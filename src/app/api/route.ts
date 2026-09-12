@@ -5,10 +5,10 @@ import { NextResponse } from "next/server";
 export async function GET() {
   return NextResponse.json({
     name: "TrustScore Platform API",
-    stage: "12 — Transparency & Alerting (public policy explainer, material score-drop receipts, timer-driven webhook worker)",
-    version: "1.11.0",
+    stage: "13 — Live-Ready Providers (real transport layer: signed calls, timeouts, retries, circuit breakers, credential vault, loopback simulator)",
+    version: "1.12.0",
     notice:
-      "NINAuth integration is implemented behind a contract-first MOCK provider adapter (OAuth 2.0 + PKCE + OIDC-style ID tokens). Phone (SMS OTP) and biometric (liveness) signals are likewise contract-first MOCK transports. No live government or MNO/biometric integration is claimed. The LIVE transports activate once partner sandbox credentials exist (audit §2.2). The B2B Trust Decision API and webhook deliveries are real integrations against that same MOCK-provider platform; plan billing is an honest mock-up (no payment processor is connected).",
+      "NINAuth integration is implemented contract-first behind a runtime-switchable provider POSTURE: MOCK (default, in-process, honestly labeled), SANDBOX LOOPBACK (the real transport path — HMAC-signed calls, timeouts, retries, per-provider circuit breakers, latency metrics — proven against the local provider simulator on :3032), and LIVE (honestly gated on partner credentials + base URLs; the API refuses the flip until they exist). Phone (SMS OTP) and biometric (liveness) follow the same posture. The credential vault stores provider secrets AES-256-GCM encrypted and write-only. The B2B Trust Decision API and webhook deliveries are real integrations against that same platform; plan billing is an honest mock-up (no payment processor is connected).",
     endpoints: [
       { method: "GET", path: "/api/health", auth: false, description: "Liveness + database readiness" },
       { method: "POST", path: "/api/v1/auth/register", auth: false, description: "Create an account (rate-limited)" },
@@ -25,6 +25,7 @@ export async function GET() {
       { method: "POST", path: "/api/v1/identity/signals/phone/start", auth: "session", description: "Stage 4: start phone OTP verification (NG E.164, consent, hashed OTP, MOCK SMS delivery)" },
       { method: "POST", path: "/api/v1/identity/signals/phone/resend", auth: "session", description: "Stage 4: resend OTP (30s cooldown, max 3, attempts reset)" },
       { method: "POST", path: "/api/v1/identity/signals/phone/confirm", auth: "session", description: "Stage 4: confirm OTP → PHONE identifier (hashed) + evidence → ladder L2" },
+      { method: "GET", path: "/api/v1/identity/signals/phone/inbox", auth: "session", description: "Stage 13: sandbox SMS inbox — the messages the loopback carrier received for your own pending verification (loopback posture only; LIVE never exposes codes)" },
       { method: "POST", path: "/api/v1/identity/signals/biometrics/start", auth: "session", description: "Stage 4: create liveness job (MOCK Smile-ID-class contract, consent, 10-min window)" },
       { method: "POST", path: "/api/v1/identity/signals/biometrics/complete", auth: "session", description: "Stage 4: submit capture → verdict (liveness + face-match vs government record) → ladder L3/L4" },
       { method: "GET", path: "/api/v1/passport/me", auth: "session", description: "Stage 5: Trust Passport — score snapshot, credentials, share tokens, receipts, sessions, notifications" },
@@ -64,6 +65,12 @@ export async function GET() {
       { method: "POST", path: "/api/v1/engine/admin/policies/:id/simulate", auth: "session+admin", description: "Stage 8: read-only impact dry-run — recompute the cohort under draft rules vs active; buckets, transitions, masked movers; nothing is written" },
       { method: "POST", path: "/api/v1/engine/admin/dpia", auth: "session+admin", description: "Stage 8: record a DPIA assessment for a policy (completes only when every checklist item is done)" },
       { method: "POST", path: "/api/v1/engine/admin/gate", auth: "session+admin", description: "Stage 8: toggle automated-significant-decisions (DPIA-gated + typed confirmation; disabling always allowed)" },
+      { method: "GET", path: "/api/v1/engine/admin/providers", auth: "session+admin", description: "Stage 13: provider console — posture, per-provider circuit state + latency/error metrics, credential vault (masked hints), simulator health" },
+      { method: "PUT", path: "/api/v1/engine/admin/providers", auth: "session+admin", description: "Stage 13: set provider posture {mock|loopback|live} — LIVE honestly refused without partner credentials + base URLs (422, never pretended)" },
+      { method: "POST", path: "/api/v1/engine/admin/providers/:key/reset", auth: "session+admin", description: "Stage 13: reset a provider's circuit breaker + transport metrics" },
+      { method: "PUT", path: "/api/v1/engine/admin/providers/:key/credential", auth: "session+admin", description: "Stage 13: store a provider credential (AES-256-GCM encrypted, write-only — secret never returned again; rotates the previous to RETIRED)" },
+      { method: "DELETE", path: "/api/v1/engine/admin/providers/:key/credential", auth: "session+admin", description: "Stage 13: revoke the ACTIVE provider credential (immediate; LIVE posture refuses to activate without one)" },
+      { method: "POST", path: "/api/v1/engine/admin/providers/:key/fault", auth: "session+admin", description: "Stage 13: set the simulator fault mode {none|timeout|error|auth|slow} — exercises retries, timeouts and circuit-breaker trips on demand (loopback only)" },
       { method: "POST", path: "/api/v1/trust/check", auth: "X-API-Key", description: "Stage 9: Trust Decision API — exactly one of { handle, phone, link, qr }; consent-gated, band-level, receipted to the subject; NOT an automated decision (NDPA §37 note on every response)" },
       { method: "GET", path: "/api/v1/dev/me", auth: "session", description: "Stage 9: developer portal — your API clients, keys (prefixes only), team, quota, 14-day usage, webhook config + deliveries" },
       { method: "POST", path: "/api/v1/dev/clients", auth: "session", description: "Stage 9: register an API client (business app; SANDBOX default; max 3 owned)" },
@@ -88,6 +95,8 @@ export async function GET() {
       "9": "B2B platform — SHIPPED (developer portal, API keys, webhooks, Trust Decision API)",
       "10": "Trust network — SHIPPED (verified-interaction graph, shared signals, provider registry)",
       "11": "Score insights — SHIPPED (why-did-my-score-change timeline, component deltas, series export)",
+      "12": "Transparency & alerting — SHIPPED (public policy explainer, drop receipts, timer worker)",
+      "13": "Live-ready providers — SHIPPED (transport layer + circuit breakers + vault + loopback simulator)",
     },
   });
 }

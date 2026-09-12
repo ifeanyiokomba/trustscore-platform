@@ -77,7 +77,14 @@ export type AuditAction =
   | "NETWORK_SIGNAL_MINTED"
   | "NETWORK_SIGNAL_RETRACTED"
   // Stage 11 — Score Insights (member-facing history + export)
-  | "SCORE_HISTORY_EXPORTED";
+  | "SCORE_HISTORY_EXPORTED"
+  // Stage 13 — live-ready provider architecture (posture, transport, vault)
+  | "PROVIDER_POSTURE_CHANGED"
+  | "PROVIDER_TRANSPORT_RESET"
+  | "PROVIDER_CREDENTIAL_SAVED"
+  | "PROVIDER_CREDENTIAL_REVOKED"
+  | "SIMULATOR_FAULT_MODE_SET"
+  | "SIGNAL_LIVENESS_TRANSPORT_FAILED";
 
 interface AuditInput {
   actorType: "USER" | "SYSTEM" | "ANONYMOUS";

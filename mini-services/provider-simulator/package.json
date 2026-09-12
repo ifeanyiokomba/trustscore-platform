@@ -1,0 +1,9 @@
+{
+  "name": "trustscore-provider-simulator",
+  "version": "1.0.0",
+  "description": "Stage 13 sandbox loopback provider simulator — stands in for NINAuth / SMS / liveness partners on port 3032 so the real transport path (signing, timeouts, retries, circuit breakers) is exercised in-sandbox.",
+  "scripts": {
+    "dev": "bun --hot index.ts",
+    "start": "bun index.ts"
+  }
+}

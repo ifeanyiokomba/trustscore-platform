@@ -5,7 +5,9 @@
 // registry, automated-decision gate), the member's own snapshot lifecycle
 // state (incl. the frozen-while-appeal fairness note), and — for ADMIN-role
 // members — the engine administration console (policy drafts, DPIA records,
-// activation, gate). Admin access is an operational grant, like reviewers.
+// activation, gate) plus the Stage 13 provider transport console (posture,
+// circuit breakers, vault). Admin access is an operational grant, like
+// reviewers.
 
 import * as React from "react";
 import { Loader2 } from "lucide-react";
@@ -13,12 +15,19 @@ import { Card, CardContent } from "@/components/ui/card";
 import { PolicyPublicCard } from "@/components/engine/policy-public-card";
 import { MyEngineCard } from "@/components/engine/my-engine-card";
 import { AdminConsoleCard } from "@/components/engine/admin-console-card";
-import type { EngineAdminOverview, EngineMe, EnginePublic } from "@/lib/types";
+import { ProviderPostureCard } from "@/components/engine/provider-posture-card";
+import type {
+  EngineAdminOverview,
+  EngineAdminProviders,
+  EngineMe,
+  EnginePublic,
+} from "@/lib/types";
 
 export interface EngineData {
   public: EnginePublic | null;
   me: EngineMe | null;
   admin: EngineAdminOverview | null;
+  providers: EngineAdminProviders | null;
   loading: boolean;
   refresh: () => Promise<void>;
 }
@@ -27,6 +36,7 @@ export function useEngineData(): EngineData {
   const [pub, setPub] = React.useState<EnginePublic | null>(null);
   const [me, setMe] = React.useState<EngineMe | null>(null);
   const [admin, setAdmin] = React.useState<EngineAdminOverview | null>(null);
+  const [providers, setProviders] = React.useState<EngineAdminProviders | null>(null);
   const [loading, setLoading] = React.useState(true);
 
   const refresh = React.useCallback(async () => {
@@ -41,8 +51,15 @@ export function useEngineData(): EngineData {
         setMe(meData);
         // Admin visibility is role-based; the overview route 403s politely.
         const admRes = await fetch("/api/v1/engine/admin/overview", { cache: "no-store" });
-        if (admRes.ok) setAdmin((await admRes.json()) as EngineAdminOverview);
-        else setAdmin(null);
+        if (admRes.ok) {
+          setAdmin((await admRes.json()) as EngineAdminOverview);
+          const provRes = await fetch("/api/v1/engine/admin/providers", { cache: "no-store" });
+          if (provRes.ok) setProviders((await provRes.json()) as EngineAdminProviders);
+          else setProviders(null);
+        } else {
+          setAdmin(null);
+          setProviders(null);
+        }
       }
     } catch {
       setPub(null);
@@ -56,7 +73,7 @@ export function useEngineData(): EngineData {
     void refresh();
   }, [refresh]);
 
-  return { public: pub, me, admin, loading, refresh };
+  return { public: pub, me, admin, providers, loading, refresh };
 }
 
 export function EngineTab() {
@@ -102,6 +119,13 @@ export function EngineTab() {
       {data.admin ? (
         <div className="min-w-0 lg:col-span-3">
           <AdminConsoleCard overview={data.admin} onChanged={data.refresh} />
+        </div>
+      ) : null}
+
+      {/* Stage 13 — provider transports (ADMIN role only — posture, circuits, vault) */}
+      {data.providers ? (
+        <div className="min-w-0 lg:col-span-3">
+          <ProviderPostureCard data={data.providers} onChanged={data.refresh} />
         </div>
       ) : null}
     </div>

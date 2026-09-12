@@ -9,9 +9,10 @@ import {
   createVerificationSession,
   consentScreen,
   ScopeValidationError,
+  IdentityProviderError,
 } from "@/lib/services/identity-service";
 import { recordAudit } from "@/lib/services/audit-service";
-import { NINAUTH_MODE, SESSION_TTL_MS } from "@/lib/providers/ninauth";
+import { SESSION_TTL_MS } from "@/lib/providers/ninauth";
 
 const CreateSchema = z.object({
   purpose: z.string().trim().max(120).optional(),
@@ -63,9 +64,19 @@ export async function POST(req: NextRequest) {
         requestId
       );
     }
+    if (err instanceof IdentityProviderError) {
+      // Stage 13 — honest provider-transport failure (circuit open, timeouts,
+      // retries exhausted). Nothing was written.
+      return jsonError(503, "PROVIDER_UNAVAILABLE", err.message, requestId);
+    }
     throw err;
   }
   const scopes = JSON.parse(session.scopes) as string[];
+  const consent = consentScreen(scopes);
+  // Stage 13 — posture-aware honesty: the consent screen's provider labels
+  // must match the transport that will actually answer (MOCK or LOOPBACK).
+  consent.provider = session.provider;
+  consent.mode = session.providerMode as "MOCK" | "LIVE";
 
   return jsonOk(
     {
@@ -73,7 +84,7 @@ export async function POST(req: NextRequest) {
         id: session.id,
         status: session.status,
         provider: session.provider,
-        providerMode: session.providerMode, // "MOCK" — honestly labeled
+        providerMode: session.providerMode, // honest per-posture label
         flow: session.flow,
         shareCode: session.shareCode,
         authorizationUrl: session.authorizationUrl,
@@ -83,7 +94,7 @@ export async function POST(req: NextRequest) {
         createdAt: session.createdAt.toISOString(),
         ttlMs: SESSION_TTL_MS,
       },
-      consent: consentScreen(scopes),
+      consent,
     },
     201
   );

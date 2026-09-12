@@ -72,6 +72,16 @@ export async function POST(
           "Granted scopes must be a subset of the requested scopes and include the core verification scopes.",
           requestId
         );
+      case "PROVIDER_UNAVAILABLE":
+        // Stage 13 — the provider transport failed honestly (loopback posture:
+        // circuit open / timeout / retries). The session is untouched and can
+        // be re-consented once the provider recovers.
+        return jsonError(
+          503,
+          "PROVIDER_UNAVAILABLE",
+          "The NINAuth provider is temporarily unavailable (transport failure). Your consent decision was not recorded — try again shortly.",
+          requestId
+        );
     }
   }
 

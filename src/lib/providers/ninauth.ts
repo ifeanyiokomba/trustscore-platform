@@ -39,6 +39,14 @@ const NINAUTH_CLIENT_SECRET =
 const MOCK_ISSUER = "https://ninauth.nimc.gov.ng/mock";
 const ID_TOKEN_TTL_SEC = 300;
 
+// Stage 13 — loopback trust config: the provider simulator on :3032 issues
+// ID tokens signed with ITS OWN key (production: the partner's JWKS). The
+// backend validates against THIS issuer + signing secret when the platform
+// posture is `loopback` — the validation DISCIPLINE stays identical.
+export const LOOPBACK_ISSUER = "https://provider-simulator.loopback/ninauth";
+export const LOOPBACK_SIGNING_SECRET =
+  process.env.LOOPBACK_SIGNING_SECRET ?? "ts_backend_only_loopback_signing_secret";
+
 export const SESSION_TTL_MS = 10 * 60_000; // verification session TTL (authorize-flow-like)
 export const CODE_TTL_MS = 60_000; // one-time authorization code TTL
 export const IDENTITY_FRESHNESS_DAYS = 90; // re-verification horizon
@@ -190,15 +198,42 @@ export function issueMockIdToken(claims: Omit<IdTokenClaims, "iat" | "exp">): st
   return `${header}.${payload}.${signature}`;
 }
 
-export function validateIdToken(token: string, expectedNonce: string): IdTokenClaims {
+export interface TokenTrustConfig {
+  issuer: string;
+  audience: string;
+  secret: string;
+}
+
+// Default trust = the in-process mock provider (existing behavior).
+const MOCK_TRUST: TokenTrustConfig = {
+  issuer: MOCK_ISSUER,
+  audience: NINAUTH_CLIENT_ID,
+  secret: NINAUTH_CLIENT_SECRET,
+};
+
+// Loopback trust = the simulator's issuer + signing key (Stage 13).
+export const LOOPBACK_TRUST: TokenTrustConfig = {
+  issuer: LOOPBACK_ISSUER,
+  audience: NINAUTH_CLIENT_ID,
+  secret: LOOPBACK_SIGNING_SECRET,
+};
+
+export function validateIdToken(
+  token: string,
+  expectedNonce: string,
+  trust: TokenTrustConfig = MOCK_TRUST
+): IdTokenClaims {
   const parts = token.split(".");
   if (parts.length !== 3) {
     throw new TokenValidationError("malformed_token");
   }
   const [header, payload, signature] = parts;
 
-  // 1. Signature check (JWKS-backed verification in LIVE mode)
-  const expectedSig = sign(`${header}.${payload}`);
+  // 1. Signature check (JWKS-backed verification in LIVE mode; the loopback
+  //    simulator signs with its own shared key, validated identically).
+  const expectedSig = createHmac("sha256", trust.secret)
+    .update(`${header}.${payload}`)
+    .digest("base64url");
   if (!safeEqual(signature, expectedSig)) {
     throw new TokenValidationError("bad_signature");
   }
@@ -211,11 +246,11 @@ export function validateIdToken(token: string, expectedNonce: string): IdTokenCl
   }
 
   // 2. Issuer
-  if (claims.iss !== MOCK_ISSUER) {
+  if (claims.iss !== trust.issuer) {
     throw new TokenValidationError("bad_issuer");
   }
   // 3. Audience
-  if (claims.aud !== NINAUTH_CLIENT_ID) {
+  if (claims.aud !== trust.audience) {
     throw new TokenValidationError("bad_audience");
   }
   // 4. Expiry / issue time
