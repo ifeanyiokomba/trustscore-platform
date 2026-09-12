@@ -51,6 +51,9 @@ export function DashboardView() {
   const [identityLoading, setIdentityLoading] = React.useState(true);
   const [phoneModalOpen, setPhoneModalOpen] = React.useState(false);
   const [livenessModalOpen, setLivenessModalOpen] = React.useState(false);
+  // Stage 12 — controlled tab state so notifications can deep-link into a
+  // specific tab (e.g. score-drop receipts → Passport → Score Insights).
+  const [tab, setTab] = React.useState("overview");
 
   const refreshIdentity = React.useCallback(async () => {
     setIdentityLoading(true);
@@ -88,7 +91,7 @@ export function DashboardView() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.2em] text-primary">
-            Stage 11 · Score Insights
+            Stage 12 · Transparency & Alerting
           </p>
           <h1 id="dash-heading" className="mt-1 text-3xl font-bold tracking-tight">
             Welcome back, {user.displayName.split(" ")[0]}
@@ -99,7 +102,7 @@ export function DashboardView() {
         </Button>
       </div>
 
-      <Tabs defaultValue="overview" className="mt-8">
+      <Tabs value={tab} onValueChange={setTab} className="mt-8">
         {/* 8 stage surfaces: 2 rows of 4 up to lg, one compact row of 8 at lg+.
             Full accessible names stay via sr-only (screen readers + E2E),
             visible labels are compact so the row never wraps. */}
@@ -329,7 +332,7 @@ export function DashboardView() {
         </TabsContent>
 
         <TabsContent value="privacy" className="mt-6">
-          <PrivacyTab />
+          <PrivacyTab onOpenScoreInsights={() => setTab("passport")} />
         </TabsContent>
       </Tabs>
 

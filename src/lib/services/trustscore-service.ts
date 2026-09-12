@@ -25,6 +25,7 @@
 
 import { db } from "@/lib/db";
 import { sha256Hex } from "@/lib/platform/crypto";
+import { notifyUser } from "@/lib/services/notification-service";
 import {
   getActivePolicy,
   policyRulesHash,
@@ -526,7 +527,6 @@ export async function getScoreSnapshot(userId: string): Promise<ReturnType<typeo
     where: { userId },
     orderBy: { computedAt: "desc" },
   });
-
   // Stage 8 — FREEZE (appeal pending): serve the frozen row verbatim.
   // The score cannot move — up or down — until the human decision lands.
   if (latest && latest.state === "FROZEN") {
@@ -564,11 +564,87 @@ export async function getScoreSnapshot(userId: string): Promise<ReturnType<typeo
   const computed = computeScoreFromInputs(inputs, trigger, rules, ttlMs);
   computed.policyVersion = policy.version;
   await persistSnapshot(userId, computed, policy.id);
+  // Stage 12 — material score-drop receipt: the member is notified the
+  // moment their score moves materially DOWN (points, band or status),
+  // pointed at Score Insights. Never a verdict — a pointer to the record.
+  await maybeNotifyScoreDrop(userId, latest ?? null, computed, {
+    policyChanged: latest ? latest.policyId !== policy.id : false,
+    policyVersion: policy.version,
+  });
   const fresh = await db.trustScoreSnapshot.findFirst({
     where: { userId },
     orderBy: { computedAt: "desc" },
   });
   return shapeSnapshot(fresh ?? latest!);
+}
+
+// ---------------------------------------------------------------------------
+// Stage 12 — material score-drop receipts (notification layer)
+// ---------------------------------------------------------------------------
+
+// A drop is "material" when it reaches this many points, OR the risk band
+// worsens, OR the status enters an adverse state (CAUTION / REVIEW_REQUIRED /
+// HIGH_RISK). Anything smaller is visible in Score Insights but does not
+// interrupt the member.
+export const MATERIAL_DROP_POINTS = 10;
+
+const BAND_RANK: Record<string, number> = { LOW: 0, MEDIUM: 1, HIGH: 2 };
+// Adverse statuses: CAUTION (identity stale), REVIEW_REQUIRED (confirmed flag
+// below the HIGH_RISK threshold), HIGH_RISK. Entering ANY of these from a
+// clean state is material — the member hears about it immediately.
+const ADVERSE_STATUSES = new Set(["CAUTION", "REVIEW_REQUIRED", "HIGH_RISK"]);
+
+interface DropReceiptContext {
+  drop: number;
+  bandWorsened: boolean;
+  enteredAdverse: boolean;
+  policyChanged: boolean;
+}
+
+function assessDrop(
+  prev: { score: number; riskBand: string; status: string },
+  next: { score: number; riskBand: string; status: string },
+  policyChanged: boolean
+): (DropReceiptContext & { material: boolean }) {
+  const drop = prev.score - next.score;
+  const bandWorsened = (BAND_RANK[next.riskBand] ?? 0) > (BAND_RANK[prev.riskBand] ?? 0);
+  const enteredAdverse = !ADVERSE_STATUSES.has(prev.status) && ADVERSE_STATUSES.has(next.status);
+  return {
+    drop,
+    bandWorsened,
+    enteredAdverse,
+    policyChanged,
+    material: drop >= MATERIAL_DROP_POINTS || bandWorsened || enteredAdverse,
+  };
+}
+
+// maybeNotifyScoreDrop — fires ONE notification per material downward move.
+// Increases, flat refreshes and INITIAL snapshots never notify (the history
+// card already shows those). The frozen path never reaches here (no write
+// happens while FROZEN — fairness guarantee), so a receipt can only follow a
+// real recompute, including the first one after an appeal decision lands.
+async function maybeNotifyScoreDrop(
+  userId: string,
+  prev: { score: number; riskBand: string; status: string } | null,
+  next: ComputedScore,
+  provenance: { policyChanged: boolean; policyVersion: number }
+): Promise<void> {
+  if (!prev) return; // INITIAL — nothing to compare against
+  const ctx = assessDrop(prev, next, provenance.policyChanged);
+  if (!ctx.material) return;
+
+  const reasons: string[] = [];
+  if (ctx.drop >= MATERIAL_DROP_POINTS) reasons.push(`down ${ctx.drop} points`);
+  if (ctx.bandWorsened) reasons.push("risk band moved up");
+  if (ctx.enteredAdverse) reasons.push("status entered an adverse state");
+
+  const title = `TrustScore change: ${prev.score} → ${next.score} (${next.score - prev.score >= 0 ? "+" : "−"}${Math.abs(next.score - prev.score)})`;
+  const body =
+    `A material change to your TrustScore was recorded (${reasons.join(", ")}). ` +
+    `Every component delta and the audited events in this window are explained in Score Insights ` +
+    `(Trust Passport → Score history)${ctx.policyChanged ? `, under policy v${provenance.policyVersion}` : ""}. ` +
+    `Confirmed flags are human-reviewed and appealable — adverse findings always carry a reason.`;
+  await notifyUser(userId, "SCORE", title, body);
 }
 
 // Material-change hook: called by identity/signal services after mutations

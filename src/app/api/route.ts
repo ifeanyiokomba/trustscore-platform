@@ -5,8 +5,8 @@ import { NextResponse } from "next/server";
 export async function GET() {
   return NextResponse.json({
     name: "TrustScore Platform API",
-    stage: "11 — Score Insights (snapshot history, why-it-changed timeline with component deltas, series export)",
-    version: "1.10.0",
+    stage: "12 — Transparency & Alerting (public policy explainer, material score-drop receipts, timer-driven webhook worker)",
+    version: "1.11.0",
     notice:
       "NINAuth integration is implemented behind a contract-first MOCK provider adapter (OAuth 2.0 + PKCE + OIDC-style ID tokens). Phone (SMS OTP) and biometric (liveness) signals are likewise contract-first MOCK transports. No live government or MNO/biometric integration is claimed. The LIVE transports activate once partner sandbox credentials exist (audit §2.2). The B2B Trust Decision API and webhook deliveries are real integrations against that same MOCK-provider platform; plan billing is an honest mock-up (no payment processor is connected).",
     endpoints: [
@@ -40,6 +40,7 @@ export async function GET() {
       { method: "POST", path: "/api/v1/passport/notifications", auth: "session", description: "Stage 5: mark notifications read ({id} or {all:true})" },
       { method: "GET", path: "/api/v1/passport/score-history", auth: "session", description: "Stage 11: score history — snapshot series, component deltas between consecutive snapshots, audited window events (correlated context, not a verdict)" },
       { method: "GET", path: "/api/v1/passport/score-history/export", auth: "session", description: "Stage 11: self-service series export — ?format=csv|json (audited SCORE_HISTORY_EXPORTED)" },
+      { method: "POST", path: "/api/v1/internal/webhook-tick", auth: "internal-token", description: "Stage 12 (internal): timer-driven webhook retry tick — called by the webhook-worker mini-service every 60s; bounded (≤5 due deliveries per call)" },
       { method: "POST", path: "/api/v1/security/sessions/:id/revoke", auth: "session", description: "Stage 5: remote sign-out of another active session" },
       { method: "POST", path: "/api/v1/safety/check", auth: "session", description: "Stage 6: run a Safety Check — exactly one of { handle, phone, link, qr }; anti-enumeration UNAVAILABLE shape; receipted + audited" },
       { method: "GET", path: "/api/v1/safety/checks", auth: "session", description: "Stage 6: verifier's check history + sent trust requests" },

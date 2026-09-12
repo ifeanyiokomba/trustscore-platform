@@ -7,6 +7,7 @@ import { Footer } from "@/components/layout/footer";
 import { Hero } from "@/components/landing/hero";
 import { Product } from "@/components/landing/product";
 import { HowItWorks } from "@/components/landing/how-it-works";
+import { PolicyExplainer } from "@/components/landing/policy-explainer";
 import { Architecture } from "@/components/landing/architecture";
 import { Roadmap } from "@/components/landing/roadmap";
 import { Security } from "@/components/landing/security";
@@ -21,6 +22,7 @@ function LandingView() {
       <Hero />
       <Product />
       <HowItWorks />
+      <PolicyExplainer />
       <Architecture />
       <Roadmap />
       <Security />

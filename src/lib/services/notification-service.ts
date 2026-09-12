@@ -1,10 +1,14 @@
 // TrustScore Stage 1 — NotificationService plumbing (Security Center UI arrives Stage 5).
+// Stage 12: SCORE type — material score-change receipts (see trustscore-service
+// maybeNotifyScoreDrop; every receipt points at Score Insights, never a verdict).
 
 import { db } from "@/lib/db";
 
+export type NotificationType = "SECURITY" | "VERIFICATION" | "SYSTEM" | "SCORE";
+
 export async function notifyUser(
   userId: string,
-  type: "SECURITY" | "VERIFICATION" | "SYSTEM",
+  type: NotificationType,
   title: string,
   body: string
 ): Promise<void> {

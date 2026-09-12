@@ -25,7 +25,7 @@ echo "--- LANDING ---"
 $AB eval "JSON.stringify({
   title: document.title,
   h1: document.querySelector('h1')?.textContent?.slice(0,60),
-  sections: ['product','how-it-works','architecture','roadmap','security'].filter(id=>document.getElementById(id)),
+  sections: ['product','how-it-works','scoring','architecture','roadmap','security'].filter(id=>document.getElementById(id)),
   navLinks: document.querySelectorAll('header nav a').length,
   footer: !!document.querySelector('footer'),
   footerStuck: (()=>{const f=document.querySelector('footer');const r=f.getBoundingClientRect();return r.bottom<=window.innerHeight+2})(),
@@ -60,7 +60,7 @@ $AB eval "JSON.stringify({
   identityCard: !!document.querySelector('[data-testid=identity-card], .grid'),
   hasIdentity: document.body.textContent.includes('Government identity verified') || document.body.textContent.includes('Level 1'),
   tabs: Array.from(document.querySelectorAll('[role=tab]')).map(t=>t.textContent.trim()),
-  stageBadge: document.body.textContent.includes('Stage 11 · Score Insights'),
+  stageBadge: document.body.textContent.includes('Stage 12 · Transparency & Alerting'),
 })" 2>&1 | tail -1
 
 # ---------- 3. wrong password ----------

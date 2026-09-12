@@ -83,8 +83,14 @@ const STAGES: { id: string; title: string; status: StageStatus; detail: string }
   {
     id: "11",
     title: "Score insights",
-    status: "active",
+    status: "done",
     detail: "Every member can answer “why did my score change?” — full snapshot history, component-level deltas, audited events between snapshots (correlated context, never a verdict), and a self-service series export.",
+  },
+  {
+    id: "12",
+    title: "Transparency & alerting",
+    status: "active",
+    detail: "The live scoring policy explained publicly on the landing page (no mystery numbers), material score-drop receipt notifications the moment they happen, and a timer-driven webhook retry worker — production hardening.",
   },
 ];
 

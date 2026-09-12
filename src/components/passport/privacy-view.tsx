@@ -15,7 +15,7 @@ import { SafetySettingsCard } from "@/components/safety/safety-settings-card";
 import { usePassportData } from "@/components/passport/passport-view";
 import { useTrustStore } from "@/lib/store";
 
-export function PrivacyTab() {
+export function PrivacyTab({ onOpenScoreInsights }: { onOpenScoreInsights?: () => void }) {
   const { passport, dsrRequests, loading, refresh } = usePassportData();
   const { signOut } = useTrustStore();
 
@@ -68,6 +68,7 @@ export function PrivacyTab() {
           securityEvents={passport.securityEvents}
           currentSessionId={passport.sessions.find((s) => s.current)?.id ?? null}
           onChanged={refresh}
+          onOpenScoreInsights={onOpenScoreInsights}
         />
       </div>
     </div>

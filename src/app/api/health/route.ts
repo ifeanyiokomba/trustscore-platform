@@ -3,8 +3,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 
-const STAGE = "11 — Score Insights (snapshot history, why-it-changed timeline, component deltas, series export)";
-const VERSION = "1.10.0";
+const STAGE = "12 — Transparency & Alerting (public policy explainer, material score-drop receipts, timer-driven webhook worker)";
+const VERSION = "1.11.0";
 const startedAt = Date.now();
 
 export async function GET(_req: NextRequest) {

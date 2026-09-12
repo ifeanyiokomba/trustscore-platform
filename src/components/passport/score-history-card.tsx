@@ -93,6 +93,12 @@ const TRIGGER_META: Record<string, { label: string; className: string }> = {
   PERIODIC: { label: "periodic refresh", className: "border-border bg-muted/60 text-muted-foreground" },
 };
 
+// Stage 12 — the SAME materiality threshold the backend uses for score-drop
+// receipts (MATERIAL_DROP_POINTS). Drops of 10+ points (or a risk-band
+// change) notify the member; the spark marks the 10+ drops.
+const MATERIAL_POINTS = 10;
+const isMaterialDrop = (prev: number, next: number) => prev - next >= MATERIAL_POINTS;
+
 // Component dots — tiny decorative markers; the label carries the meaning.
 const COMPONENT_DOT: Record<string, string> = {
   identityAssurance: "bg-emerald-600 dark:bg-emerald-400",
@@ -151,6 +157,10 @@ function Sparkline({ spark }: { spark: { at: string; score: number }[] }) {
   const line = pts.map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
   const area = `${line} L${pts[n - 1].x.toFixed(1)},${H} L${pts[0].x.toFixed(1)},${H} Z`;
 
+  // Stage 12 — material-drop points (10+ down): amber ring markers.
+  const material = pts.map((p, i) => i > 0 && isMaterialDrop(spark[i - 1].score, p.score));
+  const materialCount = material.filter(Boolean).length;
+
   // Non-overlapping pointer zones (midpoint boundaries), as % of width.
   const pctFor = (i: number) => (n === 1 ? 50 : (xFor(i) / W) * 100);
   const bounds = pts.map((_, i) => {
@@ -185,6 +195,12 @@ function Sparkline({ spark }: { spark: { at: string; score: number }[] }) {
                   className="ts-inset flex items-center gap-2 whitespace-nowrap rounded-full px-3 py-1 text-[11px] font-semibold shadow-sm"
                 >
                   <span className="ts-grad-text tabular-nums">{activeP.score}</span>
+                  {active !== null && material[active] ? (
+                    <span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400">
+                      <TrendingDown className="h-3 w-3" aria-hidden="true" />
+                      material drop
+                    </span>
+                  ) : null}
                   <span className="text-muted-foreground">{timeAgo(activeP.at)}</span>
                 </motion.div>
               </div>
@@ -198,7 +214,7 @@ function Sparkline({ spark }: { spark: { at: string; score: number }[] }) {
           preserveAspectRatio="none"
           className="h-24 w-full sm:h-28"
           role="img"
-          aria-label={`Score trend chart: ${n} snapshot${n === 1 ? "" : "s"}, from ${spark[0].score} to ${spark[n - 1].score}, lowest ${min}, highest ${max}.`}
+          aria-label={`Score trend chart: ${n} snapshot${n === 1 ? "" : "s"}, from ${spark[0].score} to ${spark[n - 1].score}, lowest ${min}, highest ${max}${materialCount > 0 ? `, ${materialCount} material drop${materialCount === 1 ? "" : "s"} of ${MATERIAL_POINTS}+ points` : ""}.`}
         >
           <defs>
             <linearGradient id="ts-spark-fill" x1="0" y1="0" x2="0" y2="1">
@@ -230,19 +246,41 @@ function Sparkline({ spark }: { spark: { at: string; score: number }[] }) {
           />
           {/* historical points */}
           {pts.map((p, i) => (
-            <circle
-              key={`pt-${i}`}
-              cx={p.x}
-              cy={p.y}
-              r={active === i ? 4.5 : 2.5}
-              className={cn(
-                "transition-all",
-                i === n - 1 ? "fill-primary stroke-background" : "fill-primary/70 stroke-background",
-                active === i && "fill-primary"
-              )}
-              strokeWidth="2"
-              vectorEffect="non-scaling-stroke"
-            />
+            <g key={`pt-${i}`}>
+              {material[i] ? (
+                <>
+                  {/* soft halo + ring — sized to read as a focal point over the
+                      emerald spark (VLM QA: rings must out-weigh the line) */}
+                  <circle
+                    cx={p.x}
+                    cy={p.y}
+                    r={active === i ? 11 : 10}
+                    className="fill-amber-500/15"
+                    vectorEffect="non-scaling-stroke"
+                  />
+                  <circle
+                    cx={p.x}
+                    cy={p.y}
+                    r={active === i ? 7.5 : 6.5}
+                    className="fill-none stroke-amber-500"
+                    strokeWidth="2.5"
+                    vectorEffect="non-scaling-stroke"
+                  />
+                </>
+              ) : null}
+              <circle
+                cx={p.x}
+                cy={p.y}
+                r={active === i ? 4.5 : 2.5}
+                className={cn(
+                  "transition-all",
+                  i === n - 1 ? "fill-primary stroke-background" : "fill-primary/70 stroke-background",
+                  active === i && "fill-primary"
+                )}
+                strokeWidth="2"
+                vectorEffect="non-scaling-stroke"
+              />
+            </g>
           ))}
         </svg>
 
@@ -285,6 +323,15 @@ function Sparkline({ spark }: { spark: { at: string; score: number }[] }) {
         <span className="truncate">{timeAgo(spark[0].at)}</span>
         <span className="truncate">{n > 1 ? timeLabel(spark[n - 1].at).split(" · ")[0] : ""}</span>
       </div>
+
+      {/* Stage 12 — material-drop legend (amber ring markers) */}
+      <p className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[10px] font-medium leading-snug text-foreground/70">
+        <span aria-hidden="true" className="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center">
+          <span className="h-3 w-3 rounded-full border-2 border-amber-500 bg-amber-500/15" />
+        </span>
+        amber ring — material drop ({MATERIAL_POINTS}+ points). Risk-band changes notify too:
+        receipts land in Privacy &amp; Security the moment the score moves materially down.
+      </p>
     </div>
   );
 }
@@ -364,6 +411,7 @@ function ChangeEntry({ change }: { change: ScoreChange }) {
   const trigger = TRIGGER_META[change.trigger] ?? TRIGGER_META.PERIODIC;
   const movers = change.componentDeltas.filter((d) => d.delta !== 0);
   const frozen = change.state === "FROZEN";
+  const materialDrop = change.delta <= -MATERIAL_POINTS;
 
   // NOTE: the parent renders this inside a motion.li — so this root MUST be
   // a div (li>li would be invalid HTML and trips a hydration warning).
@@ -389,6 +437,12 @@ function ChangeEntry({ change }: { change: ScoreChange }) {
           <ArrowRight className="mx-1 inline h-3.5 w-3.5 text-muted-foreground align-[-2px]" aria-hidden="true" />
           {change.toScore}
         </span>
+        {materialDrop ? (
+          <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-400">
+            <TrendingDown className="h-3 w-3" aria-hidden="true" />
+            material drop · you were notified
+          </span>
+        ) : null}
         <span className={cn("rounded-full border px-2 py-0.5 text-[10px] font-semibold", trigger.className)}>
           {trigger.label}
         </span>
@@ -490,9 +544,21 @@ export function ScoreHistoryCard({
   loading: boolean;
 }) {
   const summary = data?.summary;
+  const [materialOnly, setMaterialOnly] = React.useState(false);
   const changesDesc = React.useMemo(
     () => (data ? [...data.changes].reverse() : []), // newest first
     [data]
+  );
+  const materialCount = React.useMemo(
+    () => changesDesc.filter((c) => c.delta <= -MATERIAL_POINTS).length,
+    [changesDesc]
+  );
+  const shownChanges = React.useMemo(
+    () =>
+      materialOnly
+        ? changesDesc.filter((c) => Math.abs(c.delta) >= MATERIAL_POINTS)
+        : changesDesc,
+    [changesDesc, materialOnly]
   );
   const latest = changesDesc[0];
   const latestComps = React.useMemo(() => {
@@ -646,28 +712,64 @@ export function ScoreHistoryCard({
             {/* Timeline */}
             {changesDesc.length > 0 ? (
               <div>
-                <p className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                  <History className="h-3.5 w-3.5" aria-hidden="true" />
-                  Change timeline
-                  <span className="font-medium normal-case tracking-normal">
-                    (newest first · last {data.history.length} snapshots retained)
-                  </span>
-                </p>
-                <ol
-                  className="ts-scrollbar relative max-h-96 space-y-1.5 overflow-y-auto border-l border-border pl-5 pr-1"
-                  aria-label="Score change timeline, newest first"
-                >
-                  {changesDesc.map((c, i) => (
-                    <motion.li
-                      key={c.id}
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: Math.min(i * 0.05, 0.35), duration: 0.3 }}
+                <div className="mb-2 flex flex-wrap items-center gap-2">
+                  <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                    <History className="h-3.5 w-3.5" aria-hidden="true" />
+                    Change timeline
+                    <span className="font-medium normal-case tracking-normal">
+                      (newest first · last {data.history.length} snapshots retained)
+                    </span>
+                  </p>
+                  {changesDesc.some((c) => Math.abs(c.delta) >= MATERIAL_POINTS) ? (
+                    <button
+                      type="button"
+                      onClick={() => setMaterialOnly((v) => !v)}
+                      aria-pressed={materialOnly}
+                      className={cn(
+                        "ml-auto inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                        materialOnly
+                          ? "border-amber-500/50 bg-amber-500/10 text-amber-700 dark:text-amber-400"
+                          : "border-border bg-muted/40 text-muted-foreground hover:bg-muted"
+                      )}
                     >
-                      <ChangeEntry change={c} />
-                    </motion.li>
-                  ))}
-                </ol>
+                      <TrendingDown className="h-3 w-3" aria-hidden="true" />
+                      Material only (±{MATERIAL_POINTS}+)
+                    </button>
+                  ) : null}
+                </div>
+                {shownChanges.length > 0 ? (
+                  <ol
+                    className="ts-scrollbar relative max-h-96 space-y-1.5 overflow-y-auto border-l border-border pl-5 pr-1"
+                    aria-label="Score change timeline, newest first"
+                  >
+                    {shownChanges.map((c, i) => (
+                      <motion.li
+                        key={c.id}
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: Math.min(i * 0.05, 0.35), duration: 0.3 }}
+                      >
+                        <ChangeEntry change={c} />
+                      </motion.li>
+                    ))}
+                  </ol>
+                ) : (
+                  <div className="rounded-lg border border-dashed border-border px-4 py-6 text-center">
+                    <p className="text-xs font-medium text-muted-foreground">
+                      No changes of ±{MATERIAL_POINTS}+ points in your retained history.
+                    </p>
+                    <p className="mt-1 text-[11px] text-muted-foreground">
+                      Smaller moves are still listed with the filter off — and material drops
+                      (or risk-band changes) always notify you.
+                    </p>
+                  </div>
+                )}
+                {materialCount > 0 && !materialOnly ? (
+                  <p className="mt-2 text-[10px] text-muted-foreground">
+                    {materialCount} material drop{materialCount === 1 ? "" : "s"} in view — amber
+                    tagged, each with its receipt in Privacy &amp; Security.
+                  </p>
+                ) : null}
               </div>
             ) : null}
 

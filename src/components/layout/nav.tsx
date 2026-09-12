@@ -27,6 +27,7 @@ import { cn } from "@/lib/utils";
 const LANDING_LINKS = [
   { href: "#product", label: "Product" },
   { href: "#how-it-works", label: "How it works" },
+  { href: "#scoring", label: "Scoring" },
   { href: "#architecture", label: "Architecture" },
   { href: "#roadmap", label: "Roadmap" },
   { href: "#security", label: "Security & Privacy" },

@@ -1,0 +1,9 @@
+{
+  "name": "trustscore-webhook-worker",
+  "version": "1.0.0",
+  "description": "Stage 12 timer-driven webhook retry worker — ticks the platform's internal webhook-tick endpoint every 60s and serves /health on port 3031.",
+  "scripts": {
+    "dev": "bun --hot index.ts",
+    "start": "bun index.ts"
+  }
+}

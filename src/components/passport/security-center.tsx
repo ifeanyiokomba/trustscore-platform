@@ -15,6 +15,8 @@ import {
   Ban,
   Globe,
   History,
+  TrendingDown,
+  LineChart,
 } from "lucide-react";
 import {
   Card,
@@ -139,6 +141,8 @@ const NOTIF_TONE: Record<string, { icon: React.ElementType; className: string }>
   SECURITY: { icon: ShieldCheck, className: "text-primary bg-primary/10" },
   VERIFICATION: { icon: CheckCheck, className: "text-primary bg-primary/10" },
   SYSTEM: { icon: Bell, className: "text-muted-foreground bg-muted" },
+  // Stage 12 — material score-change receipts (amber, actionable)
+  SCORE: { icon: TrendingDown, className: "text-amber-600 dark:text-amber-400 bg-amber-500/10" },
 };
 
 export function SecurityCenter({
@@ -148,6 +152,7 @@ export function SecurityCenter({
   securityEvents,
   currentSessionId,
   onChanged,
+  onOpenScoreInsights,
 }: {
   sessions: SessionInfo[];
   activeSessionCount?: number;
@@ -155,6 +160,7 @@ export function SecurityCenter({
   securityEvents: { id: string; action: string; createdAt: string }[];
   currentSessionId: string | null;
   onChanged: () => void;
+  onOpenScoreInsights?: () => void;
 }) {
   const [revoking, setRevoking] = React.useState<SessionInfo | null>(null);
   const [busy, setBusy] = React.useState(false);
@@ -343,13 +349,16 @@ export function SecurityCenter({
               {notifications.map((n) => {
                 const tone = NOTIF_TONE[n.type] ?? NOTIF_TONE.SYSTEM;
                 const ToneIcon = tone.icon;
+                const isScore = n.type === "SCORE";
                 return (
                   <li
                     key={n.id}
                     className={cn(
                       "flex items-start gap-3 rounded-lg border px-3.5 py-3",
                       n.readAt === null
-                        ? "border-primary/25 bg-primary/5"
+                        ? isScore
+                          ? "border-amber-500/30 bg-amber-500/5"
+                          : "border-primary/25 bg-primary/5"
                         : "border-border/70 bg-muted/20"
                     )}
                   >
@@ -373,9 +382,25 @@ export function SecurityCenter({
                       <p className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-muted-foreground">
                         {n.body}
                       </p>
+                      {isScore && onOpenScoreInsights ? (
+                        <button
+                          type="button"
+                          onClick={onOpenScoreInsights}
+                          className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-semibold text-primary underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+                        >
+                          <LineChart className="h-3 w-3" aria-hidden="true" />
+                          View in Score Insights
+                        </button>
+                      ) : null}
                     </div>
                     {n.readAt === null && (
-                      <span className="ts-pulse mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primary" aria-label="unread" />
+                      <span
+                        className={cn(
+                          "ts-pulse mt-1.5 h-2 w-2 shrink-0 rounded-full",
+                          isScore ? "bg-amber-500" : "bg-primary"
+                        )}
+                        aria-label="unread"
+                      />
                     )}
                   </li>
                 );
