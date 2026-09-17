@@ -14,36 +14,14 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { SectionHeading } from "@/components/landing/section-heading";
 import { useTrustStore } from "@/lib/store";
-
-const fadeUp = {
-  initial: { opacity: 0, y: 24 },
-  whileInView: { opacity: 1, y: 0 },
-  viewport: { once: true, margin: "-80px" },
-};
-
-function SectionHeading({
-  eyebrow,
-  title,
-  description,
-}: {
-  eyebrow: string;
-  title: string;
-  description?: string;
-}) {
-  return (
-    <div className="mx-auto max-w-2xl text-center">
-      <p className="text-xs font-bold uppercase tracking-[0.2em] text-primary">{eyebrow}</p>
-      <h2 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">{title}</h2>
-      {description && <p className="mt-4 text-muted-foreground">{description}</p>}
-    </div>
-  );
-}
+import { EASE, SPRING, staggerParent, fadeUp as fadeUpV } from "@/lib/motion";
 
 export function Product() {
   const { user, setView } = useTrustStore();
   return (
-    <section id="product" className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20" aria-labelledby="product-heading">
+    <section id="product" className="mx-auto max-w-6xl px-4 py-20 sm:px-6 sm:py-24" aria-labelledby="product-heading">
       <SectionHeading
         eyebrow="Product"
         title="One trust identity. Many situations."
@@ -53,23 +31,29 @@ export function Product() {
         Product pillars
       </span>
 
-      <div className="mt-12 grid gap-6 md:grid-cols-3">
+      <motion.div
+        variants={staggerParent(0.1)}
+        initial="hidden"
+        whileInView="show"
+        viewport={{ once: true, margin: "-80px" }}
+        className="mt-12 grid gap-6 md:grid-cols-3"
+      >
         {/* Pillar 1 — Trust Passport */}
-        <motion.div {...fadeUp} transition={{ duration: 0.45 }}>
-          <Card className="h-full border-primary/20 transition-shadow hover:shadow-lg">
+        <motion.div variants={fadeUpV} whileHover={{ y: -6 }} transition={SPRING}>
+          <Card className="group h-full border-primary/20 shadow-sm transition-shadow duration-300 hover:shadow-xl hover:shadow-primary/10">
             <CardHeader>
-              <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <span className="ts-icon-tile flex h-12 w-12 items-center justify-center rounded-xl text-primary transition-transform duration-300 group-hover:scale-105">
                 <ShieldCheck className="h-5 w-5" />
               </span>
-              <CardTitle className="mt-3 text-xl">Trust Passport</CardTitle>
+              <CardTitle className="font-display mt-4 text-xl font-semibold tracking-tight">Trust Passport</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm leading-relaxed text-muted-foreground">
                 Establish a verified Trust Identity once — government identity, phone,
                 biometrics and credentials — then reuse it everywhere. You never send a
                 NIN image or number to anyone again.
               </p>
-              <pre className="overflow-x-auto rounded-lg border border-border bg-muted/50 p-3 text-[11px] leading-relaxed" aria-label="Trust Passport example">
+              <pre className="overflow-x-auto rounded-lg border border-border bg-muted/50 p-3 font-mono text-[11px] leading-relaxed" aria-label="Trust Passport example">
 {`✓ Government Identity Verified
 ✓ Phone Verified   ✓ Biometric Verified
 ✓ Credentials Verified
@@ -84,21 +68,21 @@ TrustScore: 782 · LOW RISK`}
         </motion.div>
 
         {/* Pillar 2 — Check Before You Deal */}
-        <motion.div {...fadeUp} transition={{ duration: 0.45, delay: 0.08 }}>
-          <Card className="h-full border-primary/20 transition-shadow hover:shadow-lg">
+        <motion.div variants={fadeUpV} whileHover={{ y: -6 }} transition={SPRING}>
+          <Card className="group h-full border-primary/20 shadow-sm transition-shadow duration-300 hover:shadow-xl hover:shadow-primary/10">
             <CardHeader>
-              <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <span className="ts-icon-tile flex h-12 w-12 items-center justify-center rounded-xl text-primary transition-transform duration-300 group-hover:scale-105">
                 <SearchCheck className="h-5 w-5" />
               </span>
-              <CardTitle className="mt-3 text-xl">Check Before You Deal</CardTitle>
+              <CardTitle className="font-display mt-4 text-xl font-semibold tracking-tight">Check Before You Deal</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm leading-relaxed text-muted-foreground">
                 About to send someone ₦300,000? Check their Trust Identity first — by QR,
                 Trust Link, or username. You get identity, risk and freshness — never raw
                 personal data.
               </p>
-              <div className="rounded-lg border border-border bg-muted/50 p-3">
+              <div className="rounded-xl border border-border bg-background p-3 shadow-sm">
                 <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                   Trust assessment
                 </p>
@@ -128,22 +112,22 @@ TrustScore: 782 · LOW RISK`}
         </motion.div>
 
         {/* Pillar 3 — Trust Link + QR */}
-        <motion.div {...fadeUp} transition={{ duration: 0.45, delay: 0.16 }}>
-          <Card className="h-full border-primary/20 transition-shadow hover:shadow-lg">
+        <motion.div variants={fadeUpV} whileHover={{ y: -6 }} transition={SPRING}>
+          <Card className="group h-full border-primary/20 shadow-sm transition-shadow duration-300 hover:shadow-xl hover:shadow-primary/10">
             <CardHeader>
-              <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <span className="ts-icon-tile flex h-12 w-12 items-center justify-center rounded-xl text-primary transition-transform duration-300 group-hover:scale-105">
                 <Link2 className="h-5 w-5" />
               </span>
-              <CardTitle className="mt-3 text-xl">Trust Link & QR Card</CardTitle>
+              <CardTitle className="font-display mt-4 text-xl font-semibold tracking-tight">Trust Link &amp; QR Card</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <p className="text-sm text-muted-foreground">
-                Every verified user gets <code className="rounded bg-muted px-1.5 py-0.5 text-xs">trustscore.ng/@username</code>{" "}
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                Every verified user gets <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">trustscore.ng/@username</code>{" "}
                 and a QR Trust Card. Put it in your WhatsApp, Instagram bio, marketplace
                 listing, invoice or shop counter.
               </p>
-              <div className="rounded-lg border border-border bg-muted/50 p-3 text-center">
-                <QrCode className="mx-auto h-10 w-10 text-primary" aria-hidden="true" />
+              <div className="group/qr rounded-lg border border-border bg-muted/50 p-3 text-center">
+                <QrCode className="mx-auto h-10 w-10 text-primary transition-transform duration-500 group-hover/qr:rotate-3 group-hover/qr:scale-110" aria-hidden="true" />
                 <p className="mt-2 text-xs font-medium">✓ Identity Verified · TrustScore 782</p>
                 <p className="text-[11px] text-muted-foreground">Verify me before payment</p>
               </div>
@@ -153,12 +137,18 @@ TrustScore: 782 · LOW RISK`}
             </CardContent>
           </Card>
         </motion.div>
-      </div>
+      </motion.div>
 
-      <motion.div {...fadeUp} transition={{ duration: 0.5 }} className="mt-10 text-center">
-        <Button size="lg" variant="outline" onClick={() => setView(user ? "dashboard" : "auth")}>
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, margin: "-60px" }}
+        transition={{ duration: 0.5, ease: EASE }}
+        className="mt-12 text-center"
+      >
+        <Button size="lg" variant="outline" className="group h-12 px-6 text-base" onClick={() => setView(user ? "dashboard" : "auth")}>
           {user ? "Go to your dashboard" : "Reserve your @handle today"}
-          <ArrowRight className="ml-2 h-4 w-4" />
+          <ArrowRight className="ml-2 h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
         </Button>
         <p className="mt-3 text-xs text-muted-foreground">
           Stage 2 — accounts and NINAuth verification sessions (mock provider) are live

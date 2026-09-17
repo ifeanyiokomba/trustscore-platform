@@ -8,6 +8,7 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-display: var(--font-fraunces), var(--font-geist-sans), ui-serif, Georgia, serif;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -55,12 +56,15 @@
 :root {
   --radius: 0.625rem;
 
-  /* TrustScore trust palette — emerald/teal spine (no indigo/blue) */
-  --trust: oklch(0.596 0.128 163); /* emerald-600 */
+  /* TrustScore trust palette — emerald/teal spine (no indigo/blue).
+     Stage 15: primary darkened to emerald-700-class so every text-primary
+     surface clears WCAG AA (≥4.5:1) on white — the earlier emerald-600
+     sat at 3.8:1 for small text. */
+  --trust: oklch(0.54 0.118 165); /* emerald-700-class */
   --trust-foreground: oklch(0.985 0 0);
   --trust-soft: oklch(0.952 0.049 163); /* emerald-50 */
   --trust-muted: oklch(0.696 0.085 163); /* emerald-400-ish */
-  --risk-low: oklch(0.596 0.128 163);
+  --risk-low: oklch(0.54 0.118 165);
   --risk-moderate: oklch(0.769 0.17 70); /* amber */
   --risk-elevated: oklch(0.681 0.158 75); /* darker amber */
   --risk-high: oklch(0.577 0.21 27); /* red */
@@ -72,31 +76,31 @@
   --card-foreground: oklch(0.19 0.02 220);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.19 0.02 220);
-  --primary: oklch(0.596 0.128 163);
+  --primary: oklch(0.54 0.118 165);
   --primary-foreground: oklch(0.985 0 0);
   --secondary: oklch(0.96 0.01 170);
   --secondary-foreground: oklch(0.24 0.03 190);
   --muted: oklch(0.965 0.008 170);
-  --muted-foreground: oklch(0.5 0.02 200);
+  --muted-foreground: oklch(0.47 0.02 200); /* Stage 15: 5.2:1 on white */
   --accent: oklch(0.94 0.03 163);
   --accent-foreground: oklch(0.26 0.05 170);
   --destructive: oklch(0.577 0.21 27);
   --border: oklch(0.91 0.015 170);
   --input: oklch(0.91 0.015 170);
-  --ring: oklch(0.596 0.128 163);
-  --chart-1: oklch(0.596 0.128 163);
+  --ring: oklch(0.54 0.118 165);
+  --chart-1: oklch(0.54 0.118 165);
   --chart-2: oklch(0.696 0.085 178);
   --chart-3: oklch(0.769 0.17 70);
   --chart-4: oklch(0.398 0.07 227);
   --chart-5: oklch(0.828 0.189 84);
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.19 0.02 220);
-  --sidebar-primary: oklch(0.596 0.128 163);
+  --sidebar-primary: oklch(0.54 0.118 165);
   --sidebar-primary-foreground: oklch(0.985 0 0);
   --sidebar-accent: oklch(0.94 0.03 163);
   --sidebar-accent-foreground: oklch(0.26 0.05 170);
   --sidebar-border: oklch(0.91 0.015 170);
-  --sidebar-ring: oklch(0.596 0.128 163);
+  --sidebar-ring: oklch(0.54 0.118 165);
 }
 
 .dark {
@@ -149,7 +153,16 @@
   }
   body {
     @apply bg-background text-foreground;
-    font-feature-settings: "ss01" on;
+    font-feature-settings: "ss01" on, "cv11" on;
+    text-rendering: optimizeLegibility;
+  }
+  /* Stage 15 — typographic rhythm: display headlines balance their line
+     breaks; body copy wraps prettily; numerals in data contexts stay tabular. */
+  h1, h2, h3 {
+    text-wrap: balance;
+  }
+  p {
+    text-wrap: pretty;
   }
   ::selection {
     background: color-mix(in oklch, var(--trust) 25%, transparent);
@@ -173,21 +186,144 @@
   background: color-mix(in oklch, var(--trust) 60%, var(--muted));
 }
 
-/* Subtle trust grid background for hero */
+/* Subtle trust grid background for hero — Stage 15: 4% mix keeps it a
+   texture, not a competitor with content. */
 .ts-grid-bg {
   background-image:
     linear-gradient(
       to right,
-      color-mix(in oklch, var(--trust) 7%, transparent) 1px,
+      color-mix(in oklch, var(--trust) 4%, transparent) 1px,
       transparent 1px
     ),
     linear-gradient(
       to bottom,
-      color-mix(in oklch, var(--trust) 7%, transparent) 1px,
+      color-mix(in oklch, var(--trust) 4%, transparent) 1px,
       transparent 1px
     );
   background-size: 44px 44px;
   mask-image: radial-gradient(ellipse 90% 70% at 50% 0%, black 40%, transparent 100%);
+}
+
+/* ---------------------------------------------------------------------------
+   Stage 15 — Design Elevation utilities
+--------------------------------------------------------------------------- */
+
+/* Aurora — layered emerald light pools behind the hero. Pure CSS, cheap,
+   and respects the palette (emerald/teal family only). */
+.ts-aurora {
+  background:
+    radial-gradient(52% 42% at 18% 8%, color-mix(in oklch, var(--trust) 16%, transparent) 0%, transparent 68%),
+    radial-gradient(46% 40% at 88% 22%, oklch(0.696 0.085 178 / 0.14) 0%, transparent 66%),
+    radial-gradient(38% 34% at 62% 96%, oklch(0.769 0.17 70 / 0.08) 0%, transparent 64%);
+}
+
+/* Aurora drift — an almost-imperceptible breathing motion for the pools. */
+@keyframes ts-aurora-drift {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(-2.5%, 1.5%, 0) scale(1.06); }
+}
+.ts-aurora-drift {
+  animation: ts-aurora-drift 18s ease-in-out infinite;
+  will-change: transform;
+}
+
+/* Film-grain noise — kills banding on large soft gradients, adds tactility.
+   SVG turbulence data-URI at ~3% opacity. */
+.ts-noise {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+  opacity: 0.035;
+  mix-blend-mode: overlay;
+}
+
+/* Nav links — the underline draws in from the left on hover/focus. */
+.ts-nav-link {
+  position: relative;
+}
+.ts-nav-link::after {
+  content: "";
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 4px;
+  height: 2px;
+  border-radius: 999px;
+  background: color-mix(in oklch, var(--trust) 70%, transparent);
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.ts-nav-link:hover::after,
+.ts-nav-link:focus-visible::after {
+  transform: scaleX(1);
+}
+
+/* CTA sheen — a light band that sweeps across primary buttons on hover. */
+.ts-sheen {
+  position: relative;
+  overflow: hidden;
+}
+.ts-sheen::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    105deg,
+    transparent 38%,
+    oklch(1 0 0 / 0.22) 50%,
+    transparent 62%
+  );
+  transform: translateX(-120%);
+  transition: transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+  pointer-events: none;
+}
+.ts-sheen:hover::before {
+  transform: translateX(120%);
+}
+
+/* Icon tile gradient — the raised glass square behind feature icons. */
+.ts-icon-tile {
+  background:
+    radial-gradient(120% 120% at 30% 20%, color-mix(in oklch, var(--trust) 22%, transparent) 0%, transparent 60%),
+    color-mix(in oklch, var(--trust) 8%, transparent);
+  box-shadow:
+    inset 0 1px 0 oklch(1 0 0 / 0.28),
+    0 6px 16px -10px color-mix(in oklch, var(--trust) 55%, transparent);
+}
+.dark .ts-icon-tile {
+  box-shadow:
+    inset 0 1px 0 oklch(1 0 0 / 0.09),
+    0 6px 16px -10px color-mix(in oklch, var(--trust) 45%, transparent);
+}
+
+/* Timeline rail — how-it-works connector, drawn on scroll (scaleY origin
+   top via framer-motion; the CSS provides the gradient rail). */
+.ts-rail {
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklch, var(--trust) 55%, transparent),
+    color-mix(in oklch, var(--trust) 12%, transparent)
+  );
+}
+
+/* Glass card — frosted panel for hero artifacts. */
+.ts-glass {
+  background: color-mix(in oklch, var(--card) 78%, transparent);
+  backdrop-filter: blur(14px) saturate(1.4);
+  -webkit-backdrop-filter: blur(14px) saturate(1.4);
+}
+
+/* Display font opt-in (Tailwind v4 theme token: font-display). Applied to
+   headlines via the `font-display` utility class. */
+
+/* Reduced motion — Stage 15 additions */
+@media (prefers-reduced-motion: reduce) {
+  .ts-aurora-drift {
+    animation: none;
+  }
+  .ts-nav-link::after,
+  .ts-sheen::before {
+    transition: none;
+  }
 }
 
 /* Trust glow for hero accents */

@@ -126,10 +126,10 @@ export function AuthView() {
 
         <Card className="ts-glow border-primary/20 shadow-xl">
           <CardHeader className="text-center">
-            <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground">
+            <span className="ts-icon-tile mx-auto flex h-12 w-12 items-center justify-center rounded-xl text-primary">
               <ShieldCheck className="h-6 w-6" />
             </span>
-            <CardTitle id="auth-heading" className="mt-4 text-2xl">
+            <CardTitle id="auth-heading" className="font-display mt-4 text-2xl font-semibold tracking-tight">
               {tab === "signup" ? "Create your account" : "Welcome back"}
             </CardTitle>
             <CardDescription>

@@ -144,12 +144,12 @@ def db_rows(sql, args=()):
 # ---------------------------------------------------------------------------
 print("== 1) version catalog ==")
 s, b = call(client(), "GET", "/api/health")
-check("health reports Stage 14 / v1.13.0",
-      s == 200 and b.get("version") == "1.13.0" and "14" in b.get("stage", ""),
+check("health reports Stage 15 / v1.14.0",
+      s == 200 and b.get("version") == "1.14.0" and "15" in b.get("stage", ""),
       str(b.get("stage")))
 s, b = call(client(), "GET", "/api")
 paths = {(e["method"], e["path"]) for e in b.get("endpoints", [])}
-check("api index: v1.13.0 + Stage 14", b.get("version") == "1.13.0" and "14" in b.get("stage", ""))
+check("api index: v1.14.0 + Stage 15", b.get("version") == "1.14.0" and "15" in b.get("stage", ""))
 check("api index catalogs the 4 observability endpoints",
       ("GET", "/api/v1/engine/admin/providers/history") in paths
       and ("POST", "/api/v1/engine/admin/providers/history") in paths

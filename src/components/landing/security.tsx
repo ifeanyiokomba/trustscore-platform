@@ -4,12 +4,8 @@ import * as React from "react";
 import { motion } from "framer-motion";
 import { ShieldCheck, Eye, FileText, UserCheck, Bell, Lock, ScrollText } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-
-const fadeUp = {
-  initial: { opacity: 0, y: 24 },
-  whileInView: { opacity: 1, y: 0 },
-  viewport: { once: true, margin: "-80px" },
-};
+import { SectionHeading } from "@/components/landing/section-heading";
+import { staggerParent, fadeUp as fadeUpV, SPRING } from "@/lib/motion";
 
 const PILLARS = [
   {
@@ -56,36 +52,38 @@ const PILLARS = [
 
 export function Security() {
   return (
-    <section id="security" className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20" aria-labelledby="security-heading">
-      <div className="mx-auto max-w-2xl text-center">
-        <p className="text-xs font-bold uppercase tracking-[0.2em] text-primary">
-          Security &amp; Privacy
-        </p>
-        <h2 id="security-heading" className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">
-          Trust has to be earned — starting with ours
-        </h2>
-        <p className="mt-4 text-muted-foreground">
-          A trust product that mishandles data is a contradiction. Privacy and consent are
-          architectural requirements here, not features.
-        </p>
-      </div>
+    <section id="security" className="mx-auto max-w-6xl px-4 py-20 sm:px-6 sm:py-24" aria-labelledby="security-heading">
+      <SectionHeading
+        eyebrow="Security & Privacy"
+        title="Trust has to be earned — starting with ours"
+        description="A trust product that mishandles data is a contradiction. Privacy and consent are architectural requirements here, not features."
+      />
 
-      <div className="mt-12 grid gap-6 sm:grid-cols-2">
-        {PILLARS.map((p, i) => (
-          <motion.div key={p.title} {...fadeUp} transition={{ duration: 0.45, delay: i * 0.06 }}>
-            <Card className="h-full">
+      <motion.div
+        variants={staggerParent(0.1, 0.08)}
+        initial="hidden"
+        whileInView="show"
+        viewport={{ once: true, margin: "-80px" }}
+        className="mt-12 grid gap-6 sm:grid-cols-2"
+      >
+        {PILLARS.map((p) => (
+          <motion.div key={p.title} variants={fadeUpV} whileHover={{ y: -4 }} transition={SPRING}>
+            <Card className="group h-full transition-shadow duration-300 hover:shadow-xl hover:shadow-primary/5">
               <CardHeader className="flex-row items-center gap-3 space-y-0">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <span className="ts-icon-tile flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-primary transition-transform duration-300 group-hover:scale-105">
                   <p.icon className="h-5 w-5" />
                 </span>
-                <CardTitle className="text-base">{p.title}</CardTitle>
+                <CardTitle className="font-display text-base font-semibold tracking-tight">{p.title}</CardTitle>
               </CardHeader>
               <CardContent>
                 <ul className="space-y-2.5">
                   {p.points.map((point) => (
-                    <li key={point} className="flex items-start gap-2 text-sm text-muted-foreground">
-                      <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" />
-                      {point}
+                    <li key={point} className="group/item flex items-start gap-2 text-sm text-muted-foreground">
+                      <ShieldCheck
+                        className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary/80 transition-colors duration-200 group-hover/item:text-primary"
+                        aria-hidden="true"
+                      />
+                      <span className="transition-colors duration-200 group-hover/item:text-foreground/90">{point}</span>
                     </li>
                   ))}
                 </ul>
@@ -93,11 +91,13 @@ export function Security() {
             </Card>
           </motion.div>
         ))}
-      </div>
+      </motion.div>
 
       <motion.div
-        {...fadeUp}
-        transition={{ duration: 0.5 }}
+        variants={staggerParent(0.2)}
+        initial="hidden"
+        whileInView="show"
+        viewport={{ once: true, margin: "-60px" }}
         className="mt-10 grid gap-3 sm:grid-cols-3"
       >
         {[
@@ -105,13 +105,14 @@ export function Security() {
           { icon: FileText, label: "Trust receipts arrive Stage 6" },
           { icon: ShieldCheck, label: "Continuous verification freshness built-in from Stage 3" },
         ].map((n) => (
-          <div
+          <motion.div
             key={n.label}
-            className="flex items-center gap-2.5 rounded-lg border border-dashed border-border px-4 py-3 text-xs text-muted-foreground"
+            variants={fadeUpV}
+            className="group flex items-center gap-2.5 rounded-lg border border-dashed border-border px-4 py-3 text-xs text-muted-foreground transition-colors duration-300 hover:border-primary/40 hover:text-foreground"
           >
-            <n.icon className="h-4 w-4 shrink-0 text-primary/70" aria-hidden="true" />
+            <n.icon className="h-4 w-4 shrink-0 text-primary/70 transition-transform duration-300 group-hover:scale-110" aria-hidden="true" />
             {n.label}
-          </div>
+          </motion.div>
         ))}
       </motion.div>
     </section>

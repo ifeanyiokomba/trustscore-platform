@@ -1,10 +1,11 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono, Fraunces } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { ConsoleGuard } from "@/components/layout/console-guard";
+import { MotionConfig } from "framer-motion";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -14,6 +15,15 @@ const geistSans = Geist({
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+});
+
+// Stage 15 — the display voice: Fraunces, a warm authoritative serif with
+// optical sizing. Headlines carry institutional gravitas; Geist keeps the
+// UI and data surfaces crisp and modern.
+const fraunces = Fraunces({
+  variable: "--font-fraunces",
+  subsets: ["latin"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -60,13 +70,17 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}
+        className={`${geistSans.variable} ${geistMono.variable} ${fraunces.variable} antialiased bg-background text-foreground`}
       >
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
-          <ConsoleGuard />
-          {children}
-          <Toaster />
-          <Sonner />
+          {/* Stage 15 — the product-wide motion contract: users who prefer
+              reduced motion get instant, transform-free transitions. */}
+          <MotionConfig reducedMotion="user">
+            <ConsoleGuard />
+            {children}
+            <Toaster />
+            <Sonner />
+          </MotionConfig>
         </ThemeProvider>
       </body>
     </html>

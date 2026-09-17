@@ -181,7 +181,7 @@ export function PolicyExplainer() {
         <p className="text-xs font-bold uppercase tracking-[0.2em] text-primary">
           The scoring policy is public
         </p>
-        <h2 id="scoring-heading" className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">
+        <h2 id="scoring-heading" className="font-display mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
           No mystery numbers — the exact rules, published
         </h2>
         <p className="mt-4 text-muted-foreground">

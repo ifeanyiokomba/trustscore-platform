@@ -3,8 +3,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 
-const STAGE = "14 — Transport Observability (persisted snapshot history, circuit transition log, sustained-open alerting for provider circuits)";
-const VERSION = "1.13.0";
+const STAGE = "15 — Design Elevation (professional typography system, shared motion design language, scroll choreography and micro-interactions across the product)";
+const VERSION = "1.14.0";
 const startedAt = Date.now();
 
 export async function GET(_req: NextRequest) {

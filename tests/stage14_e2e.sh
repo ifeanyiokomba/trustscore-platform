@@ -132,7 +132,7 @@ R=$($AB eval "JSON.stringify({
   a: document.body.textContent.includes('Transport observability'),
   b: document.body.textContent.includes('sustained threshold alerts every admin'),
   c: document.querySelector('#roadmap')?.textContent.includes('In progress'),
-  d: document.body.textContent.includes('(Stage 14)'),
+  d: document.body.textContent.includes('(Stage 15)'),
 })" 2>/dev/null | tail -1)
 A=$(echo "$R" | python3 -c "import json,sys; d=json.loads(json.load(sys.stdin)); print('true' if d['a'] else 'false')" 2>/dev/null)
 B=$(echo "$R" | python3 -c "import json,sys; d=json.loads(json.load(sys.stdin)); print('true' if d['b'] else 'false')" 2>/dev/null)
@@ -141,7 +141,7 @@ D=$(echo "$R" | python3 -c "import json,sys; d=json.loads(json.load(sys.stdin));
 check "roadmap shows the Stage 14 'Transport observability' entry" "$A"
 check "roadmap detail mentions admin alerts" "$B"
 check "stage 14 marked in progress (spinner state)" "$C"
-check "hero carries the Stage 14 badge" "$D"
+check "hero carries the Stage 15 badge" "$D"
 $AB screenshot /home/z/my-project/research/s14-landing-roadmap.png >/dev/null 2>&1
 
 # ===========================================================================

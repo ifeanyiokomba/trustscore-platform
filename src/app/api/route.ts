@@ -5,8 +5,8 @@ import { NextResponse } from "next/server";
 export async function GET() {
   return NextResponse.json({
     name: "TrustScore Platform API",
-    stage: "14 — Transport Observability (persisted snapshot history, circuit transition log, sustained-open alerting for provider circuits)",
-    version: "1.13.0",
+    stage: "15 — Design Elevation (professional typography system, shared motion design language, scroll choreography and micro-interactions across the product)",
+    version: "1.14.0",
     notice:
       "NINAuth integration is implemented contract-first behind a runtime-switchable provider POSTURE: MOCK (default, in-process, honestly labeled), SANDBOX LOOPBACK (the real transport path — HMAC-signed calls, timeouts, retries, per-provider circuit breakers, latency metrics — proven against the local provider simulator on :3032), and LIVE (honestly gated on partner credentials + base URLs; the API refuses the flip until they exist). Phone (SMS OTP) and biometric (liveness) follow the same posture. The credential vault stores provider secrets AES-256-GCM encrypted and write-only. The B2B Trust Decision API and webhook deliveries are real integrations against that same platform; plan billing is an honest mock-up (no payment processor is connected).",
     endpoints: [

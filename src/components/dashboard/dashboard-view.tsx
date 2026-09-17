@@ -91,9 +91,9 @@ export function DashboardView() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.2em] text-primary">
-            Stage 14 · Transport Observability
+            Stage 15 · Design Elevation
           </p>
-          <h1 id="dash-heading" className="mt-1 text-3xl font-bold tracking-tight">
+          <h1 id="dash-heading" className="font-display mt-1 text-3xl font-semibold tracking-tight">
             Welcome back, {user.displayName.split(" ")[0]}
           </h1>
         </div>
@@ -209,7 +209,7 @@ export function DashboardView() {
                   </div>
                   <Button
                     variant="outline"
-                    className="w-full text-destructive hover:bg-destructive/10 hover:text-destructive"
+                    className="w-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                     onClick={() => signOut()}
                     disabled={pending}
                   >

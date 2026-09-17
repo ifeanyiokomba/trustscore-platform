@@ -4,12 +4,8 @@ import * as React from "react";
 import { motion } from "framer-motion";
 import { CheckCircle2, Circle, Loader2, Lock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-
-const fadeUp = {
-  initial: { opacity: 0, y: 24 },
-  whileInView: { opacity: 1, y: 0 },
-  viewport: { once: true, margin: "-80px" },
-};
+import { SectionHeading } from "@/components/landing/section-heading";
+import { EASE, staggerParent, fadeUp as fadeUpV } from "@/lib/motion";
 
 type StageStatus = "done" | "active" | "planned";
 
@@ -101,8 +97,14 @@ const STAGES: { id: string; title: string; status: StageStatus; detail: string }
   {
     id: "14",
     title: "Transport observability",
-    status: "active",
+    status: "done",
     detail: "Circuit-breaker trips, half-open probes and recoveries are now a persisted audit trail with metrics snapshot history that survives restarts — and a circuit open beyond the sustained threshold alerts every admin, with a recovery note when it heals.",
+  },
+  {
+    id: "15",
+    title: "Design elevation",
+    status: "active",
+    detail: "A professional typographic voice (Fraunces display over Geist), a shared motion design language with scroll choreography and micro-interactions, and a visual- polish pass across every surface — trust you can feel.",
   },
 ];
 
@@ -121,47 +123,61 @@ export function Roadmap() {
       className="border-y border-border/70 bg-muted/30"
       aria-labelledby="roadmap-heading"
     >
-      <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20">
-        <div className="mx-auto max-w-2xl text-center">
-          <p className="text-xs font-bold uppercase tracking-[0.2em] text-primary">
-            Roadmap
-          </p>
-          <h2 id="roadmap-heading" className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">
-            Built stage-by-stage, tested at every gate
-          </h2>
-          <p className="mt-4 text-muted-foreground">
-            No big-bang launches. Each stage ships, gets tested end-to-end, is re-audited,
-            and only then does the next one begin.
-          </p>
-        </div>
+      <div className="mx-auto max-w-6xl px-4 py-20 sm:px-6 sm:py-24">
+        <SectionHeading
+          eyebrow="Roadmap"
+          title="Built stage-by-stage, tested at every gate"
+          description="No big-bang launches. Each stage ships, gets tested end-to-end, is re-audited, and only then does the next one begin."
+        />
 
-        <motion.ol {...fadeUp} transition={{ duration: 0.5 }} className="mx-auto mt-12 max-w-3xl space-y-1">
-          {STAGES.map((s) => (
-            <li
-              key={s.id}
-              className="relative flex gap-4 rounded-xl px-4 py-4 transition-colors hover:bg-accent/50"
-            >
-              <StatusIcon status={s.status} />
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <p className="text-sm font-semibold">
-                    <span className="mr-2 font-mono text-xs text-muted-foreground">
-                      {s.id.padStart(2, "0")}
-                    </span>
-                    {s.title}
-                  </p>
-                  {s.status === "active" && (
-                    <Badge className="text-[10px]">In progress — this release</Badge>
-                  )}
+        <div className="relative mx-auto mt-14 max-w-3xl">
+          {/* The journey rail — the full height of the roadmap, drawing
+              itself once as the section enters the viewport. */}
+          <motion.div
+            aria-hidden="true"
+            className="ts-rail absolute bottom-4 left-[2.05rem] top-2 w-px origin-top rounded-full sm:left-[2.3rem]"
+            initial={{ scaleY: 0 }}
+            whileInView={{ scaleY: 1 }}
+            viewport={{ once: true, margin: "-40px" }}
+            transition={{ duration: 1.6, ease: EASE }}
+          />
+          <motion.ol
+            variants={staggerParent(0.05, 0.045)}
+            initial="hidden"
+            whileInView="show"
+            viewport={{ once: true, margin: "-40px" }}
+            className="relative space-y-1"
+          >
+            {STAGES.map((s) => (
+              <motion.li
+                key={s.id}
+                variants={fadeUpV}
+                className="group relative flex gap-4 rounded-xl px-4 py-4 transition-colors hover:bg-accent/50"
+              >
+                <span className="relative z-10 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-background">
+                  <StatusIcon status={s.status} />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-sm font-semibold">
+                      <span className="mr-2 font-mono text-xs text-muted-foreground transition-colors group-hover:text-primary">
+                        {s.id.padStart(2, "0")}
+                      </span>
+                      {s.title}
+                    </p>
+                    {s.status === "active" && (
+                      <Badge className="text-[10px]">In progress — this release</Badge>
+                    )}
+                  </div>
+                  <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{s.detail}</p>
                 </div>
-                <p className="mt-1 text-sm text-muted-foreground">{s.detail}</p>
-              </div>
-              {s.status === "planned" && (
-                <Lock className="mt-1 hidden h-3.5 w-3.5 text-muted-foreground/40 sm:block" aria-hidden="true" />
-              )}
-            </li>
-          ))}
-        </motion.ol>
+                {s.status === "planned" && (
+                  <Lock className="mt-1 hidden h-3.5 w-3.5 text-muted-foreground/40 sm:block" aria-hidden="true" />
+                )}
+              </motion.li>
+            ))}
+          </motion.ol>
+        </div>
       </div>
     </section>
   );
