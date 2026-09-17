@@ -46,7 +46,7 @@ local-*
 *.log
 dev.log
 dev.out.log
-test
+/test
 prompt
 
 server.log
@@ -64,7 +64,9 @@ server.log
 *.log
 
 # Sandbox / development artifacts (QA screenshots, research dumps, uploads)
-research/
+# Root-anchored ONLY: docs/research/ is product documentation and MUST be tracked
+# (a bare `research/` pattern silently excluded docs/research and lost files).
+/research/
 tool-results/
 download/
 upload/
