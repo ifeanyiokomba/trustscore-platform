@@ -95,8 +95,14 @@ const STAGES: { id: string; title: string; status: StageStatus; detail: string }
   {
     id: "13",
     title: "Live-ready providers",
-    status: "active",
+    status: "done",
     detail: "The real provider transport layer — HMAC-signed calls, timeouts, retries, per-provider circuit breakers and latency metrics — proven end-to-end against a local loopback simulator, plus an encrypted write-only credential vault. LIVE partners flip on credentials, nothing else changes.",
+  },
+  {
+    id: "14",
+    title: "Transport observability",
+    status: "active",
+    detail: "Circuit-breaker trips, half-open probes and recoveries are now a persisted audit trail with metrics snapshot history that survives restarts — and a circuit open beyond the sustained threshold alerts every admin, with a recovery note when it heals.",
   },
 ];
 

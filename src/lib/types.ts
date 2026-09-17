@@ -872,6 +872,8 @@ export interface ProviderTransportStatus {
   lastError: string | null;
   lastErrorAt: string | null;
   lastOkAt: string | null;
+  /** Stage 14 — first trip of the current non-CLOSED episode (epoch ms). */
+  firstTripAt: number | null;
 }
 
 export interface VaultEntryInfo {
@@ -917,6 +919,48 @@ export interface EngineAdminProviders {
     circuitThreshold: number;
     circuitOpenMs: number;
   };
+  requestId?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Stage 14 — transport observability (history + sustained-open alerting)
+// ---------------------------------------------------------------------------
+
+export interface TransportSnapshotEntry {
+  createdAt: string;
+  circuit: string;
+  calls: number;
+  errors: number;
+  errorRate: number;
+  p50: number | null;
+  p95: number | null;
+}
+
+export interface CircuitEventEntry {
+  createdAt: string;
+  fromState: string;
+  toState: string;
+  reason: string;
+}
+
+export interface TransportAlertEpisode {
+  firstTripAt: string;
+  alertedAt: string | null;
+}
+
+export interface TransportHistoryProvider {
+  key: string;
+  title: string;
+  snapshots: TransportSnapshotEntry[];
+  events: CircuitEventEntry[];
+  alert: TransportAlertEpisode | null;
+}
+
+export interface EngineTransportHistory {
+  sustainedMs: number;
+  defaultSustainedMs: number;
+  posture: string;
+  providers: TransportHistoryProvider[];
   requestId?: string;
 }
 

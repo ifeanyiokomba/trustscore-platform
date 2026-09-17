@@ -3,8 +3,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 
-const STAGE = "13 — Live-Ready Providers (real transport layer: signed calls, timeouts, retries, circuit breakers, credential vault, loopback simulator)";
-const VERSION = "1.12.0";
+const STAGE = "14 — Transport Observability (persisted snapshot history, circuit transition log, sustained-open alerting for provider circuits)";
+const VERSION = "1.13.0";
 const startedAt = Date.now();
 
 export async function GET(_req: NextRequest) {

@@ -84,7 +84,10 @@ export type AuditAction =
   | "PROVIDER_CREDENTIAL_SAVED"
   | "PROVIDER_CREDENTIAL_REVOKED"
   | "SIMULATOR_FAULT_MODE_SET"
-  | "SIGNAL_LIVENESS_TRANSPORT_FAILED";
+  | "SIGNAL_LIVENESS_TRANSPORT_FAILED"
+  // Stage 14 — transport observability (snapshots, sustained-open alerting)
+  | "TRANSPORT_SNAPSHOT_TAKEN"
+  | "PROVIDER_ALERTING_CHANGED";
 
 interface AuditInput {
   actorType: "USER" | "SYSTEM" | "ANONYMOUS";
@@ -165,6 +168,14 @@ const SAFE_METADATA_KEYS = new Set([
   // Stage 11 — score-insights export labels / counters only
   "format",
   "records",
+  // Stage 14 — transport observability labels / counters only
+  "posture",
+  "sustainedMs",
+  "snapshots",
+  "events",
+  "alertsRaised",
+  "recoveriesSent",
+  "provider",
 ]);
 
 export async function recordAudit(input: AuditInput): Promise<void> {

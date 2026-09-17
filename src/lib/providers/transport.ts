@@ -14,6 +14,11 @@
 //   - Latency/error metrics per provider (p50/p95 over the last 100 calls,
 //     error counts, last error) — surfaced in the admin provider console.
 //
+// Stage 14: every circuit state TRANSITION is also pushed onto an in-memory
+// queue (drainCircuitTransitions) so the observability tick can persist the
+// transition log + evaluate sustained-open alerts. The hot path only pushes
+// a small object — no I/O in the request path.
+//
 // Honest-error discipline: every failure is a typed ProviderTransportError
 // with a machine code. Callers translate these into honest 503s — never a
 // silent fallback to a different provider's answer.
@@ -70,11 +75,27 @@ export class ProviderTransportError extends Error {
 
 export type CircuitState = "CLOSED" | "OPEN" | "HALF_OPEN";
 
+/** Stage 14 — a persisted circuit state transition (transport audit trail). */
+export interface CircuitTransition {
+  provider: ProviderKey;
+  fromState: CircuitState;
+  toState: CircuitState;
+  reason: string; // transport error code | SUCCESS | RESET
+  at: number; // epoch ms
+}
+
 interface ProviderBreaker {
   state: CircuitState;
   consecutiveFailures: number;
   openedAt: number | null;
   lastProbeAt: number | null;
+  firstTripAt: number | null; // Stage 14: episode start (oldest trip since last CLOSED)
+}
+
+interface TransportGlobal {
+  __tsProviderBreakers: Map<ProviderKey, ProviderBreaker>;
+  __tsProviderMetrics: Map<ProviderKey, ProviderMetrics>;
+  __tsCircuitTransitions: CircuitTransition[];
 }
 
 interface ProviderMetrics {
@@ -87,18 +108,33 @@ interface ProviderMetrics {
   lastLatencyMs: number | null;
 }
 
-interface TransportGlobal {
-  __tsProviderBreakers: Map<ProviderKey, ProviderBreaker>;
-  __tsProviderMetrics: Map<ProviderKey, ProviderMetrics>;
-}
-
 const g = globalThis as unknown as TransportGlobal;
 const breakers: Map<ProviderKey, ProviderBreaker> =
   g.__tsProviderBreakers ?? new Map();
 const metrics: Map<ProviderKey, ProviderMetrics> =
   g.__tsProviderMetrics ?? new Map();
+const transitions: CircuitTransition[] = g.__tsCircuitTransitions ?? [];
 g.__tsProviderBreakers = breakers;
 g.__tsProviderMetrics = metrics;
+g.__tsCircuitTransitions = transitions;
+
+function pushTransition(
+  provider: ProviderKey,
+  fromState: CircuitState,
+  toState: CircuitState,
+  reason: string
+): void {
+  if (fromState === toState) return;
+  transitions.push({ provider, fromState, toState, reason, at: Date.now() });
+  // Bounded queue — the tick drains it every 60s; a fault-injection storm
+  // must never grow this unbounded.
+  if (transitions.length > 500) transitions.splice(0, transitions.length - 500);
+}
+
+/** Stage 14 — drain the persist-pending circuit transitions (tick-side). */
+export function drainCircuitTransitions(): CircuitTransition[] {
+  return transitions.splice(0, transitions.length);
+}
 
 function breakerFor(key: ProviderKey): ProviderBreaker {
   let b = breakers.get(key);
@@ -108,6 +144,7 @@ function breakerFor(key: ProviderKey): ProviderBreaker {
       consecutiveFailures: 0,
       openedAt: null,
       lastProbeAt: null,
+      firstTripAt: null,
     };
     breakers.set(key, b);
   }
@@ -155,10 +192,13 @@ function recordSuccess(key: ProviderKey, latencyMs: number) {
   m.lastOkAt = Date.now();
   m.lastLatencyMs = latencyMs;
   // Success closes the circuit (also settles a HALF_OPEN probe).
+  if (b.state !== "CLOSED") {
+    pushTransition(key, b.state, "CLOSED", "SUCCESS");
+  }
   b.state = "CLOSED";
   b.consecutiveFailures = 0;
   b.openedAt = null;
-  b.lastProbeAt = b.lastProbeAt; // preserve probe history
+  b.firstTripAt = null;
 }
 
 function recordFailure(key: ProviderKey, code: TransportErrorCode, detail: string) {
@@ -170,8 +210,14 @@ function recordFailure(key: ProviderKey, code: TransportErrorCode, detail: strin
   m.lastErrorAt = Date.now();
   b.consecutiveFailures += 1;
   if (b.state === "HALF_OPEN" || b.consecutiveFailures >= CIRCUIT_FAILURE_THRESHOLD) {
+    const from = b.state;
+    // A HALF_OPEN re-trip belongs to the SAME episode as the trip that
+    // opened it — "sustained open" is measured from the first trip.
+    const continuing = from === "OPEN" || (from === "HALF_OPEN" && b.firstTripAt !== null);
     b.state = "OPEN";
     b.openedAt = Date.now();
+    if (!continuing) b.firstTripAt = Date.now();
+    pushTransition(key, from, "OPEN", code);
   }
 }
 
@@ -187,11 +233,16 @@ function allowCall(key: ProviderKey): boolean {
 
 /** Admin: reset a provider's circuit + metrics. */
 export function resetProviderTransport(key: ProviderKey): void {
+  const b = breakerFor(key);
+  if (b.state !== "CLOSED") {
+    pushTransition(key, b.state, "CLOSED", "RESET");
+  }
   breakers.set(key, {
     state: "CLOSED",
     consecutiveFailures: 0,
     openedAt: null,
     lastProbeAt: null,
+    firstTripAt: null,
   });
   metrics.set(key, {
     calls: 0,
@@ -223,6 +274,8 @@ export function providerTransportStatus(key: ProviderKey) {
     lastError: m.lastError,
     lastErrorAt: m.lastErrorAt ? new Date(m.lastErrorAt).toISOString() : null,
     lastOkAt: m.lastOkAt ? new Date(m.lastOkAt).toISOString() : null,
+    /** Stage 14 — episode start (first trip of the current non-CLOSED run). */
+    firstTripAt: b.firstTripAt,
   };
 }
 
@@ -432,3 +485,19 @@ export const TRANSPORT_CONSTANTS = {
   CIRCUIT_OPEN_MS,
   METRICS_SAMPLES,
 } as const;
+
+// ---------------------------------------------------------------------------
+// Stage 14 — sustained-open episode bookkeeping (read by the observability
+// service; kept here beside the breaker it describes).
+// ---------------------------------------------------------------------------
+
+/**
+ * The current non-CLOSED episode start for a provider (epoch ms), or null
+ * when the breaker is CLOSED. Uses firstTripAt so OPEN → HALF_OPEN → re-trip
+ * counts as ONE sustained episode (the honest reading of "sustained open").
+ */
+export function circuitEpisodeStart(key: ProviderKey): number | null {
+  const b = breakerFor(key);
+  if (b.state === "CLOSED") return null;
+  return b.firstTripAt ?? b.openedAt;
+}

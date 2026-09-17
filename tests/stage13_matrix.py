@@ -111,12 +111,13 @@ def set_fault(op, key, mode):
 # ---------------------------------------------------------------------------
 print("== 1) version catalog ==")
 s, b = call(client(), "GET", "/api/health")
-check("health reports Stage 13 / v1.12.0",
-      s == 200 and b.get("version") == "1.12.0" and "13" in b.get("stage", ""),
+check("health reports the current platform version (Stage 14 / v1.13.0)",
+      s == 200 and b.get("version") == "1.13.0" and "14" in b.get("stage", ""),
       str(b.get("stage")))
 s, b = call(client(), "GET", "/api")
 paths = {e["path"] for e in b.get("endpoints", [])}
-check("api index: v1.12.0 + Stage 13", b.get("version") == "1.12.0" and "13" in b.get("stage", ""))
+check("api index: v1.13.0 + Stage 14 (provider endpoints still cataloged)",
+      b.get("version") == "1.13.0" and "14" in b.get("stage", ""))
 check("api index catalogs all 7 provider endpoints",
       "/api/v1/engine/admin/providers" in paths
       and "/api/v1/identity/signals/phone/inbox" in paths

@@ -5,8 +5,8 @@ import { NextResponse } from "next/server";
 export async function GET() {
   return NextResponse.json({
     name: "TrustScore Platform API",
-    stage: "13 — Live-Ready Providers (real transport layer: signed calls, timeouts, retries, circuit breakers, credential vault, loopback simulator)",
-    version: "1.12.0",
+    stage: "14 — Transport Observability (persisted snapshot history, circuit transition log, sustained-open alerting for provider circuits)",
+    version: "1.13.0",
     notice:
       "NINAuth integration is implemented contract-first behind a runtime-switchable provider POSTURE: MOCK (default, in-process, honestly labeled), SANDBOX LOOPBACK (the real transport path — HMAC-signed calls, timeouts, retries, per-provider circuit breakers, latency metrics — proven against the local provider simulator on :3032), and LIVE (honestly gated on partner credentials + base URLs; the API refuses the flip until they exist). Phone (SMS OTP) and biometric (liveness) follow the same posture. The credential vault stores provider secrets AES-256-GCM encrypted and write-only. The B2B Trust Decision API and webhook deliveries are real integrations against that same platform; plan billing is an honest mock-up (no payment processor is connected).",
     endpoints: [
@@ -41,7 +41,7 @@ export async function GET() {
       { method: "POST", path: "/api/v1/passport/notifications", auth: "session", description: "Stage 5: mark notifications read ({id} or {all:true})" },
       { method: "GET", path: "/api/v1/passport/score-history", auth: "session", description: "Stage 11: score history — snapshot series, component deltas between consecutive snapshots, audited window events (correlated context, not a verdict)" },
       { method: "GET", path: "/api/v1/passport/score-history/export", auth: "session", description: "Stage 11: self-service series export — ?format=csv|json (audited SCORE_HISTORY_EXPORTED)" },
-      { method: "POST", path: "/api/v1/internal/webhook-tick", auth: "internal-token", description: "Stage 12 (internal): timer-driven webhook retry tick — called by the webhook-worker mini-service every 60s; bounded (≤5 due deliveries per call)" },
+      { method: "POST", path: "/api/v1/internal/webhook-tick", auth: "internal-token", description: "Stage 12 (internal): timer-driven webhook retry tick — called by the webhook-worker mini-service every 60s; bounded (≤5 due deliveries per call). Stage 14: the tick also persists transport snapshots + circuit transitions and evaluates sustained-open alerts" },
       { method: "POST", path: "/api/v1/security/sessions/:id/revoke", auth: "session", description: "Stage 5: remote sign-out of another active session" },
       { method: "POST", path: "/api/v1/safety/check", auth: "session", description: "Stage 6: run a Safety Check — exactly one of { handle, phone, link, qr }; anti-enumeration UNAVAILABLE shape; receipted + audited" },
       { method: "GET", path: "/api/v1/safety/checks", auth: "session", description: "Stage 6: verifier's check history + sent trust requests" },
@@ -71,6 +71,10 @@ export async function GET() {
       { method: "PUT", path: "/api/v1/engine/admin/providers/:key/credential", auth: "session+admin", description: "Stage 13: store a provider credential (AES-256-GCM encrypted, write-only — secret never returned again; rotates the previous to RETIRED)" },
       { method: "DELETE", path: "/api/v1/engine/admin/providers/:key/credential", auth: "session+admin", description: "Stage 13: revoke the ACTIVE provider credential (immediate; LIVE posture refuses to activate without one)" },
       { method: "POST", path: "/api/v1/engine/admin/providers/:key/fault", auth: "session+admin", description: "Stage 13: set the simulator fault mode {none|timeout|error|auth|slow} — exercises retries, timeouts and circuit-breaker trips on demand (loopback only)" },
+      { method: "GET", path: "/api/v1/engine/admin/providers/history", auth: "session+admin", description: "Stage 14: transport observability — per-provider snapshot history (sparkline source), circuit transition log, sustained-open alert episode state" },
+      { method: "POST", path: "/api/v1/engine/admin/providers/history", auth: "session+admin", description: "Stage 14: run the observability tick now — drains + persists pending circuit transitions, writes fresh snapshots, evaluates sustained-open alerts/recoveries (audited)" },
+      { method: "GET", path: "/api/v1/engine/admin/providers/alerting", auth: "session+admin", description: "Stage 14: read the sustained-open alert threshold (ms) + bounds" },
+      { method: "PUT", path: "/api/v1/engine/admin/providers/alerting", auth: "session+admin", description: "Stage 14: tune the sustained-open alert threshold {sustainedMs 5000–600000} — audited PROVIDER_ALERTING_CHANGED" },
       { method: "POST", path: "/api/v1/trust/check", auth: "X-API-Key", description: "Stage 9: Trust Decision API — exactly one of { handle, phone, link, qr }; consent-gated, band-level, receipted to the subject; NOT an automated decision (NDPA §37 note on every response)" },
       { method: "GET", path: "/api/v1/dev/me", auth: "session", description: "Stage 9: developer portal — your API clients, keys (prefixes only), team, quota, 14-day usage, webhook config + deliveries" },
       { method: "POST", path: "/api/v1/dev/clients", auth: "session", description: "Stage 9: register an API client (business app; SANDBOX default; max 3 owned)" },
@@ -97,6 +101,7 @@ export async function GET() {
       "11": "Score insights — SHIPPED (why-did-my-score-change timeline, component deltas, series export)",
       "12": "Transparency & alerting — SHIPPED (public policy explainer, drop receipts, timer worker)",
       "13": "Live-ready providers — SHIPPED (transport layer + circuit breakers + vault + loopback simulator)",
+      "14": "Transport observability — SHIPPED (persisted snapshot history, circuit transition log, sustained-open alerting)",
     },
   });
 }

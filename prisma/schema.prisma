@@ -970,3 +970,37 @@ model ProviderCredential {
 
   @@index([provider, status])
 }
+
+// Stage 14 — transport observability. Periodic per-provider metrics
+// snapshots persisted by the internal tick (and on-demand by admins), so
+// transport health history survives dev restarts (the live counters stay
+// in-memory, single-instance posture — documented). Pruned per provider.
+model TransportSnapshot {
+  id        String   @id @default(cuid())
+  provider  String // ninauth | phone | liveness
+  posture   String // mock | loopback | live — posture at snapshot time
+  circuit   String // CLOSED | OPEN | HALF_OPEN — effective state
+  calls     Int // cumulative in-memory call counter at snapshot time
+  errors    Int // cumulative in-memory error counter at snapshot time
+  errorRate Int // percent, rounded
+  p50       Int? // latency ms
+  p95       Int? // latency ms
+  createdAt DateTime @default(now())
+
+  @@index([provider, createdAt])
+}
+
+// Stage 14 — circuit-breaker transition log (the audit trail for the
+// transport layer): CLOSED→OPEN (trip, with the failing code), OPEN→HALF_OPEN
+// (probe window elapsed), HALF_OPEN→OPEN (re-trip), →CLOSED (recovered /
+// reset). Persisted from the in-memory transition queue on each tick.
+model CircuitEvent {
+  id        String   @id @default(cuid())
+  provider  String // ninauth | phone | liveness
+  fromState String // CLOSED | OPEN | HALF_OPEN
+  toState   String // CLOSED | OPEN | HALF_OPEN
+  reason    String // transport error code or SUCCESS | RESET
+  createdAt DateTime @default(now())
+
+  @@index([provider, createdAt])
+}
