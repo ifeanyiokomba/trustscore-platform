@@ -915,6 +915,7 @@ model TrustDecision {
   keyId        String
   subjectId    String? // null when there is no consented match (probe record only)
   method       String // HANDLE | PHONE | TRUST_LINK | QR
+  purpose      String? // Batch 0 (directive §22): transaction context — marketplace_transaction | employment | rental | professional_engagement | high_value_transaction | b2b_onboarding | general_screening
   inputHint    String // masked: "@handle" | "verified phone (hashed)" | "trust link"
   outcome      String // OK | UNAVAILABLE | DEAD_LINK
   assessment   String? // JSON — exactly what was returned (band-level, no score number)

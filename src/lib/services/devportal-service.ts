@@ -645,6 +645,7 @@ export async function getDecisions(
       decisions: {
         id: string;
         method: string;
+        purpose: string | null;
         inputHint: string;
         outcome: string;
         requestId: string;
@@ -670,6 +671,7 @@ export async function getDecisions(
     decisions: rows.map((r) => ({
       id: r.id,
       method: r.method,
+      purpose: r.purpose,
       inputHint: r.inputHint,
       outcome: r.outcome,
       requestId: r.requestId,

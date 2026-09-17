@@ -176,7 +176,7 @@ export function AuthView() {
               type="button"
               onClick={() => void startNinAuth()}
               disabled={ninStarting}
-              className="mt-1 w-full gap-2.5 border border-emerald-600/40 bg-white py-5 text-emerald-700 shadow-sm transition-all hover:-translate-y-px hover:bg-emerald-50 hover:text-emerald-800 dark:bg-white dark:text-emerald-700 dark:hover:bg-emerald-50"
+              className="mt-1 min-h-12 w-full gap-2.5 border border-emerald-600/40 bg-white py-5 text-emerald-700 shadow-sm transition-all hover:-translate-y-px hover:bg-emerald-50 hover:text-emerald-800 dark:bg-white dark:text-emerald-700 dark:hover:bg-emerald-50"
               size="lg"
               data-testid="ninauth-signin-button"
             >

@@ -1061,6 +1061,7 @@ export interface DevPortal {
 export interface DevDecision {
   id: string;
   method: string;
+  purpose: string | null;
   inputHint: string;
   outcome: string;
   requestId: string;

@@ -46,6 +46,41 @@ export const API_HONESTY_NOTE =
   "SANDBOX/LIVE labels describe integration posture. Underlying identity providers remain contract-first MOCK until partner credentials exist — no live government, MNO or biometric integration is claimed.";
 
 // ---------------------------------------------------------------------------
+// Transaction context (directive §22 — transaction-specific trust).
+// The SAME identity may need different evidence for a marketplace sale vs a
+// rental application; the purpose labels the check end-to-end: it is stored
+// on the TrustDecision, shown to the subject on the receipt + notification,
+// and echoed in the webhook payload. Optional + backward-compatible — checks
+// without a purpose behave exactly as before (general screening).
+// ---------------------------------------------------------------------------
+
+export const PURPOSE_OPTIONS = [
+  "marketplace_transaction",
+  "employment",
+  "rental",
+  "professional_engagement",
+  "high_value_transaction",
+  "b2b_onboarding",
+  "general_screening",
+] as const;
+
+export type CheckPurpose = (typeof PURPOSE_OPTIONS)[number];
+
+const PURPOSE_LABELS: Record<CheckPurpose, string> = {
+  marketplace_transaction: "a marketplace transaction",
+  employment: "employment screening",
+  rental: "rental screening",
+  professional_engagement: "a professional engagement",
+  high_value_transaction: "a high-value transaction",
+  b2b_onboarding: "business onboarding",
+  general_screening: "general screening",
+};
+
+export function purposeLabel(purpose?: string | null): string {
+  return PURPOSE_LABELS[(purpose ?? "general_screening") as CheckPurpose] ?? PURPOSE_LABELS.general_screening;
+}
+
+// ---------------------------------------------------------------------------
 // API-key authentication (raw key exists only in the caller's header)
 // ---------------------------------------------------------------------------
 
@@ -145,6 +180,7 @@ export interface DecisionInput {
   phone?: string;
   link?: string;
   qr?: string;
+  purpose?: CheckPurpose; // transaction context (directive §22) — receipt-labeled
 }
 
 export interface DecisionResponse {
@@ -186,6 +222,8 @@ export async function runTrustDecision(
   const provided = [input.handle, input.phone, input.link, input.qr].filter(
     (v) => v !== undefined && v !== ""
   ).length;
+  const purpose = input.purpose ?? "general_screening";
+  const purposeText = purposeLabel(purpose);
 
   const client = await db.apiClient.findUnique({ where: { id: caller.clientId } });
 
@@ -209,6 +247,7 @@ export async function runTrustDecision(
         keyId: caller.keyId,
         subjectId: extra?.subjectId ?? null,
         method: extra?.method ?? "HANDLE",
+        purpose,
         inputHint: extra?.inputHint ?? "invalid",
         outcome,
         assessment: extra?.assessment ? JSON.stringify(extra.assessment) : null,
@@ -226,7 +265,7 @@ export async function runTrustDecision(
       await db.trustReceipt.create({
         data: {
           userId: extra.subjectId,
-          viewerLabel: `Trust API check by ${caller.clientName}`,
+          viewerLabel: `Trust API check by ${caller.clientName} — ${purposeText}`,
           channel: "API_CHECK",
           cardShown: JSON.stringify({
             status: summary.status ?? null,
@@ -250,7 +289,7 @@ export async function runTrustDecision(
       action: "TRUST_DECISION_API",
       subjectType: "ApiClient",
       subjectId: caller.clientId,
-      metadata: { method: extra?.method ?? "none", outcome, environment: caller.environment },
+      metadata: { method: extra?.method ?? "none", purpose, outcome, environment: caller.environment },
     });
     // Fire the webhook (attempt #1 synchronous; response does not depend on it).
     // The `subject` field follows the SAME profile-scope rule as the assessment:
@@ -264,6 +303,7 @@ export async function runTrustDecision(
         decisionId: requestId,
         outcome,
         method: extra?.method ?? null,
+        purpose,
         subject: assessmentSubject?.handle ? `@${assessmentSubject.handle}` : null,
         assessment:
           extra?.assessment && outcome === "OK"
@@ -331,7 +371,7 @@ export async function runTrustDecision(
       view.subject.id,
       "SECURITY",
       "A business ran a trust check on you",
-      `${caller.clientName} (an integrated business) checked your Trust Card via the Trust Decision API using ${method === "QR" ? "a QR Trust Card scan" : "a trust link"}. The assessment they saw is recorded in your receipts.`
+      `${caller.clientName} (an integrated business) checked your Trust Card via the Trust Decision API using ${method === "QR" ? "a QR Trust Card scan" : "a trust link"}, for ${purposeText}. The assessment they saw is recorded in your receipts.`
     );
     return finish(
       200,
@@ -383,7 +423,7 @@ export async function runTrustDecision(
       subject.id,
       "SECURITY",
       "A business ran a trust check on you",
-      `${caller.clientName} (an integrated business) ran a trust check using your verified phone number via the Trust Decision API. The assessment they saw is recorded in your receipts.`
+      `${caller.clientName} (an integrated business) ran a trust check using your verified phone number via the Trust Decision API, for ${purposeText}. The assessment they saw is recorded in your receipts.`
     );
     return finish(
       200,
@@ -453,7 +493,7 @@ export async function runTrustDecision(
     subject.id,
     "SECURITY",
     "A business ran a trust check on you",
-    `${caller.clientName} (an integrated business) ran a trust check on your handle via the Trust Decision API. The assessment they saw is recorded in your receipts.`
+    `${caller.clientName} (an integrated business) ran a trust check on your handle via the Trust Decision API, for ${purposeText}. The assessment they saw is recorded in your receipts.`
   );
   return finish(
     200,

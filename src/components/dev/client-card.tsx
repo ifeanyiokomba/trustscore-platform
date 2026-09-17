@@ -901,6 +901,9 @@ function DecisionsSection({ client }: { client: DevClient }) {
                 const oMeta = OUTCOME_META[d.outcome] ?? OUTCOME_META.UNAVAILABLE;
                 const headline =
                   (d.assessment as { headline?: string } | null)?.headline ?? null;
+                const purposeText = d.purpose
+                  ? d.purpose.replace(/_/g, " ")
+                  : null;
                 return (
                   <li key={d.id} className="rounded-lg border border-border px-2.5 py-2">
                     <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -910,6 +913,14 @@ function DecisionsSection({ client }: { client: DevClient }) {
                       <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-[9px] font-semibold">
                         {d.method}
                       </code>
+                      {purposeText ? (
+                        <span
+                          className="shrink-0 rounded-full bg-primary/10 px-1.5 py-0.5 text-[9px] font-medium text-primary"
+                          data-testid="decision-purpose"
+                        >
+                          {purposeText}
+                        </span>
+                      ) : null}
                       <span className="min-w-0 truncate font-mono text-[10px] text-muted-foreground">
                         {d.inputHint}
                       </span>
