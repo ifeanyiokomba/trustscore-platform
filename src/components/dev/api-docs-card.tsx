@@ -61,6 +61,7 @@ const FIELD_ROWS: { name: string; type: string; note: string }[] = [
   { name: "phone", type: "string?", note: "Nigerian mobile (E.164). Hashed server-side and discarded — never stored or echoed." },
   { name: "link", type: "string?", note: "Trust link (URL or raw ts_ token) — token scopes govern the assessment." },
   { name: "qr", type: "string?", note: "QR Trust Card payload (URL or raw token) — same token semantics." },
+  { name: "purpose", type: "string?", note: "Why you are checking: marketplace_transaction | employment | rental | professional_engagement | high_value_transaction | b2b_onboarding | general_screening. Labeled on the subject's receipt + notification." },
 ];
 
 const RESPONSE_ROWS: { name: string; note: string }[] = [
@@ -82,7 +83,7 @@ const ERROR_ROWS: { code: string; status: string; note: string }[] = [
 const CURL_SAMPLE = `curl -X POST http://localhost:3000/api/v1/trust/check \\
   -H "Content-Type: application/json" \\
   -H "X-API-Key: tsk_sandbox_<your key>" \\
-  -d '{"handle": "ada_okoro"}'`;
+  -d '{"handle": "ada_okoro", "purpose": "rental"}'`;
 
 const VERIFY_SAMPLE = `// Node — verify a TrustScore webhook delivery
 const crypto = require("crypto");

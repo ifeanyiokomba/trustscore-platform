@@ -24,7 +24,11 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import { jsonError, jsonOk, newRequestId } from "@/lib/platform/http";
-import { authenticateApiKey, runTrustDecision } from "@/lib/services/trustdecision-service";
+import {
+  authenticateApiKey,
+  runTrustDecision,
+  PURPOSE_OPTIONS,
+} from "@/lib/services/trustdecision-service";
 
 const CheckSchema = z
   .object({
@@ -32,6 +36,10 @@ const CheckSchema = z
     phone: z.string().trim().min(1).max(20).optional(),
     link: z.string().trim().min(1).max(512).optional(),
     qr: z.string().trim().min(1).max(512).optional(),
+    // Directive §22 — transaction-specific trust: the business states WHY it is
+    // checking. Optional + backward-compatible; echoed on the subject's
+    // receipt/notification and stored on the TrustDecision audit row.
+    purpose: z.enum(PURPOSE_OPTIONS).optional(),
   })
   .strict();
 

@@ -495,7 +495,7 @@ export function IdentityCard({
                     : "Verify through Nigeria's official identity consent gateway — a QR or share code, one approval in your NINAuth app, and you're done. No forms, no document uploads."}
                 </p>
                 <Button
-                  className="mt-5"
+                  className="mt-5 min-h-11"
                   onClick={startVerification}
                   disabled={starting}
                 >
