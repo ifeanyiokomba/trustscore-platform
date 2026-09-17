@@ -1,0 +1,1006 @@
+// TrustScore — NIN-First rebuild
+// Stage 1–7 schema (per docs/STAGE0_AUDIT.md §4.3 / §4.2)
+//
+// Principle: UserAccount ≠ TrustIdentity ≠ NIN ≠ Phone (directive §29).
+// Raw identity numbers (NIN, BVN, raw phone) are NEVER stored here.
+// Stage 3 added the Trust Identity management layer: hashed identifiers,
+// consent-scoped attributes, evidence records with provenance + freshness.
+// Stage 4 adds phone (OTP) + biometric (liveness) verification sessions —
+// contract-first MOCK providers; raw phone numbers are stored ONLY as
+// peppered sha256 fingerprints with masked display hints.
+// Stage 7 adds the reputation layer: flags with evidence, human-reviewed
+// resolutions, appeals — anti-gaming by design (L2 reporter gate, one
+// open flag per pair, 3-per-7-day quota, mandatory evidence).
+// Stage 10 adds the Trust Network: opt-in membership (NETWORK consent
+// scope), mutual verified-interaction edges (TrustGraph — they feed the
+// SAME Verified Reputation score component as consented checks, never a
+// new hidden number), k-anonymized shared signals (FraudNet-class, band
+// level only), and a pan-African country-provider registry (honest
+// MOCK_LIVE / PLANNED labels).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Stage 1 — Accounts (authentication subjects)
+// ---------------------------------------------------------------------------
+
+model UserAccount {
+  id              String   @id @default(cuid())
+  email           String   @unique
+  passwordHash    String // scrypt output (never plaintext, never reversible)
+  passwordSalt    String // per-user random salt
+  displayName     String
+  handle          String   @unique // reserved for future trustscore.ng/@handle Trust Link (Stage 5)
+  status          String   @default("ACTIVE") // ACTIVE | SUSPENDED | PENDING_DELETION
+  role            String   @default("USER") // USER | REVIEWER — reviewer role grants human-review queue access (operational grant, never self-service)
+  acceptedTermsAt DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  sessions             Session[]
+  notifications        Notification[]
+  trustIdentity        TrustIdentity?
+  verificationSessions VerificationSession[]
+  consents             Consent[]
+  evidence             Evidence[]
+  phoneVerifications   PhoneVerification[]
+  livenessSessions     LivenessSession[]
+  scoreSnapshots      TrustScoreSnapshot[]
+  credentials          Credential[]
+  shareTokens          ShareToken[]
+  trustReceipts        TrustReceipt[]
+  dsrRequests          DsrRequest[]
+  safetyChecksMade     SafetyCheck[]     @relation("SafetyChecksMade")
+  safetyChecksReceived SafetyCheck[]     @relation("SafetyChecksReceived")
+  trustRequestsSent    TrustRequest[]    @relation("TrustRequestsSent")
+  trustRequestsReceived TrustRequest[]   @relation("TrustRequestsReceived")
+  flagsFiled          Flag[]            @relation("FlagsFiled")
+  flagsReceived       Flag[]            @relation("FlagsReceived")
+  flagResolutions     FlagResolution[]  @relation("FlagResolutions")
+  flagAppeals         FlagAppeal[]      @relation("FlagAppeals")
+  // Stage 9 — B2B developer portal
+  apiClientsOwned     ApiClient[]       @relation("ApiClientsOwned")
+  apiTeams            ApiTeamMember[]   @relation("ApiTeams")
+  // Stage 10 — Trust Network
+  networkMembership   NetworkMembership?
+  edgesA              TrustEdge[]       @relation("EdgesA")
+  edgesB              TrustEdge[]       @relation("EdgesB")
+  sharedSignals       SharedSignal[]
+
+  @@index([email])
+  @@index([status])
+}
+
+// ---------------------------------------------------------------------------
+// Stage 2 — NINAuth identity spine (contract-first, MOCK provider)
+// Raw NIN / raw identifiers are NEVER stored. The provider returns only a
+// masked subject reference (providerIdentityRef) + verification outcome.
+// ---------------------------------------------------------------------------
+
+model TrustIdentity {
+  id                    String    @id @default(cuid())
+  userId                String    @unique
+  status                String    @default("PENDING") // PENDING | VERIFIED | EXPIRED | REVOKED
+  assuranceLevel        Int       @default(0) // 0 = none; 1 = government-verified via NINAuth; L2 phone/L3 biometric arrive Stage 4; L4 cross-signal
+  provider              String    @default("NINAUTH_MOCK")
+  providerMode          String    @default("MOCK") // MOCK until partner sandbox creds exist (audit §2.2)
+  providerIdentityRef   String? // masked subject from provider — never a raw NIN
+  establishingConsentId String? // the consent that established this identity (withdrawal semantics, Stage 3)
+  verifiedAt            DateTime?
+  expiresAt             DateTime? // verification freshness horizon (90 days)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  user        UserAccount          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  identifiers IdentityIdentifier[]
+  attributes  IdentityAttribute[]
+  evidence    Evidence[]
+
+  @@index([status])
+}
+
+// ---------------------------------------------------------------------------
+// Stage 3 — Identity identifiers (HASHED — directive §29 identity_identifiers)
+// We store only peppered sha256 fingerprints for future match lookops
+// (Stage 6 Safety Check) — never raw NIN/phone values.
+// ---------------------------------------------------------------------------
+
+model IdentityIdentifier {
+  id              String    @id @default(cuid())
+  trustIdentityId String
+  type            String // NIN_FINGERPRINT | PHONE | EMAIL — signal family
+  hash            String // sha256(pepper + provider subject / normalized value) — NEVER raw
+  hint            String // masked display hint, e.g. "Government ID · NINAuth ref"
+  status          String    @default("ACTIVE") // ACTIVE | REVOKED | SUPERSEDED
+  verifiedAt      DateTime
+  expiresAt       DateTime? // identifier freshness horizon
+  consentId       String? // provenance
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  trustIdentity TrustIdentity @relation(fields: [trustIdentityId], references: [id], onDelete: Cascade)
+
+  @@unique([trustIdentityId, type])
+  @@index([hash])
+}
+
+// ---------------------------------------------------------------------------
+// Stage 3 — Identity attributes (CONSENT-SCOPED — directive §29/§31)
+// An attribute exists only while the consent that produced it stands.
+// Withdrawing the consent revokes the attribute (NDPA data-subject right).
+// ---------------------------------------------------------------------------
+
+model IdentityAttribute {
+  id              String    @id @default(cuid())
+  trustIdentityId String
+  key             String // given_name | family_name | birth_year | state_of_origin | ...
+  value           String // consent-scoped display value
+  scope           String // the consent scope that produced this attribute
+  consentId       String // provenance — withdraw the consent, revoke the attribute
+  status          String    @default("ACTIVE") // ACTIVE | REVOKED
+  source          String // provider that asserted the value
+  assertedAt      DateTime // when the provider asserted it
+  expiresAt       DateTime? // attribute freshness (follows identity horizon)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  trustIdentity TrustIdentity @relation(fields: [trustIdentityId], references: [id], onDelete: Cascade)
+
+  @@unique([trustIdentityId, key])
+  @@index([status])
+}
+
+// ---------------------------------------------------------------------------
+// Stage 3 — Evidence records (provenance + freshness — directive §29 evidence)
+// Verified evidence with chain: which session produced it, under which consent,
+// from which provider, with what confidence, valid until when.
+// ---------------------------------------------------------------------------
+
+model Evidence {
+  id              String    @id @default(cuid())
+  userId          String
+  trustIdentityId String?
+  sessionId       String? // verification session provenance
+  consentId       String? // consent provenance
+  type            String // NINAUTH_ID_TOKEN | PHONE_OTP | LIVENESS (Stage 4) | ...
+  provider        String
+  providerMode    String
+  summary         String // redacted human summary — no PII (directive §38)
+  confidence      Int       @default(100) // 0–100 provider confidence
+  status          String    @default("ACTIVE") // ACTIVE | REVOKED
+  collectedAt     DateTime
+  expiresAt       DateTime? // evidence freshness
+  createdAt       DateTime  @default(now())
+
+  user          UserAccount    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trustIdentity TrustIdentity? @relation(fields: [trustIdentityId], references: [id], onDelete: SetNull)
+
+  @@index([userId, collectedAt])
+  @@index([trustIdentityId])
+  @@index([status])
+}
+
+model VerificationSession {
+  id                    String    @id @default(cuid())
+  userId                String
+  provider              String    @default("NINAUTH_MOCK")
+  providerMode          String    @default("MOCK")
+  flow                  String    @default("QR") // QR | SHARE_CODE
+  status                String    @default("AWAITING_CONSENT") // AWAITING_CONSENT | CONSENT_GRANTED | CONSENT_DENIED | COMPLETED | FAILED | EXPIRED
+  state                 String    @unique // OAuth state / anti-CSRF (also used as nonce)
+  codeVerifier          String // PKCE verifier — SERVER-SIDE ONLY, never sent to any client
+  codeChallenge         String // S256(verifier)
+  authorizationCodeHash String? // one-time code issued by the provider (mock NINAuth app)
+  authorizationCodeExp  DateTime?
+  scopes                String // JSON array requested/granted
+  purpose               String
+  policyVersion         String
+  shareCode             String    @unique // NINAuth-style share code for the user to present
+  authorizationUrl      String // provider authorize URL (mock endpoint shape in sandbox)
+  errorReason           String?
+  consentId             String?
+  expiresAt             DateTime // session TTL (10 min, like an authorize flow)
+  completedAt           DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  events VerificationEvent[]
+  user   UserAccount         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+}
+
+model VerificationEvent {
+  id        String   @id @default(cuid())
+  sessionId String
+  eventType String // SESSION_CREATED | CONSENT_SCREEN_PRESENTED | CONSENT_GRANTED | CONSENT_DENIED | CODE_ISSUED | CODE_EXCHANGED | TOKEN_VALIDATED | IDENTITY_VERIFIED | SESSION_FAILED | SESSION_EXPIRED
+  detail    String? // redacted JSON — no PII (directive §38)
+  createdAt DateTime @default(now())
+
+  session VerificationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, createdAt])
+}
+
+// Consent record per directive §31: who requested, why, what scopes were
+// requested/granted, when, which provider, policy version.
+model Consent {
+  id            String    @id @default(cuid())
+  userId        String
+  sessionId     String?   @unique
+  requester     String // who requested the identity access
+  purpose       String
+  scopes        String // JSON array granted
+  policyVersion String
+  grantedAt     DateTime  @default(now())
+  withdrawnAt   DateTime?
+  createdAt     DateTime  @default(now())
+
+  user UserAccount @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// ---------------------------------------------------------------------------
+// Stage 4 — Phone verification (OTP, contract-first MOCK SMS transport).
+// The raw phone number NEVER lands in this table: only a peppered sha256
+// fingerprint (matching Stage 3 identifier discipline) + a masked display
+// hint. The OTP itself is stored hashed; attempts are capped server-side.
+// ---------------------------------------------------------------------------
+
+model PhoneVerification {
+  id          String    @id @default(cuid())
+  userId      String
+  phoneHash   String // sha256(pepper + E.164) — NEVER raw phone
+  phoneHint   String // masked display hint, e.g. "+234 8•• ••• ••34"
+  status      String    @default("PENDING") // PENDING | VERIFIED | FAILED | EXPIRED
+  otpHash     String // sha256(pepper + code) — never plaintext
+  attempts    Int       @default(0) // wrong-OTP attempts (max 3, reset on resend)
+  resends     Int       @default(0) // resend count (max 3)
+  simSwapRisk String    @default("LOW") // LOW | MEDIUM | HIGH — mock network signal
+  consentId   String // the consent that authorized this verification
+  expiresAt   DateTime // OTP TTL (5 minutes)
+  verifiedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user UserAccount @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([status])
+}
+
+// ---------------------------------------------------------------------------
+// Stage 4 — Biometric liveness (selfie/liveness, Smile-ID-class MOCK adapter).
+// The provider returns a verdict contract: liveness score, face-match against
+// the government-anchored reference, consistency flag. No selfie pixels or
+// biometric templates are ever stored — only the redacted verdict + a
+// fingerprint of the subject linkage.
+// ---------------------------------------------------------------------------
+
+model LivenessSession {
+  id              String    @id @default(cuid())
+  userId          String
+  trustIdentityId String?
+  jobId           String    @unique // provider job reference (mock)
+  status          String    @default("PENDING") // PENDING | PASSED | FAILED | EXPIRED
+  result          String? // JSON verdict: passed, livenessScore, faceMatchScore, consistent, reason (redacted)
+  confidence      Int? // provider confidence 0–100
+  consentId       String // the consent that authorized this check
+  expiresAt       DateTime // capture-window TTL (10 minutes)
+  completedAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  user UserAccount @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([status])
+}
+
+// ---------------------------------------------------------------------------
+// Stage 8 — Trust Engine: rules-first, versioned, configurable scoring
+// policy (audit §4.2). Every snapshot names the policy that produced it;
+// policy changes are append-only (new version row) so old snapshots stay
+// explainable forever. A DPIA record must cover the ACTIVE policy before
+// automated significant decisions are allowed to ship (NDPC guidance gate).
+// ---------------------------------------------------------------------------
+
+model ScoringPolicy {
+  id            String   @id @default(cuid())
+  version       Int      @unique // 1, 2, 3 … append-only
+  status        String   @default("DRAFT") // DRAFT | ACTIVE | RETIRED
+  // Rules (all clamped at write time by the service — the engine never trusts
+  // un-validated config): component budgets, thresholds, windows, penalties.
+  rules         String // JSON: { assuranceBase, credentials, reputation, resolution, riskPenalty, statusThresholds, freshnessTtlHours … }
+  changeSummary String // human-readable — what changed vs the prior version
+  createdBy     String // admin handle/id (operational grant — never self-service)
+  activatedAt   DateTime?
+  createdAt     DateTime @default(now())
+
+  @@index([status])
+}
+
+// Platform-level key/value settings (DPIA gate, future engine switches).
+// Values are JSON strings; keys are engine-owned constants.
+model PlatformSetting {
+  key       String   @id
+  value     String // JSON value
+  updatedAt DateTime @updatedAt
+}
+
+// DPIA record — one per completed assessment. The ACTIVE scoring policy's
+// DPIA must be `COMPLETED` (and not superseded) for the automated-decision
+// gate to open. This is the NDPC-governance gate the audit demands.
+model DpiaRecord {
+  id            String   @id @default(cuid())
+  policyId      String // the ScoringPolicy this assessment covers
+  status        String   @default("IN_PROGRESS") // IN_PROGRESS | COMPLETED
+  summary       String // scope, risks, mitigations — human-readable registry entry
+  residualRisk  String   @default("MEDIUM") // LOW | MEDIUM | HIGH (post-mitigation)
+  checklist     String // JSON: [{id, label, done}] — governance evidence
+  completedAt   DateTime?
+  createdBy     String
+  createdAt     DateTime @default(now())
+
+  @@index([policyId])
+}
+
+// ---------------------------------------------------------------------------
+// Stage 5 — TrustScore snapshots (directive §35/§36 score contract).
+// Formula: Identity Assurance + Verified Reputation + Verified Credentials +
+// Resolution History − Confirmed Risk. Output: score, confidence, risk band,
+// human-readable explanation (NDPA §37 automated-decision transparency) and
+// freshness. Snapshots are immutable; a new row is written on material change
+// or TTL expiry (24h), and only the last 20 per user are retained.
+// Stage 8 adds the lifecycle: state (ACTIVE/STALE/FROZEN/RETIRED) + the
+// policy that produced the snapshot (every score stays explainable) +
+// freeze fields (appeal filed → frozen, appeal decided → recomputed).
+// ---------------------------------------------------------------------------
+
+model TrustScoreSnapshot {
+  id          String   @id @default(cuid())
+  userId      String
+  version     Int      @default(1)
+  status      String // NEW | VERIFIED | ESTABLISHED | CAUTION | HIGH_RISK | REVIEW_REQUIRED
+  score       Int // 0–100
+  confidence  Int // 0–100
+  riskBand    String // LOW | MEDIUM | HIGH
+  components  String // JSON: per-component {value, max, note}
+  explanation String // JSON array of human-readable lines (NDPA §37)
+  inputsHash  String // canonical hash of score inputs (change detection)
+  trigger     String // INITIAL | MATERIAL_CHANGE | PERIODIC
+  computedAt  DateTime @default(now())
+  expiresAt   DateTime // snapshot freshness horizon (24h)
+  state       String   @default("ACTIVE") // Stage 8: ACTIVE | STALE | FROZEN | RETIRED
+  policyId    String? // Stage 8: the ScoringPolicy version that produced this
+  frozenAt    DateTime?
+  frozenReason String? // e.g. APPEAL_PENDING
+
+  user UserAccount @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, computedAt])
+}
+
+// ---------------------------------------------------------------------------
+// Stage 5 — Credentials (directive §6, wallet alignment).
+// Platform-issued, evidence-backed assertions ("government identity verified",
+// "phone verified", "liveness passed"). Claims are MASKED ONLY (hints/counts)
+// — never attribute values, never raw identifiers. Credential never outlives
+// its source evidence; user may revoke it manually at any time.
+// ---------------------------------------------------------------------------
+
+model Credential {
+  id              String    @id @default(cuid())
+  userId          String
+  trustIdentityId String?
+  type            String // GOV_ID_VERIFIED | PHONE_VERIFIED | LIVENESS_VERIFIED
+  issuer          String // "TrustScore Platform" (issuer of record)
+  issuerMode      String    @default("MOCK") // honesty: underlying providers are MOCK
+  claims          String // JSON, masked only (hints/counts)
+  status          String    @default("ACTIVE") // ACTIVE | REVOKED | EXPIRED
+  evidenceId      String? // provenance
+  manualRevoked   Boolean   @default(false) // user-initiated revocation sticks
+  issuedAt        DateTime  @default(now())
+  expiresAt       DateTime?
+  revokedAt       DateTime?
+
+  user UserAccount @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, type])
+  @@index([status])
+}
+
+// ---------------------------------------------------------------------------
+// Stage 5 — Share tokens / Trust Link (directive §5 Trust Passport).
+// The RAW token exists only transiently in the owner's UI (shown once at
+// creation). At rest we keep sha256(raw) — lookup key for public views.
+// Views are counted, bounded, expiring and revocable; every public view
+// writes a TrustReceipt (who-checked-you log) for the owner.
+// ---------------------------------------------------------------------------
+
+model ShareToken {
+  id           String    @id @default(cuid())
+  userId       String
+  tokenHash    String    @unique // sha256(raw token) — never the raw token
+  scopes       String // JSON array: PROFILE | SIGNALS | ATTRIBUTES | SCORE
+  maxViews     Int       @default(5)
+  views        Int       @default(0)
+  status       String    @default("ACTIVE") // ACTIVE | REVOKED | EXPIRED
+  expiresAt    DateTime
+  revokedAt    DateTime?
+  lastViewedAt DateTime?
+  createdAt    DateTime  @default(now())
+
+  user UserAccount @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+}
+
+model TrustReceipt {
+  id           String   @id @default(cuid())
+  userId       String
+  shareTokenId String?
+  viewerLabel  String // e.g. "Trust link viewer" — no PII collected
+  channel      String   @default("TRUST_LINK")
+  cardShown    String // JSON: status/level/score shown at view time
+  ipHash       String? // salted hash — abuse dedupe only, never displayed raw
+  viewedAt     DateTime @default(now())
+
+  user UserAccount @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, viewedAt])
+}
+
+// ---------------------------------------------------------------------------
+// Stage 5 — DSR requests (NDPA §36 data-subject rights, self-service).
+// EXPORT: full data payload (hashes included — they ARE the stored data),
+// downloadable for 7 days, then purged. DELETE: identity + account erased
+// with cascade; only a redacted audit tombstone survives (legal basis).
+// ---------------------------------------------------------------------------
+
+model DsrRequest {
+  id          String    @id @default(cuid())
+  userId      String
+  type        String // EXPORT | DELETE
+  status      String    @default("PENDING") // PENDING | COMPLETED | REJECTED
+  detail      String? // redacted summary
+  payload     String? // EXPORT only: JSON payload (7-day retention)
+  requestedAt DateTime  @default(now())
+  completedAt DateTime?
+  expiresAt   DateTime? // export availability window
+
+  user UserAccount @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, requestedAt])
+}
+
+// ---------------------------------------------------------------------------
+// Stage 6 — Safety Check (directive §2/§46 "Check Before You Deal").
+// A signed-in VERIFIER runs a sanitized assessment on a subject via:
+//   HANDLE        — the subject's @handle (requires their standing safety
+//                   consent; anti-enumeration: "no such handle" and "checks
+//                   disabled" are byte-identical responses)
+//   PHONE         — consent-gated peppered-hash match against the subject's
+//                   PHONE identifier (the raw phone is hashed and discarded;
+//                   it is NEVER stored, logged or echoed)
+//   TRUST_LINK/QR — an active Stage 5 share token / QR Trust Card payload
+//                   (token scopes govern; the view is counted and receipted
+//                   with the verifier's NAME — a named check)
+// Every completed check writes a SafetyCheck row (the snapshot the verifier
+// saw), a receipt + notification for the subject, and an audit event.
+// The assessment NEVER says "this person is safe" (directive §50).
+// ---------------------------------------------------------------------------
+
+model SafetyCheck {
+  id           String    @id @default(cuid())
+  verifierId   String
+  subjectId    String
+  method       String // HANDLE | PHONE | TRUST_LINK | QR
+  assessment   String // JSON snapshot of exactly what the verifier saw (sanitized, no raw identifiers)
+  consentId    String? // standing SAFETY_CHECK consent that authorized a HANDLE/PHONE check
+  shareTokenId String? // governing token for TRUST_LINK/QR checks
+  ipHash       String? // salted — abuse dedupe only
+  createdAt    DateTime  @default(now())
+
+  verifier UserAccount @relation("SafetyChecksMade", fields: [verifierId], references: [id], onDelete: Cascade)
+  subject  UserAccount @relation("SafetyChecksReceived", fields: [subjectId], references: [id], onDelete: Cascade)
+
+  @@index([verifierId, createdAt])
+  @@index([subjectId, createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Stage 6 — Trust Requests (verifier-side ask). When a handle is not
+// checkable (no standing consent), the verifier can ASK once: the subject
+// accepts (a scoped trust link is minted and the assessment runs) or
+// declines. Requests expire after 7 days; one pending request per pair.
+// ---------------------------------------------------------------------------
+
+model TrustRequest {
+  id           String    @id @default(cuid())
+  verifierId   String
+  subjectId    String
+  status       String    @default("PENDING") // PENDING | ACCEPTED | DECLINED | EXPIRED
+  message      String // short preset ask — no free-text PII surface
+  shareTokenId String? // minted on ACCEPT
+  expiresAt    DateTime
+  respondedAt  DateTime?
+  createdAt    DateTime  @default(now())
+
+  verifier UserAccount @relation("TrustRequestsSent", fields: [verifierId], references: [id], onDelete: Cascade)
+  subject  UserAccount @relation("TrustRequestsReceived", fields: [subjectId], references: [id], onDelete: Cascade)
+
+  @@index([subjectId, status])
+  @@index([verifierId, createdAt])
+}
+
+model Session {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique // sha256(token); the raw token exists only in the user's httpOnly cookie
+  expiresAt DateTime
+  userAgent String?
+  ipHash    String? // salted hash of client IP — never raw IP
+  createdAt DateTime  @default(now())
+  revokedAt DateTime?
+
+  user UserAccount @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+
+// ---------------------------------------------------------------------------
+// Stage 7 — Reputation: Flags with evidence (directive §29 flags/flag_evidence).
+// A flag is a REPORT TO THE PLATFORM about a member's conduct — never a
+// public accusation: nothing about a flag is visible to anyone except the
+// reporter, the subject and human reviewers. Anti-gaming by design
+// (enforced in reputation-service):
+//   * the reporter must hold a live L2+ Trust Identity (a verified human)
+//   * one OPEN/UNDER_REVIEW flag per reporter→subject pair (409 duplicate)
+//   * at most 3 flags per rolling 7-day window per reporter (429 window)
+//   * at least one evidence item is mandatory at submission (422 zod)
+//   * reporter identity is MASKED to the subject (retaliation shield);
+//     the full record remains available via NDPA DSR export
+// ---------------------------------------------------------------------------
+
+model Flag {
+  id                 String    @id @default(cuid())
+  reporterId         String
+  subjectId          String
+  category           String // FRAUD | IMPERSONATION | NON_PAYMENT | SCAM | HARASSMENT | OTHER
+  description        String // the reporter's claim — shown to subject + reviewer
+  status             String    @default("OPEN") // OPEN | UNDER_REVIEW | RESOLVED_CONFIRMED | RESOLVED_UNFOUNDED | RESOLVED_DISMISSED | WITHDRAWN
+  evidenceCount      Int       @default(0)
+  subjectRespondedAt DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  reporter   UserAccount     @relation("FlagsFiled", fields: [reporterId], references: [id], onDelete: Cascade)
+  subject    UserAccount     @relation("FlagsReceived", fields: [subjectId], references: [id], onDelete: Cascade)
+  evidence   FlagEvidence[]
+  resolution FlagResolution?
+  appeal     FlagAppeal?
+
+  @@index([subjectId, status])
+  @@index([reporterId, createdAt])
+}
+
+// Evidence items attached by either party. Content is their own statement or
+// reference (text/link) — user data: shown to the two parties + reviewers,
+// included in the DSR export, NEVER in audit metadata (directive §38).
+
+model FlagEvidence {
+  id            String   @id @default(cuid())
+  flagId        String
+  submittedById String
+  role          String // REPORTER | SUBJECT — which side submitted it
+  kind          String // TEXT | LINK
+  content       String
+  createdAt     DateTime @default(now())
+
+  flag Flag @relation(fields: [flagId], references: [id], onDelete: Cascade)
+
+  @@index([flagId])
+}
+
+// Human-reviewed resolution (directive §33 — no automated significant
+// decisions in Stage 7). A REVIEWER decides CONFIRMED / UNFOUNDED / DISMISSED
+// with a published rationale. CONFIRMED sets fraudSignal=true and feeds the
+// score engine's Confirmed Risk component (−25 per confirmed flag, cap −50).
+
+model FlagResolution {
+  id          String   @id @default(cuid())
+  flagId      String   @unique
+  reviewerId  String
+  outcome     String // CONFIRMED | UNFOUNDED | DISMISSED
+  rationale   String // published to subject + reporter
+  fraudSignal Boolean  @default(false) // true when outcome = CONFIRMED
+  decidedAt   DateTime @default(now())
+
+  reviewer UserAccount @relation("FlagResolutions", fields: [reviewerId], references: [id], onDelete: Cascade)
+  flag     Flag        @relation(fields: [flagId], references: [id], onDelete: Cascade)
+
+  @@index([reviewerId])
+}
+
+// Subject appeal of a CONFIRMED resolution — one per flag, 14-day window
+// from the decision. UPHELD keeps the outcome; OVERTURNED flips the flag to
+// RESOLVED_UNFOUNDED and restores the score (NDPA §37 redress path).
+
+model FlagAppeal {
+  id           String    @id @default(cuid())
+  flagId       String    @unique
+  appellantId  String // the flag subject
+  reason       String
+  status       String    @default("PENDING") // PENDING | UPHELD | OVERTURNED
+  reviewerId   String?
+  decisionNote String?
+  decidedAt    DateTime?
+  createdAt    DateTime  @default(now())
+
+  appellant UserAccount @relation("FlagAppeals", fields: [appellantId], references: [id], onDelete: Cascade)
+  flag      Flag        @relation(fields: [flagId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+}
+
+// ---------------------------------------------------------------------------
+// Stage 10 — Trust Network (audit §4.2: verified-interactions network,
+// FraudNet-class shared signals, cross-platform trust, pan-African
+// country-provider abstraction).
+//
+// Principles carried in:
+// - Membership is OPT-IN and consent-scoped (NDPA §31): joining creates a
+//   standing NETWORK consent; pausing withdraws it. Edges stop counting
+//   toward the score the moment either endpoint pauses.
+// - An edge is a MUTUAL attestation (request → accept), gated at L2+ on
+//   both sides (the same reporter gate the reputation layer uses),
+//   quota-limited (3 proposals / 7 days) and revocable by either party.
+//   Canonical ordering (aUserId < bUserId) keeps the pair unique in
+//   queries; history rows are kept for audit, only ACTIVE rows count.
+// - Shared signals are BAND-LEVEL ONLY: counts + platform attribution,
+//   never details, never raw identifiers. Real signals mint from
+//   human-confirmed flags (appeal path = the dispute path) and retract
+//   automatically when an appeal is overturned. Partner-platform rows in
+//   this sandbox are honest MOCK demo data.
+// - The country-provider registry is a read model (no verification-flow
+//   change): NG is contract-first MOCK_LIVE; the rest of the corridor is
+//   PLANNED until partners exist. No claims of live coverage.
+// ---------------------------------------------------------------------------
+
+model NetworkMembership {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  status    String   @default("ACTIVE") // ACTIVE | PAUSED (opt-out; edges stop counting)
+  consentId String? // the standing NETWORK consent backing membership
+  joinedAt  DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user UserAccount @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+}
+
+model TrustEdge {
+  id            String    @id @default(cuid())
+  // Canonical ordering: aUserId < bUserId (lexicographic) — set at write
+  // time by the service so a pair has exactly one row per lifecycle.
+  aUserId       String
+  bUserId       String
+  status        String    @default("PENDING") // PENDING | ACTIVE | DECLINED | EXPIRED | REVOKED
+  requestedById String // who proposed the attestation
+  requestedToId String // who must accept
+  requestedAt   DateTime  @default(now())
+  expiresAt     DateTime // pending requests expire after 7 days (lazy)
+  respondedAt   DateTime?
+  activatedAt   DateTime? // set on ACCEPT — the window for score input starts here
+  revokedAt     DateTime?
+  revokedById   String?
+  lastActiveAt  DateTime? // refreshed on any interaction evidence (reserved)
+
+  aUser UserAccount @relation("EdgesA", fields: [aUserId], references: [id], onDelete: Cascade)
+  bUser UserAccount @relation("EdgesB", fields: [bUserId], references: [id], onDelete: Cascade)
+
+  @@index([aUserId, status])
+  @@index([bUserId, status])
+  @@index([requestedById, requestedAt])
+}
+
+model SharedSignal {
+  id           String    @id @default(cuid())
+  subjectUserId String
+  kind         String // CONFIRMED_ADVERSE (from human-confirmed flags)
+  platform     String // "TrustScore (sandbox)" | partner label
+  platformMode String    @default("MOCK") // MOCK | LIVE — honesty on every row
+  severity     String    @default("MEDIUM") // LOW | MEDIUM | HIGH
+  windowDays   Int       @default(90)
+  note         String // subject-visible provenance (no third-party PII)
+  sourceType   String // PLATFORM_RESOLUTION | MOCK_PARTNER | DEMO_SEED
+  sourceId     String? // flag id for PLATFORM_RESOLUTION
+  createdAt    DateTime  @default(now())
+  expiresAt    DateTime
+  retractedAt  DateTime? // appeal overturned → signal withdrawn
+
+  user UserAccount @relation(fields: [subjectUserId], references: [id], onDelete: Cascade)
+
+  @@index([subjectUserId])
+  @@index([sourceType, sourceId])
+}
+
+model CountryProvider {
+  code           String @id // ISO 3166-1 alpha-2, e.g. "NG"
+  name           String
+  idTypeName     String // e.g. "National Identification Number (NINAuth)"
+  govDepth       Int    @default(0) // 0..3 — government-identity depth
+  phoneDepth     Int    @default(0) // 0..3 — phone/OTP signal depth
+  livenessDepth  Int    @default(0) // 0..3 — biometric/liveness depth
+  mode           String @default("PLANNED") // MOCK_LIVE | PLANNED — honest registry
+  note           String
+  sortOrder      Int    @default(0)
+}
+
+// ---------------------------------------------------------------------------
+// Stage 1 — Audit + notification plumbing (Security Center arrives Stage 5)
+// ---------------------------------------------------------------------------
+
+model AuditEvent {
+  id          String   @id @default(cuid())
+  actorType   String // USER | SYSTEM | ANONYMOUS
+  actorId     String?
+  action      String // AUTH_REGISTER | AUTH_LOGIN | AUTH_LOGIN_FAILED | AUTH_LOGOUT | ...
+  subjectType String?
+  subjectId   String?
+  requestId   String?
+  metadata    String? // JSON, redacted — no PII, no raw identifiers (directive §38)
+  createdAt   DateTime @default(now())
+
+  @@index([action])
+  @@index([actorId])
+  @@index([createdAt])
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  type      String // SECURITY | VERIFICATION | SYSTEM
+  title     String
+  body      String
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user UserAccount @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt])
+}
+
+// ---------------------------------------------------------------------------
+// Stage 9 — B2B Platform (audit §4.2: developer portal, API keys, webhooks,
+// usage, team/RBAC, Trust Decision API POST /v1/trust/check).
+//
+// A member registers "API clients" (business apps). Each client has a
+// SANDBOX or LIVE environment (LIVE is an HONEST label — underlying identity
+// providers stay contract-first MOCK until partner credentials exist), a
+// mock-billing plan with REAL daily check quotas, API keys (raw key exists
+// only in the minting response; sha256 at rest — session-token discipline),
+// an optional webhook endpoint (HMAC-SHA256-signed deliveries, bounded
+// retries) and a team (OWNER / DEVELOPER / VIEWER — enforced server-side).
+//
+// Compliance carried over: the Trust Decision API is a CONSENT-GATED
+// assessment surface — subjects control API checks through the SAME standing
+// SAFETY_CHECK consent as member checks, every completed check is receipted
+// to the subject with the business's name, and responses are band-level
+// with the locked language (never "this person is safe" — directive §50).
+// ---------------------------------------------------------------------------
+
+model ApiClient {
+  id            String    @id @default(cuid())
+  ownerId       String
+  name          String // the business's public label (shown in subject receipts)
+  environment   String    @default("SANDBOX") // SANDBOX | LIVE (LIVE = typed-confirmation honesty label)
+  status        String    @default("ACTIVE") // ACTIVE | SUSPENDED
+  plan          String    @default("FREE") // FREE | STARTER — mock billing (no processor connected)
+  webhookUrl    String? // https://… (SANDBOX also allows http://localhost for self-tests)
+  webhookSecret String? // HMAC shared secret (whsec_…) — must stay readable to SIGN deliveries (industry-standard shared secret); shown once, rotatable. Not PII.
+  liveEnabledAt DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  owner      UserAccount       @relation("ApiClientsOwned", fields: [ownerId], references: [id], onDelete: Cascade)
+  team       ApiTeamMember[]
+  keys       ApiKey[]
+  decisions  TrustDecision[]
+  usageDays  ApiUsageDay[]
+  deliveries WebhookDelivery[]
+
+  @@index([ownerId])
+  @@index([status])
+}
+
+// API key — the raw key (tsk_<env>_<hex>) is returned EXACTLY ONCE at mint
+// time; at rest only sha256(raw) + a short identification prefix.
+model ApiKey {
+  id            String    @id @default(cuid())
+  clientId      String
+  name          String // developer-chosen label
+  keyPrefix     String // first ~14 chars of the raw key — identification only
+  keyHash       String    @unique // sha256(raw) — never the raw key
+  scope         String    @default("TRUST_CHECK") // TRUST_CHECK (single scope in v1)
+  status        String    @default("ACTIVE") // ACTIVE | REVOKED
+  totalRequests Int       @default(0)
+  lastUsedAt    DateTime?
+  expiresAt     DateTime? // mint + 365d (informational)
+  revokedAt     DateTime?
+  createdAt     DateTime  @default(now())
+
+  client ApiClient       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  usage  ApiUsageEvent[]
+  decisions TrustDecision[]
+
+  @@index([clientId, status])
+}
+
+// Team membership per client — RBAC enforced server-side on every portal
+// route. OWNER (creator) manages team + LIVE; DEVELOPER manages keys +
+// webhook; VIEWER is read-only. Membership is also the visibility grant:
+// a client appears in a member's portal ONLY through this table.
+model ApiTeamMember {
+  id        String   @id @default(cuid())
+  clientId  String
+  userId    String
+  role      String // OWNER | DEVELOPER | VIEWER
+  addedById String
+  createdAt DateTime @default(now())
+
+  client ApiClient  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  user   UserAccount @relation("ApiTeams", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([clientId, userId])
+}
+
+// One row per Trust Decision API call. Records exactly what the business
+// was shown (the assessment snapshot) with masked input hints — never raw
+// phone digits; a handle echo is the business's own request data. Anti-
+// enumeration is preserved in the RESPONSE (identical UNAVAILABLE shape);
+// this row is the business's own audit trail.
+model TrustDecision {
+  id           String   @id @default(cuid())
+  clientId     String
+  keyId        String
+  subjectId    String? // null when there is no consented match (probe record only)
+  method       String // HANDLE | PHONE | TRUST_LINK | QR
+  inputHint    String // masked: "@handle" | "verified phone (hashed)" | "trust link"
+  outcome      String // OK | UNAVAILABLE | DEAD_LINK
+  assessment   String? // JSON — exactly what was returned (band-level, no score number)
+  consentId    String? // standing SAFETY_CHECK consent that authorized a HANDLE/PHONE check
+  shareTokenId String? // governing token for TRUST_LINK/QR checks
+  requestId    String
+  createdAt    DateTime @default(now())
+
+  client ApiClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  key    ApiKey    @relation(fields: [keyId], references: [id], onDelete: Cascade)
+
+  @@index([clientId, createdAt])
+}
+
+// Daily usage rollup per key (90-day retention) — feeds quota enforcement
+// and the portal usage charts. Counts are non-PII.
+model ApiUsageDay {
+  id        String   @id @default(cuid())
+  keyId     String
+  clientId  String
+  day       String // "YYYY-MM-DD" (server date)
+  checks    Int      @default(0)
+  errors    Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  client ApiClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([keyId, day])
+}
+
+// Per-request usage events — bounded (last 100 per key, pruned on write).
+model ApiUsageEvent {
+  id         String   @id @default(cuid())
+  keyId      String
+  route      String
+  statusCode Int
+  outcome    String // OK | UNAVAILABLE | DEAD_LINK | REJECTED
+  latencyMs  Int
+  createdAt  DateTime @default(now())
+
+  key ApiKey @relation(fields: [keyId], references: [id], onDelete: Cascade)
+
+  @@index([keyId, createdAt])
+}
+
+// Webhook delivery — the exact payload + HMAC signature we sent, the
+// endpoint's response code/snippet, and the bounded retry schedule
+// (attempts at +0s, +60s, +5m, +25m, +2h; retries are processed lazily on
+// portal reads and subsequent API calls). Retention: last 50 per client.
+model WebhookDelivery {
+  id             String    @id @default(cuid())
+  clientId       String
+  event          String // TRUST_CHECK_COMPLETED | WEBHOOK_TEST
+  payload        String // JSON — exactly what was sent (band-level, masked inputs)
+  status         String    @default("PENDING") // PENDING | DELIVERED | RETRYING | EXHAUSTED
+  attempts       Int       @default(0)
+  statusCode     Int?
+  responseSnippet String? // first 200 chars of the endpoint response
+  signature      String? // last computed "t=…,v1=…" header value (verification aid)
+  durationMs     Int?
+  lastAttemptAt  DateTime?
+  nextRetryAt    DateTime?
+  deliveredAt    DateTime?
+  createdAt      DateTime  @default(now())
+
+  client ApiClient @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId, createdAt])
+  @@index([status, nextRetryAt])
+}
+
+// Stage 13 — provider credential vault. Holds the LIVE-posture credentials
+// (client secrets, signing keys) for the verification providers, encrypted
+// at rest with AES-256-GCM under a platform master key (env VAULT_MASTER_KEY).
+// The plaintext secret is NEVER returned by any API — reads surface only a
+// masked hint. One ACTIVE credential per provider; revocation is immediate.
+model ProviderCredential {
+  id          String    @id @default(cuid())
+  provider    String // ninauth | phone | liveness
+  keyId       String // partner-issued key identifier (rotatable)
+  secretCipher String // AES-256-GCM blob: v1.<iv>.<tag>.<ciphertext> (base64url parts)
+  hint        String // masked display hint — never the secret
+  status      String    @default("ACTIVE") // ACTIVE | RETIRED
+  note        String? // operator note (provenance)
+  lastUsedAt  DateTime?
+  createdBy   String // admin handle
+  createdAt   DateTime  @default(now())
+  retiredAt   DateTime?
+
+  @@index([provider, status])
+}
+
+// Stage 14 — transport observability. Periodic per-provider metrics
+// snapshots persisted by the internal tick (and on-demand by admins), so
+// transport health history survives dev restarts (the live counters stay
+// in-memory, single-instance posture — documented). Pruned per provider.
+model TransportSnapshot {
+  id        String   @id @default(cuid())
+  provider  String // ninauth | phone | liveness
+  posture   String // mock | loopback | live — posture at snapshot time
+  circuit   String // CLOSED | OPEN | HALF_OPEN — effective state
+  calls     Int // cumulative in-memory call counter at snapshot time
+  errors    Int // cumulative in-memory error counter at snapshot time
+  errorRate Int // percent, rounded
+  p50       Int? // latency ms
+  p95       Int? // latency ms
+  createdAt DateTime @default(now())
+
+  @@index([provider, createdAt])
+}
+
+// Stage 14 — circuit-breaker transition log (the audit trail for the
+// transport layer): CLOSED→OPEN (trip, with the failing code), OPEN→HALF_OPEN
+// (probe window elapsed), HALF_OPEN→OPEN (re-trip), →CLOSED (recovered /
+// reset). Persisted from the in-memory transition queue on each tick.
+model CircuitEvent {
+  id        String   @id @default(cuid())
+  provider  String // ninauth | phone | liveness
+  fromState String // CLOSED | OPEN | HALF_OPEN
+  toState   String // CLOSED | OPEN | HALF_OPEN
+  reason    String // transport error code or SUCCESS | RESET
+  createdAt DateTime @default(now())
+
+  @@index([provider, createdAt])
+}

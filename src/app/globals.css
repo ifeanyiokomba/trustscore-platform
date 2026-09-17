@@ -1,0 +1,761 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --font-display: var(--font-fraunces), var(--font-geist-sans), ui-serif, Georgia, serif;
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-trust: var(--trust);
+  --color-trust-foreground: var(--trust-foreground);
+  --color-trust-soft: var(--trust-soft);
+  --color-trust-muted: var(--trust-muted);
+  --color-risk-low: var(--risk-low);
+  --color-risk-moderate: var(--risk-moderate);
+  --color-risk-elevated: var(--risk-elevated);
+  --color-risk-high: var(--risk-high);
+  --color-risk-unknown: var(--risk-unknown);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+:root {
+  --radius: 0.625rem;
+
+  /* TrustScore trust palette — emerald/teal spine (no indigo/blue).
+     Stage 15: primary darkened to emerald-700-class so every text-primary
+     surface clears WCAG AA (≥4.5:1) on white — the earlier emerald-600
+     sat at 3.8:1 for small text. */
+  --trust: oklch(0.54 0.118 165); /* emerald-700-class */
+  --trust-foreground: oklch(0.985 0 0);
+  --trust-soft: oklch(0.952 0.049 163); /* emerald-50 */
+  --trust-muted: oklch(0.696 0.085 163); /* emerald-400-ish */
+  --risk-low: oklch(0.54 0.118 165);
+  --risk-moderate: oklch(0.769 0.17 70); /* amber */
+  --risk-elevated: oklch(0.681 0.158 75); /* darker amber */
+  --risk-high: oklch(0.577 0.21 27); /* red */
+  --risk-unknown: oklch(0.556 0 0); /* neutral */
+
+  --background: oklch(0.99 0.005 163);
+  --foreground: oklch(0.19 0.02 220);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.19 0.02 220);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.19 0.02 220);
+  --primary: oklch(0.54 0.118 165);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.96 0.01 170);
+  --secondary-foreground: oklch(0.24 0.03 190);
+  --muted: oklch(0.965 0.008 170);
+  --muted-foreground: oklch(0.47 0.02 200); /* Stage 15: 5.2:1 on white */
+  --accent: oklch(0.94 0.03 163);
+  --accent-foreground: oklch(0.26 0.05 170);
+  --destructive: oklch(0.577 0.21 27);
+  --border: oklch(0.91 0.015 170);
+  --input: oklch(0.91 0.015 170);
+  --ring: oklch(0.54 0.118 165);
+  --chart-1: oklch(0.54 0.118 165);
+  --chart-2: oklch(0.696 0.085 178);
+  --chart-3: oklch(0.769 0.17 70);
+  --chart-4: oklch(0.398 0.07 227);
+  --chart-5: oklch(0.828 0.189 84);
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.19 0.02 220);
+  --sidebar-primary: oklch(0.54 0.118 165);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.94 0.03 163);
+  --sidebar-accent-foreground: oklch(0.26 0.05 170);
+  --sidebar-border: oklch(0.91 0.015 170);
+  --sidebar-ring: oklch(0.54 0.118 165);
+}
+
+.dark {
+  --trust: oklch(0.72 0.14 165); /* brighter emerald for dark */
+  --trust-foreground: oklch(0.16 0.02 165);
+  --trust-soft: oklch(0.26 0.05 165);
+  --trust-muted: oklch(0.62 0.1 168);
+  --risk-low: oklch(0.72 0.14 165);
+  --risk-moderate: oklch(0.8 0.16 75);
+  --risk-elevated: oklch(0.74 0.16 70);
+  --risk-high: oklch(0.74 0.17 25);
+  --risk-unknown: oklch(0.6 0 0);
+
+  --background: oklch(0.16 0.015 200);
+  --foreground: oklch(0.93 0.01 165);
+  --card: oklch(0.2 0.02 195);
+  --card-foreground: oklch(0.93 0.01 165);
+  --popover: oklch(0.2 0.02 195);
+  --popover-foreground: oklch(0.93 0.01 165);
+  --primary: oklch(0.72 0.14 165);
+  --primary-foreground: oklch(0.16 0.02 165);
+  --secondary: oklch(0.27 0.02 190);
+  --secondary-foreground: oklch(0.9 0.01 165);
+  --muted: oklch(0.26 0.015 195);
+  --muted-foreground: oklch(0.68 0.015 180);
+  --accent: oklch(0.28 0.04 165);
+  --accent-foreground: oklch(0.9 0.02 165);
+  --destructive: oklch(0.74 0.17 25);
+  --border: oklch(0.3 0.02 190);
+  --input: oklch(0.32 0.02 190);
+  --ring: oklch(0.72 0.14 165);
+  --chart-1: oklch(0.72 0.14 165);
+  --chart-2: oklch(0.62 0.1 178);
+  --chart-3: oklch(0.8 0.16 75);
+  --chart-4: oklch(0.55 0.09 230);
+  --chart-5: oklch(0.83 0.17 80);
+  --sidebar: oklch(0.2 0.02 195);
+  --sidebar-foreground: oklch(0.93 0.01 165);
+  --sidebar-primary: oklch(0.72 0.14 165);
+  --sidebar-primary-foreground: oklch(0.16 0.02 165);
+  --sidebar-accent: oklch(0.28 0.04 165);
+  --sidebar-accent-foreground: oklch(0.9 0.02 165);
+  --sidebar-border: oklch(0.3 0.02 190);
+  --sidebar-ring: oklch(0.72 0.14 165);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "ss01" on, "cv11" on;
+    text-rendering: optimizeLegibility;
+  }
+  /* Stage 15 — typographic rhythm: display headlines balance their line
+     breaks; body copy wraps prettily; numerals in data contexts stay tabular. */
+  h1, h2, h3 {
+    text-wrap: balance;
+  }
+  p {
+    text-wrap: pretty;
+  }
+  ::selection {
+    background: color-mix(in oklch, var(--trust) 25%, transparent);
+  }
+}
+
+/* Custom scrollbar — trust-tinted */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: color-mix(in oklch, var(--trust) 35%, var(--muted));
+  border-radius: 8px;
+  border: 2px solid var(--background);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in oklch, var(--trust) 60%, var(--muted));
+}
+
+/* Subtle trust grid background for hero — Stage 15: 4% mix keeps it a
+   texture, not a competitor with content. */
+.ts-grid-bg {
+  background-image:
+    linear-gradient(
+      to right,
+      color-mix(in oklch, var(--trust) 4%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      to bottom,
+      color-mix(in oklch, var(--trust) 4%, transparent) 1px,
+      transparent 1px
+    );
+  background-size: 44px 44px;
+  mask-image: radial-gradient(ellipse 90% 70% at 50% 0%, black 40%, transparent 100%);
+}
+
+/* ---------------------------------------------------------------------------
+   Stage 15 — Design Elevation utilities
+--------------------------------------------------------------------------- */
+
+/* Aurora — layered emerald light pools behind the hero. Pure CSS, cheap,
+   and respects the palette (emerald/teal family only). */
+.ts-aurora {
+  background:
+    radial-gradient(52% 42% at 18% 8%, color-mix(in oklch, var(--trust) 16%, transparent) 0%, transparent 68%),
+    radial-gradient(46% 40% at 88% 22%, oklch(0.696 0.085 178 / 0.14) 0%, transparent 66%),
+    radial-gradient(38% 34% at 62% 96%, oklch(0.769 0.17 70 / 0.08) 0%, transparent 64%);
+}
+
+/* Aurora drift — an almost-imperceptible breathing motion for the pools. */
+@keyframes ts-aurora-drift {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(-2.5%, 1.5%, 0) scale(1.06); }
+}
+.ts-aurora-drift {
+  animation: ts-aurora-drift 18s ease-in-out infinite;
+  will-change: transform;
+}
+
+/* Film-grain noise — kills banding on large soft gradients, adds tactility.
+   SVG turbulence data-URI at ~3% opacity. */
+.ts-noise {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+  opacity: 0.035;
+  mix-blend-mode: overlay;
+}
+
+/* Nav links — the underline draws in from the left on hover/focus. */
+.ts-nav-link {
+  position: relative;
+}
+.ts-nav-link::after {
+  content: "";
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 4px;
+  height: 2px;
+  border-radius: 999px;
+  background: color-mix(in oklch, var(--trust) 70%, transparent);
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.ts-nav-link:hover::after,
+.ts-nav-link:focus-visible::after {
+  transform: scaleX(1);
+}
+
+/* CTA sheen — a light band that sweeps across primary buttons on hover. */
+.ts-sheen {
+  position: relative;
+  overflow: hidden;
+}
+.ts-sheen::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    105deg,
+    transparent 38%,
+    oklch(1 0 0 / 0.22) 50%,
+    transparent 62%
+  );
+  transform: translateX(-120%);
+  transition: transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+  pointer-events: none;
+}
+.ts-sheen:hover::before {
+  transform: translateX(120%);
+}
+
+/* Icon tile gradient — the raised glass square behind feature icons. */
+.ts-icon-tile {
+  background:
+    radial-gradient(120% 120% at 30% 20%, color-mix(in oklch, var(--trust) 22%, transparent) 0%, transparent 60%),
+    color-mix(in oklch, var(--trust) 8%, transparent);
+  box-shadow:
+    inset 0 1px 0 oklch(1 0 0 / 0.28),
+    0 6px 16px -10px color-mix(in oklch, var(--trust) 55%, transparent);
+}
+.dark .ts-icon-tile {
+  box-shadow:
+    inset 0 1px 0 oklch(1 0 0 / 0.09),
+    0 6px 16px -10px color-mix(in oklch, var(--trust) 45%, transparent);
+}
+
+/* Timeline rail — how-it-works connector, drawn on scroll (scaleY origin
+   top via framer-motion; the CSS provides the gradient rail). */
+.ts-rail {
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklch, var(--trust) 55%, transparent),
+    color-mix(in oklch, var(--trust) 12%, transparent)
+  );
+}
+
+/* Glass card — frosted panel for hero artifacts. */
+.ts-glass {
+  background: color-mix(in oklch, var(--card) 78%, transparent);
+  backdrop-filter: blur(14px) saturate(1.4);
+  -webkit-backdrop-filter: blur(14px) saturate(1.4);
+}
+
+/* Display font opt-in (Tailwind v4 theme token: font-display). Applied to
+   headlines via the `font-display` utility class. */
+
+/* Reduced motion — Stage 15 additions */
+@media (prefers-reduced-motion: reduce) {
+  .ts-aurora-drift {
+    animation: none;
+  }
+  .ts-nav-link::after,
+  .ts-sheen::before {
+    transition: none;
+  }
+}
+
+/* Trust glow for hero accents */
+.ts-glow {
+  box-shadow: 0 0 80px -20px color-mix(in oklch, var(--trust) 55%, transparent);
+}
+
+/* Passport card shimmer */
+@keyframes ts-shimmer {
+  0% {
+    background-position: -400px 0;
+  }
+  100% {
+    background-position: 400px 0;
+  }
+}
+.ts-shimmer {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in oklch, var(--trust) 12%, transparent) 50%,
+    transparent 100%
+  );
+  background-size: 800px 100%;
+  animation: ts-shimmer 3.5s infinite linear;
+}
+
+/* Pulse ring for "live" status dots */
+@keyframes ts-pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in oklch, var(--trust) 45%, transparent);
+  }
+  70% {
+    box-shadow: 0 0 0 8px transparent;
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+.ts-pulse {
+  animation: ts-pulse-ring 2.4s infinite;
+}
+
+/* Card hover lift — interactive dashboard cards */
+.ts-card-hover {
+  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+}
+.ts-card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 32px -16px color-mix(in oklch, var(--trust) 40%, transparent);
+  border-color: color-mix(in oklch, var(--trust) 35%, var(--border));
+}
+
+/* Gradient text — assurance level numerals, scores */
+.ts-grad-text {
+  background: linear-gradient(
+    135deg,
+    var(--trust) 0%,
+    oklch(0.696 0.085 178) 60%,
+    oklch(0.769 0.17 70) 130%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Assurance ladder — achieved rung gradient rail */
+.ts-rung-active {
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklch, var(--trust) 16%, transparent),
+    color-mix(in oklch, var(--trust) 4%, transparent)
+  );
+  border-color: color-mix(in oklch, var(--trust) 40%, var(--border));
+}
+
+/* Confidence meter fill */
+.ts-conf-fill {
+  background: linear-gradient(
+    90deg,
+    oklch(0.696 0.085 178),
+    var(--trust)
+  );
+}
+
+/* Subtle inset panel for hashed identifiers / fingerprints */
+.ts-inset {
+  background: color-mix(in oklch, var(--muted) 55%, transparent);
+  box-shadow: inset 0 1px 2px color-mix(in oklch, var(--foreground) 6%, transparent);
+}
+
+/* ---------------------------------------------------------------------------
+   Stage 4 — signal utilities
+--------------------------------------------------------------------------- */
+
+/* Liveness scan sweep — the moving line inside the simulated camera frame */
+@keyframes ts-scan-sweep {
+  0% {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  15% {
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+.ts-scanline {
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  height: 2px;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in oklch, var(--trust) 85%, transparent) 50%,
+    transparent 100%
+  );
+  box-shadow: 0 0 12px 2px color-mix(in oklch, var(--trust) 40%, transparent);
+  animation: ts-scan-sweep 1.6s infinite ease-in-out;
+}
+
+/* Success panels — phone verified / liveness passed / cross-signal consistent */
+.ts-signal-success {
+  background:
+    radial-gradient(
+      120% 90% at 50% 0%,
+      color-mix(in oklch, var(--trust) 14%, transparent) 0%,
+      transparent 70%
+    ),
+    color-mix(in oklch, var(--trust) 4%, transparent);
+}
+
+/* Ladder progress rail fill */
+.ts-rail-fill {
+  box-shadow: 0 0 10px color-mix(in oklch, var(--trust) 45%, transparent);
+}
+
+/* Focus-visible ring polish for signal cards' inline actions */
+.ts-card-hover button:focus-visible {
+  outline: 2px solid color-mix(in oklch, var(--trust) 65%, transparent);
+  outline-offset: 2px;
+}
+
+/* Reduced motion respect */
+@media (prefers-reduced-motion: reduce) {
+  .ts-shimmer,
+  .ts-pulse,
+  .ts-scanline {
+    animation: none;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Stage 5 — Trust Passport utilities
+--------------------------------------------------------------------------- */
+
+/* QR Trust Card — emerald gradient band (the shareable artifact) */
+.ts-trust-card {
+  background:
+    radial-gradient(120% 160% at 85% -20%, oklch(0.769 0.17 70) 0%, transparent 45%),
+    linear-gradient(135deg, oklch(0.505 0.12 160) 0%, oklch(0.596 0.128 163) 55%, oklch(0.696 0.085 178) 100%);
+  color: white;
+}
+
+/* Focus-visible polish for passport inline actions (revoke buttons etc.) */
+.ts-trust-card button:focus-visible,
+.ts-rung-active button:focus-visible {
+  outline: 2px solid color-mix(in oklch, var(--trust) 65%, transparent);
+  outline-offset: 2px;
+}
+
+/* Reduced motion — Stage 5 additions */
+@media (prefers-reduced-motion: reduce) {
+  .ts-trust-card .ts-shimmer {
+    animation: none;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Stage 6 — Safety Check utilities
+--------------------------------------------------------------------------- */
+
+/* Assessment headline band — subtle emerald wash, like a stamped verdict */
+.ts-assessment-band {
+  background:
+    radial-gradient(110% 140% at 0% 0%, color-mix(in oklch, var(--trust) 12%, transparent) 0%, transparent 55%),
+    color-mix(in oklch, var(--trust) 4%, transparent);
+}
+
+/* Method selector triggers — active state carries the trust color */
+[data-slot="tabs-trigger"][data-state="active"][data-testid^="safety-method-"] {
+  box-shadow: inset 0 -2px 0 color-mix(in oklch, var(--trust) 55%, transparent);
+}
+
+/* Assessment reveal glow — a soft stamp around the verdict panel */
+.ts-assessment-band + div {
+  position: relative;
+}
+[data-testid="safety-assessment"] {
+  box-shadow:
+    0 1px 2px oklch(0 0 0 / 0.06),
+    0 8px 24px -12px color-mix(in oklch, var(--trust) 35%, transparent);
+}
+
+/* Small numeric stat blocks (subject-side check counters) */
+.ts-stat-block {
+  transition: transform 150ms ease, border-color 150ms ease;
+}
+.ts-stat-block:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in oklch, var(--trust) 40%, transparent);
+}
+
+/* Focus-visible polish for safety inline actions */
+[data-testid="safety-assessment"] button:focus-visible,
+[data-testid="safety-consent-state"] + * button:focus-visible {
+  outline: 2px solid color-mix(in oklch, var(--trust) 65%, transparent);
+  outline-offset: 2px;
+}
+
+/* ---------------------------------------------------------------------------
+   Stage 7 — Reputation utilities
+--------------------------------------------------------------------------- */
+
+/* Flag rows — the case-file look: a left rail tinted by case severity */
+[data-testid="flag-against-row"],
+[data-testid="my-flag-row"] {
+  position: relative;
+  overflow: hidden;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+[data-testid="flag-against-row"]::before,
+[data-testid="my-flag-row"]::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  border-radius: 999px 0 0 999px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklch, var(--trust) 70%, transparent),
+    color-mix(in oklch, var(--trust) 25%, transparent)
+  );
+}
+[data-testid="flag-against-row"]:hover,
+[data-testid="my-flag-row"]:hover {
+  border-color: color-mix(in oklch, var(--trust) 35%, transparent);
+  box-shadow: 0 6px 18px -12px color-mix(in oklch, var(--trust) 45%, transparent);
+}
+
+/* Confirmed flags carry the destructive rail instead */
+li[data-status="confirmed"]::before {
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklch, var(--destructive) 75%, transparent),
+    color-mix(in oklch, var(--destructive) 20%, transparent)
+  );
+}
+
+/* Review queue — the reviewer's desk: faint stamped header */
+[data-testid="reviewer-queue-card"] > [data-slot="card-header"] {
+  background:
+    radial-gradient(90% 120% at 100% 0%, color-mix(in oklch, var(--trust) 10%, transparent) 0%, transparent 60%),
+    transparent;
+}
+[data-testid="review-queue-row"],
+[data-testid="appeal-queue-row"] {
+  transition: border-color 150ms ease, transform 150ms ease;
+}
+[data-testid="review-queue-row"]:hover,
+[data-testid="appeal-queue-row"]:hover {
+  border-color: color-mix(in oklch, var(--trust) 40%, transparent);
+  transform: translateY(-1px);
+}
+
+/* Decision radio cards — selected outcome gets a quiet emerald ring */
+[data-testid="decision-dialog"] [data-radix-collection-item]:has([data-state="checked"]) {
+  border-color: color-mix(in oklch, var(--trust) 45%, transparent);
+  background: color-mix(in oklch, var(--trust) 6%, transparent);
+}
+
+/* Focus-visible polish for reputation inline actions */
+[data-testid="flags-against-card"] button:focus-visible,
+[data-testid="file-flag-card"] button:focus-visible,
+[data-testid="reviewer-queue-card"] button:focus-visible {
+  outline: 2px solid color-mix(in oklch, var(--trust) 65%, transparent);
+  outline-offset: 2px;
+}
+
+/* Reduced motion — Stage 7 additions (list reveals use framer-motion
+   layout; the CSS layer adds nothing animated) */
+@media (prefers-reduced-motion: reduce) {
+  [data-testid="review-queue-row"]:hover,
+  [data-testid="appeal-queue-row"]:hover {
+    transform: none;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Stage 8 — Trust Engine utilities
+   Rail segments (budget visualization), policy version chips, DPIA checklist
+   rows, admin stamps. Emerald-family tones only (no indigo/blue).
+--------------------------------------------------------------------------- */
+
+.ts-rail-identity { background: color-mix(in oklch, var(--trust) 88%, black 12%); }
+.ts-rail-credentials { background: color-mix(in oklch, var(--trust) 72%, white 10%); }
+.ts-rail-reputation { background: color-mix(in oklch, var(--trust) 52%, white 22%); }
+.ts-rail-resolution { background: color-mix(in oklch, var(--trust) 34%, white 30%); }
+
+/* Rail segment hover — the legend dot and segment share the hue */
+.ts-rail-identity, .ts-rail-credentials, .ts-rail-reputation, .ts-rail-resolution {
+  transition: filter 150ms ease;
+}
+[data-testid]:has(> .ts-rail-identity):hover .ts-rail-identity,
+[data-testid]:has(> .ts-rail-credentials):hover .ts-rail-credentials,
+[data-testid]:has(> .ts-rail-reputation):hover .ts-rail-reputation,
+[data-testid]:has(> .ts-rail-resolution):hover .ts-rail-resolution {
+  filter: brightness(1.12);
+}
+
+/* Policy version rows — ACTIVE gets a quiet left rail; DRAFT gets amber */
+[data-testid="engine-admin"] li:has(> .flex .bg-primary\/15) {
+  border-left: 3px solid color-mix(in oklch, var(--trust) 55%, transparent);
+}
+[data-testid="engine-admin"] li:has(> .flex .bg-amber-500\/10) {
+  border-left: 3px solid color-mix(in oklch, #d97706 55%, transparent);
+}
+
+/* DPIA checklist rows — done state ticks emerald */
+label:has(> [data-state="checked"]) {
+  border-color: color-mix(in oklch, var(--trust) 40%, transparent);
+  background: color-mix(in oklch, var(--trust) 5%, transparent);
+}
+
+/* Frozen state accent (teal — emerald family, never blue) */
+.ts-frozen-accent {
+  border-color: color-mix(in oklch, #0d9488 40%, transparent);
+  background: color-mix(in oklch, #0d9488 5%, transparent);
+}
+
+/* Rule number inputs — tabular + focus ring in trust hue */
+[data-testid="engine-admin"] input[type="number"] {
+  font-variant-numeric: tabular-nums;
+}
+[data-testid="engine-admin"] input[type="number"]:focus-visible {
+  outline: 2px solid color-mix(in oklch, var(--trust) 65%, transparent);
+  outline-offset: 1px;
+}
+
+/* Reduced motion — Stage 8 (rail scaleX animations are framer-motion; CSS
+   layer keeps hovers static only) */
+@media (prefers-reduced-motion: reduce) {
+  .ts-rail-identity, .ts-rail-credentials, .ts-rail-reputation, .ts-rail-resolution {
+    transition: none;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Stage 8.1 — Engine deep-detail utilities (sparkline, lifecycle log,
+   simulation dry-run dialog, policy diff). Emerald family only.
+--------------------------------------------------------------------------- */
+
+/* Slim custom scrollbars for dense engine lists (lifecycle log, movers) */
+.ts-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in oklch, var(--trust) 45%, transparent) transparent;
+}
+.ts-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.ts-scrollbar::-webkit-scrollbar-thumb {
+  background: color-mix(in oklch, var(--trust) 45%, transparent);
+  border-radius: 999px;
+}
+.ts-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in oklch, var(--trust) 65%, transparent);
+}
+.ts-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Sparkline — pointer affordance on the chart surface */
+[data-testid="score-sparkline"] svg {
+  cursor: crosshair;
+}
+
+/* Lifecycle log rows — newest row gets a quiet emphasis */
+[data-testid="lifecycle-log"] li:first-child {
+  border-color: color-mix(in oklch, var(--trust) 35%, transparent);
+  background: color-mix(in oklch, var(--trust) 4%, transparent);
+}
+[data-testid="lifecycle-log"] li {
+  transition: border-color 150ms ease, background 150ms ease;
+}
+[data-testid="lifecycle-log"] li:hover {
+  border-color: color-mix(in oklch, var(--trust) 30%, transparent);
+}
+
+/* Simulation dialog — movers table rows hover + delta chips */
+[data-testid="sim-movers"] tr {
+  transition: background 120ms ease;
+}
+[data-testid="sim-movers"] tr:hover {
+  background: color-mix(in oklch, var(--trust) 5%, transparent);
+}
+
+/* Policy diff rows — dashed container reads as "working notes" */
+[data-testid="policy-diff"] li {
+  transition: background 120ms ease;
+}
+[data-testid="policy-diff"] li:hover {
+  background: color-mix(in oklch, var(--trust) 7%, transparent);
+}
+
+/* Histogram bars in the simulation dialog — motion-safe shimmer on after-bar */
+@keyframes ts-sim-bar-settle {
+  from { filter: brightness(1.35); }
+  to { filter: brightness(1); }
+}
+[data-testid="sim-buckets"] .bg-primary\/80 {
+  animation: ts-sim-bar-settle 600ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-testid="sim-buckets"] .bg-primary\/80 {
+    animation: none;
+  }
+}
