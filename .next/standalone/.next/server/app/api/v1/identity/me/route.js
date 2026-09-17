@@ -1,0 +1,10 @@
+var R=require("../../../../../chunks/[turbopack]_runtime.js")("server/app/api/v1/identity/me/route.js")
+R.c("server/chunks/src_lib_services_trustscore-service_ts_71af2c5e._.js")
+R.c("server/chunks/src_lib_services_identity-service_ts_181b2b8a._.js")
+R.c("server/chunks/src_lib_services_signal-service_ts_e66a9933._.js")
+R.c("server/chunks/[root-of-the-server]__f408c708._.js")
+R.c("server/chunks/[root-of-the-server]__198301ec._.js")
+R.c("server/chunks/_ac0ee7b1._.js")
+R.c("server/chunks/_next-internal_server_app_api_v1_identity_me_route_actions_c8527bb5.js")
+R.m(49579)
+module.exports=R.m(49579).exports

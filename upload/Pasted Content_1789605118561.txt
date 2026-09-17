@@ -1,0 +1,1777 @@
+Yes. This is the point where we should stop treating TrustScore as merely a “NIN verification product” and design the **actual company/product around what NIN makes possible**.
+
+I researched the current NINAuth/NIMC ecosystem, its enterprise and wallet model, the 2026 NIMC Act position, Nigerian data-protection requirements, and the competitive KYC/fraud landscape. The biggest strategic opportunity is clear:
+
+> **NIN should be TrustScore's identity root. TrustScore's proprietary value should sit above it: identity assurance, verified credentials, trust profiles, reputation, dispute resolution, transaction-specific trust decisions, and eventually a network of trust signals.**
+
+NINAuth itself is now positioned by NIMC as more than a basic NIN lookup: it supports online identity verification, QR/share-code flows, consented data sharing, digital identity, and a wallet that can contain government and third-party credentials.  The 2026 NIMC Act also explicitly positions NIN as Nigeria's foundational identity credential and NIMC as central to the country's digital identity, PKI and DPI infrastructure.
+
+---
+
+# 1. BRAINSTORMING: HOW WE GET THE MOST OUT OF TRUSTSCORE
+
+Let's deliberately think beyond the original product.
+
+## A. Trust Passport
+
+This should be the flagship consumer product.
+
+A person establishes a verified Trust Identity and gets:
+
+```text
+TRUST PASSPORT
+
+Identity
+✓ Government Identity Verified
+
+Phone
+✓ Verified
+
+Biometric
+✓ Verified
+
+Credentials
+✓ Verified
+
+Reputation
+Good / New / Established
+
+TrustScore
+782
+
+[Share Trust Passport]
+[Generate QR]
+```
+
+The user doesn't send a NIN image or NIN number around.
+
+They share a controlled verification experience.
+
+This aligns very well with NINAuth's current QR/share-code and digital-wallet direction.
+
+---
+
+# 2. “CHECK BEFORE YOU DEAL”
+
+This is the killer consumer feature.
+
+Imagine:
+
+> “I'm about to send this person ₦300,000.”
+
+Open TrustScore:
+
+```text
+CHECK SOMEONE
+
+Phone / Username / QR / Trust Link
+             ↓
+       Verify Identity
+             ↓
+       Trust Assessment
+```
+
+Result:
+
+```text
+┌─────────────────────────┐
+│     TRUST ASSESSMENT    │
+│                         │
+│   Identity: VERIFIED ✓  │
+│   Phone: VERIFIED ✓     │
+│   Reputation: NEW       │
+│                         │
+│   TrustScore: 734       │
+│   Risk: LOW             │
+│                         │
+│   No confirmed adverse  │
+│   signals found.        │
+└─────────────────────────┘
+```
+
+Notice the language:
+
+**“No confirmed adverse signals found.”**
+
+Not:
+
+> “This person is safe.”
+
+That distinction protects the product and improves trustworthiness.
+
+---
+
+# 3. TRUST LINK
+
+Every verified user gets:
+
+```text
+trustscore.ng/@username
+```
+
+A seller could put it in:
+
+* WhatsApp;
+* Instagram bio;
+* Facebook;
+* marketplace listing;
+* business website;
+* invoice;
+* email;
+* quotation;
+* physical poster.
+
+Example:
+
+> Verify me before payment → `trustscore.ng/@john`
+
+This is a potentially powerful viral loop.
+
+---
+
+# 4. QR TRUST CARD
+
+A business or individual can show:
+
+```text
+[ QR ]
+
+✓ Identity Verified
+TrustScore 782
+```
+
+The buyer scans.
+
+This could work:
+
+* online;
+* at physical stores;
+* at events;
+* during deliveries;
+* in offices;
+* in rental situations.
+
+NINAuth already uses QR/share-code identity flows, giving us a strong interaction pattern to study.
+
+---
+
+# 5. TRUST REQUEST
+
+Instead of asking someone:
+
+> “Send me your NIN.”
+
+You send:
+
+> **“Please verify your identity through TrustScore.”**
+
+The recipient clicks:
+
+```text
+Verify Identity
+      ↓
+NINAuth
+      ↓
+Consent
+      ↓
+Verified
+```
+
+This is much better UX.
+
+---
+
+# 6. VERIFIED CREDENTIALS
+
+This could become one of the biggest opportunities.
+
+NINAuth's current wallet architecture already contemplates:
+
+* government-issued credentials;
+* tax-related identity information;
+* professional credentials;
+* student credentials;
+* third-party credentials;
+* self-declared credentials.
+
+TrustScore could eventually become the place where a user builds:
+
+```text
+TRUST PASSPORT
+
+✓ Government Identity
+✓ Phone
+✓ Student
+✓ Professional
+✓ Business Owner
+✓ Address
+✓ Tax Identity
+✓ Insurance
+```
+
+Important: TrustScore should **not invent the credential**. The credential should have an identifiable issuer and verification provenance.
+
+---
+
+# 7. VERIFIED BUSINESS PROFILE
+
+Don't limit TrustScore to individuals.
+
+Create:
+
+```text
+TrustScore Business
+```
+
+A business gets:
+
+* verified owner;
+* registration evidence;
+* business identity;
+* verified contact;
+* credentials;
+* reputation;
+* dispute history;
+* trust profile.
+
+Example:
+
+```text
+OKOMBA TECHNOLOGIES
+
+✓ Business identity verified
+✓ Authorized representative verified
+✓ Contact verified
+✓ Credentials verified
+
+TrustScore: 841
+```
+
+This opens the B2B market.
+
+---
+
+# 8. TRUSTED SELLER
+
+For marketplaces:
+
+```text
+SELLER
+✓ Trust Identity
+✓ Phone
+✓ Business
+✓ Reputation
+✓ Verified transactions
+```
+
+Eventually marketplaces could display:
+
+> **TrustScore Verified Seller**
+
+This is considerably more useful than a generic “KYC complete” badge.
+
+---
+
+# 9. TRUSTED LANDLORD / TENANT
+
+Potential vertical:
+
+```text
+Tenant Trust Profile
+Landlord Trust Profile
+```
+
+Not necessarily a “credit score.”
+
+Instead:
+
+```text
+Identity
+Contact
+Verified credentials
+References
+Dispute/resolution history
+Consent-based reputation
+```
+
+This could become a high-value vertical later.
+
+---
+
+# 10. VERIFIED PROFESSIONAL
+
+Imagine:
+
+```text
+TRUST PASSPORT
+
+Identity ✓
+Professional certification ✓
+Employer/issuer ✓
+Portfolio ✓
+References ✓
+```
+
+Potential markets:
+
+* freelancers;
+* technicians;
+* developers;
+* tutors;
+* consultants;
+* drivers;
+* artisans;
+* healthcare professionals.
+
+The powerful idea is:
+
+> **TrustScore becomes a reusable verification layer across many parts of life.**
+
+---
+
+# 11. “WHY SHOULD I TRUST THIS PERSON?”
+
+Instead of displaying only:
+
+> 782
+
+show:
+
+```text
+WHY?
+
+✓ Government identity verified
+✓ Phone verified
+✓ Strong identity assurance
+✓ 3 verified credentials
+✓ No confirmed active fraud findings
+✓ 12 resolved transactions/disputes
+```
+
+This dramatically improves explainability.
+
+---
+
+# 12. TRANSACTION-SPECIFIC TRUST
+
+This is a major improvement.
+
+The same person can have different risk depending on context.
+
+For example:
+
+```text
+Employment
+Rental
+Marketplace
+Loan
+High-value transaction
+```
+
+Therefore eventually:
+
+```text
+TrustScore
+```
+
+could become:
+
+```text
+Trust Decision
+for this context
+```
+
+Example:
+
+```text
+For marketplace transaction:
+
+Identity: HIGH
+Reputation: MEDIUM
+Fraud Risk: LOW
+
+Decision:
+LOW RISK
+```
+
+That is much more useful to businesses than a generic universal score.
+
+---
+
+# 13. TRUST SCORE + TRUST LEVEL
+
+Don't rely on a single number.
+
+Use:
+
+```text
+Identity Assurance
++
+Trust Level
++
+Risk Status
+```
+
+Example:
+
+```text
+IDENTITY
+Government verified
+
+REPUTATION
+Established
+
+RISK
+Low
+
+SCORE
+782
+```
+
+This makes the product understandable.
+
+---
+
+# 14. CONTINUOUS VERIFICATION
+
+Verification shouldn't be permanent.
+
+A person's phone changes.
+
+Documents expire.
+
+Credentials expire.
+
+Businesses change ownership.
+
+Therefore:
+
+```text
+Verified
+       ↓
+Verified 30 days ago
+       ↓
+Needs re-verification
+```
+
+TrustScore should display **verification freshness**.
+
+Example:
+
+> Identity verified 11 days ago.
+
+This is much more informative than simply “Verified.”
+
+---
+
+# 15. IDENTITY CHANGE ALERTS
+
+Create an **Identity Security Center**.
+
+For example:
+
+```text
+YOUR TRUST IDENTITY
+
+New verification attempt
+New phone binding
+New credential
+New TrustScore change
+New flag
+New share request
+```
+
+This could become a powerful consumer-security feature.
+
+---
+
+# 16. TRUST RECEIPT
+
+After someone verifies you:
+
+```text
+Trust verification completed
+
+Date: 04 Sep 2026
+Purpose: Marketplace transaction
+Identity assurance: Level 3
+Status: Verified
+```
+
+The user can keep this record.
+
+That is valuable for disputes and auditing.
+
+---
+
+# 17. TRUST HISTORY
+
+Users could see:
+
+```text
+Trust History
+
+Sep 4
+Identity re-verified ✓
+
+Aug 22
+Phone verified ✓
+
+Aug 18
+Professional credential verified ✓
+
+Jul 10
+Dispute resolved ✓
+```
+
+But never expose sensitive details unnecessarily.
+
+---
+
+# 18. DISPUTE RESOLUTION AS THE MOAT
+
+This may eventually become more valuable than NIN verification.
+
+NIN gives us:
+
+> **Who are you?**
+
+TrustScore can answer:
+
+> **What happened, what evidence exists, what was resolved, and what can reasonably be trusted?**
+
+That is proprietary.
+
+---
+
+# 19. TRUST REFERENCES
+
+A controlled reference system could eventually let someone request:
+
+> “Can three verified people attest that they have dealt with me?”
+
+But this must be carefully designed.
+
+Never turn it into:
+
+```text
+Invite 20 friends → gain 200 points
+```
+
+That would make it gameable.
+
+Instead:
+
+```text
+verified relationship
++
+actual interaction
++
+anti-collusion
++
+issuer/reporter history
+```
+
+---
+
+# 20. TRUST FOR AFRICAN DIGITAL COMMERCE
+
+Long term:
+
+```text
+Nigeria
+ ↓
+Ghana
+ ↓
+Kenya
+ ↓
+Rwanda
+ ↓
+South Africa
+ ↓
+Africa
+```
+
+The architecture should make identity providers country-specific.
+
+TrustScore stays country-agnostic at the product layer.
+
+---
+
+# 21. THE BIGGER IDEA
+
+Eventually TrustScore could become:
+
+> **“The identity and trust layer behind digital interactions.”**
+
+Not simply:
+
+> KYC API.
+
+That is the company-level vision.
+
+---
+
+# 22. WHAT CURRENT MARKET RESEARCH TELLS US
+
+This market is already crowded at the **identity-verification layer**.
+
+Dojah offers NIN/BVN, phone intelligence and fraud/credit functionality, and advertises API pricing starting around $0.06/call.
+
+Smile ID offers KYC across African identity systems, including Nigeria, with PAYG and enterprise plans.
+
+Youverify goes even further into KYC, AML and fraud, including identity, liveness, monitoring and risk workflows.
+
+Therefore:
+
+### Do NOT compete by saying:
+
+> “We verify NIN better.”
+
+That is a vendor/platform battle.
+
+Instead:
+
+> **“We turn verified identity into reusable trust.”**
+
+That's the gap.
+
+---
+
+# 23. THE NIN-FIRST TRUSTSCORE MODEL
+
+Here is the model I would now officially adopt.
+
+```text
+                    NINAuth
+                       │
+                       ▼
+              VERIFIED IDENTITY
+                       │
+                       ▼
+                TRUST IDENTITY
+                       │
+          ┌────────────┼────────────┐
+          │            │            │
+        PHONE        SELFIE      CREDENTIALS
+          │            │            │
+          └────────────┼────────────┘
+                       │
+                       ▼
+                  TRUST GRAPH
+                       │
+          ┌────────────┼────────────┐
+          │            │            │
+     Reputation       Risk       Resolution
+          │            │            │
+          └────────────┼────────────┘
+                       ▼
+               TRUST DECISION
+                       │
+              ┌────────┴────────┐
+              │                 │
+          Consumer             B2B
+        Trust Passport       Trust API
+```
+
+---
+
+# 24. WEB + MOBILE PRODUCT ARCHITECTURE
+
+We should build **one platform with three experiences**, not three separate systems.
+
+## A. Consumer mobile app
+
+Flutter.
+
+Primary screens:
+
+```text
+Splash
+Onboarding
+Login
+NINAuth Verification
+Home
+Trust Passport
+Safety Check
+Scan QR
+Trust History
+Credentials
+Flags & Disputes
+Notifications
+Privacy & Consent
+Security
+Settings
+```
+
+## B. Consumer web
+
+Next.js.
+
+Purpose:
+
+* public Trust Passport;
+* share links;
+* QR verification;
+* account management;
+* web onboarding;
+* lightweight Safety Check;
+* B2B portal.
+
+## C. B2B dashboard
+
+Next.js.
+
+Features:
+
+```text
+Overview
+Verifications
+Trust Checks
+API Keys
+Webhooks
+Usage
+Team
+Roles
+Billing
+Logs
+Cases
+Settings
+```
+
+---
+
+# 25. MOBILE UX PRINCIPLE
+
+Do not make identity verification feel like a government form.
+
+Bad:
+
+```text
+Enter:
+NIN
+DOB
+Full name
+Phone
+Address
+Upload ID
+Upload passport
+Upload selfie
+```
+
+Better:
+
+```text
+Verify your identity
+
+[ Continue with NINAuth ]
+
+Why?
+Your identity is verified directly through
+Nigeria's national identity infrastructure.
+
+[ Continue ]
+```
+
+NINAuth itself is explicitly designed around mobile authentication, QR/share-code and controlled sharing, so we should align rather than fight the ecosystem.
+
+![Image](https://images.openai.com/static-rsc-4/6Pt1fSzkQHdEBlxrLTXM3xJVZ8ChcDH2OLmzTXAXX4zrpaNkxuAOYTaCjk19vrGFYboyYl7f0OEfzahpoaVpMewJgOfs74sGc1Jz3mCjOgcZoG6mWc98uemaM-8uRo2e4ft5eTxtpUa6BiyMZebZPDo9CsaiIpNBsWU5qN5ybMwvunNGT_YtB8FgZAI1Reep?purpose=fullsize)
+
+![Image](https://images.openai.com/static-rsc-4/tzciLQCduXKn9-pxMqHnMSnBb_kcpEDHbi5m3NMDlga-L1PE-sqCo5canjq_DRMRydv_BM-eQRZwl_DxiyzA0jdGhEjZmGDbS6blQ5qu-WyVHPiQRjXEU7v8AN88BOdXc9SbG9pmUdr0sogdJK2D5T1njJoDCNlA_1zSmbHP5ZOwHPblwIik5yoBXE7u2SDi?purpose=fullsize)
+
+---
+
+# 26. WEB PUBLIC PROFILE
+
+Example:
+
+```text
+trustscore.ng/@ifeanyi
+
+────────────────────────
+
+IFEANYI OKOMBA
+
+✓ Identity Verified
+
+TrustScore
+782
+
+LOW RISK
+
+Identity Assurance
+Level 4
+
+Verified:
+✓ Government identity
+✓ Phone
+✓ Selfie
+✓ Professional credential
+
+Reputation:
+Established
+
+Last verified:
+11 days ago
+
+[ Verify Identity ]
+[ Share ]
+```
+
+Public pages must be heavily sanitized.
+
+Never publish:
+
+* NIN;
+* raw phone;
+* DOB;
+* internal risk variables;
+* private reports;
+* raw evidence.
+
+---
+
+# 27. CORE BACKEND ARCHITECTURE
+
+I recommend:
+
+```text
+Frontend
+   │
+   ├── Flutter
+   └── Next.js
+        │
+        ▼
+      API
+     FastAPI
+        │
+ ┌──────┼────────┐
+ │      │        │
+Auth Identity Trust
+ │      │        │
+ │      ├────────┤
+ │      │        │
+ │   Evidence  Score
+ │      │        │
+ └──────┼────────┘
+        │
+   PostgreSQL
+        │
+      Redis
+        │
+      Queue
+        │
+ Providers
+        │
+   NINAuth
+   Phone
+   Biometric
+   Credentials
+```
+
+---
+
+# 28. DOMAIN SERVICES
+
+Keep these separate:
+
+```text
+IdentityService
+NINAuthService
+ConsentService
+VerificationService
+CredentialService
+EvidenceService
+TrustGraphService
+ReputationService
+FlagService
+ResolutionService
+AppealService
+RiskService
+TrustScoreService
+NotificationService
+AuditService
+```
+
+This will prevent the backend from becoming one giant KYC controller.
+
+---
+
+# 29. DATABASE MODEL
+
+The core domain should become:
+
+```text
+organizations
+users
+trust_identities
+identity_identifiers
+identity_attributes
+identity_credentials
+consents
+verification_sessions
+verification_events
+evidence
+trust_signals
+trust_score_snapshots
+trust_share_tokens
+flags
+flag_evidence
+resolutions
+appeals
+notifications
+api_clients
+api_keys
+audit_events
+```
+
+Most importantly:
+
+```text
+User
+   ≠
+Trust Identity
+   ≠
+NIN
+   ≠
+Phone
+```
+
+---
+
+# 30. THE NIN IDENTITY RECORD
+
+Conceptually:
+
+```text
+TrustIdentity
+
+id
+status
+assurance_level
+
+NINAuth
+ ├── provider_identity_ref
+ ├── verification_status
+ ├── scopes
+ └── verified_at
+
+Phone
+ ├── verification_status
+ └── verified_at
+
+Biometric
+ ├── verification_status
+ └── verified_at
+```
+
+Raw NIN should not be the centerpiece of the database.
+
+---
+
+# 31. CONSENT ARCHITECTURE
+
+Every identity access needs context.
+
+Record:
+
+```text
+who requested it
+why
+what fields/scopes were requested
+what was granted
+when
+which provider
+policy version
+```
+
+This is particularly important because NINAuth enterprise integration currently requires informed consent, purpose-limited use, access controls, logging/monitoring and compliance reporting.
+
+---
+
+# 32. SECURITY MODEL
+
+NINAuth's current developer documentation specifically requires secure OAuth handling, PKCE and backend-only client secrets. It also instructs applications to validate returned ID tokens rather than merely decoding them.
+
+Therefore:
+
+```text
+Frontend
+  ↓
+NINAuth
+  ↓
+Authorization code
+  ↓
+Backend
+  ↓
+PKCE validation
+  ↓
+Token exchange
+  ↓
+ID token validation
+  ↓
+Trust Identity
+```
+
+Never:
+
+```text
+Mobile App
+  ↓
+NINAuth client secret
+```
+
+---
+
+# 33. DATA PROTECTION MUST BE DESIGNED IN
+
+The NDPA gives data subjects rights around access, rectification, objection, erasure, portability and automated decision-making. Section 37 specifically addresses solely automated decisions with legal or similarly significant effects.
+
+NDPC guidance also identifies scoring/profiling, significant automated decisions, sensitive/highly personal data and other high-risk processing as circumstances requiring DPIA consideration.
+
+Therefore:
+
+### TrustScore V1 must include
+
+```text
+Privacy Center
+Consent Center
+Data Access
+Data Correction
+Deletion Request
+Appeal
+Human Review
+Decision Explanation
+```
+
+from the beginning.
+
+---
+
+# 34. SCORE DESIGN
+
+The score should not represent identity verification alone.
+
+Use:
+
+```text
+Identity Assurance
++
+Verified Reputation
++
+Verified Credentials
++
+Resolution History
+-
+Confirmed Risk
+```
+
+And:
+
+```text
+Score
++
+Confidence
++
+Risk Band
++
+Explanation
++
+Freshness
+```
+
+Example:
+
+```text
+782
+Confidence: 87%
+
+LOW RISK
+
+Why:
+✓ Government identity verified
+✓ Phone verified
+✓ 4 verified credentials
+✓ Established reputation
+✓ No confirmed active fraud findings
+```
+
+---
+
+# 35. SCORE STATES
+
+This is more important than the actual formula:
+
+```text
+NEW
+VERIFIED
+ESTABLISHED
+CAUTION
+HIGH_RISK
+REVIEW_REQUIRED
+```
+
+A new user should not be penalized because they have no history.
+
+---
+
+# 36. DON'T BUILD AI FIRST
+
+Start with rules.
+
+Example:
+
+```text
+NIN verified       → identity signal
+Phone verified     → authenticity signal
+Credential verified→ evidence signal
+Confirmed fraud    → negative signal
+Resolved dispute   → resolution signal
+```
+
+Only later:
+
+```text
+historical data
+      ↓
+validated outcomes
+      ↓
+statistical modelling
+      ↓
+ML risk engine
+```
+
+---
+
+# 37. FRAUD MODEL
+
+The system needs two separate layers:
+
+```text
+Identity Fraud
+```
+
+and:
+
+```text
+Reputation Fraud
+```
+
+### Identity fraud
+
+* stolen NIN;
+* synthetic identity;
+* impersonation;
+* deepfake;
+* SIM swap;
+* account takeover.
+
+### Reputation fraud
+
+* fake reviews;
+* flag wars;
+* collusive references;
+* score farming;
+* malicious competitors;
+* retaliatory reporting.
+
+Both need different defenses.
+
+---
+
+# 38. NIN-SPECIFIC THREAT MODEL
+
+## Stolen NIN
+
+Don't accept possession of NIN as proof of identity.
+
+Use:
+
+```text
+NINAuth authentication
++
+consent
++
+session security
+```
+
+plus stronger signals when appropriate.
+
+## Reused identity
+
+Detect abnormal attempts to create multiple Trust Identities around the same underlying identity.
+
+## NIN enumeration
+
+Never permit mass queries.
+
+## Insider access
+
+Privileged access must be:
+
+```text
+RBAC
++
+MFA
++
+audit
++
+least privilege
+```
+
+## Data leakage
+
+No NIN in:
+
+```text
+URLs
+logs
+analytics
+support screenshots
+error messages
+frontend state
+```
+
+---
+
+# 39. WEB/MOBILE ARCHITECTURE BY STAGE
+
+## STAGE 0 — DISCOVERY
+
+Before writing code:
+
+```text
+Audit current repository
+Confirm NIN access model
+Confirm NINAuth/partner scope
+Confirm API fields
+Confirm pricing
+Confirm allowed purposes
+Confirm data-retention obligations
+Confirm environment
+```
+
+NINAuth's current enterprise documentation says private organizations access the system through approved verification partners and must satisfy NDPA, Nigerian-presence, consent, security, logging and audit requirements.
+
+This needs to be reconciled with **your actual authorization arrangement**.
+
+---
+
+# 40. STAGE 1 — PLATFORM FOUNDATION
+
+### Web
+
+* Next.js;
+* authentication;
+* landing page;
+* responsive design system.
+
+### Mobile
+
+* Flutter;
+* onboarding;
+* authentication;
+* secure local storage;
+* deep linking.
+
+### Backend
+
+* FastAPI;
+* PostgreSQL;
+* Redis;
+* migrations;
+* API auth;
+* logging.
+
+### Infrastructure
+
+* Docker;
+* CI/CD;
+* secrets;
+* monitoring;
+* backups.
+
+---
+
+# 41. STAGE 2 — NINAUTH IDENTITY
+
+Build:
+
+```text
+POST /v1/identity/sessions
+GET /v1/identity/sessions/:id
+GET /v1/identity/me
+```
+
+Flow:
+
+```text
+TrustScore
+ ↓
+NINAuth
+ ↓
+Consent
+ ↓
+Callback
+ ↓
+PKCE
+ ↓
+Token validation
+ ↓
+Identity evidence
+ ↓
+TrustIdentity
+```
+
+---
+
+# 42. STAGE 3 — TRUST IDENTITY
+
+Build:
+
+```text
+TrustIdentity
+Identity Assurance
+Evidence
+Consent
+Verification history
+```
+
+The user now has a persistent Trust identity.
+
+---
+
+# 43. STAGE 4 — PHONE + BIOMETRIC
+
+Build:
+
+```text
+Phone verification
+Selfie/liveness
+Identity consistency
+```
+
+The assurance level increases when independently verified signals agree.
+
+---
+
+# 44. STAGE 5 — TRUST PASSPORT
+
+Build:
+
+```text
+Profile
+TrustScore
+Identity Assurance
+Credentials
+QR
+Share Link
+Verification History
+```
+
+This is the first major consumer launch.
+
+---
+
+# 45. STAGE 6 — SAFETY CHECK
+
+This is the viral growth engine.
+
+User:
+
+```text
+Check a person
+```
+
+Methods:
+
+```text
+QR
+Trust Link
+Username
+Phone where permissible
+```
+
+Return:
+
+```text
+Identity
+Risk
+Trust
+Freshness
+Explanation
+```
+
+No unauthorized data disclosure.
+
+---
+
+# 46. STAGE 7 — REPUTATION
+
+Build:
+
+```text
+verified interaction
+reference
+review
+flag
+evidence
+resolution
+appeal
+```
+
+But start with limited reputation functionality.
+
+Don't build a social network.
+
+---
+
+# 47. STAGE 8 — TRUST ENGINE
+
+Build:
+
+```text
+Evidence
+ ↓
+Signals
+ ↓
+Risk
+ ↓
+Trust Decision
+ ↓
+Score
+```
+
+Make the scoring policy configurable.
+
+---
+
+# 48. STAGE 9 — B2B PLATFORM
+
+Build:
+
+```text
+Developer Portal
+API keys
+API documentation
+Usage
+Webhooks
+Team management
+Roles
+Billing
+```
+
+B2B endpoint:
+
+```text
+POST /v1/trust/check
+```
+
+---
+
+# 49. STAGE 10 — TRUST NETWORK
+
+Only after real usage:
+
+```text
+credentials
+references
+verified interactions
+disputes
+FraudNet
+cross-platform trust signals
+```
+
+This is where the proprietary moat starts becoming significant.
+
+---
+
+# 50. 8-WEEK MVP ROADMAP
+
+| Week | Product         | Technical                          |
+| ---- | --------------- | ---------------------------------- |
+| 1    | Foundation      | FastAPI/Postgres/Redis/CI/security |
+| 2    | NIN identity    | NINAuth/OAuth/PKCE/consent         |
+| 3    | Trust Identity  | evidence + assurance               |
+| 4    | Phone/biometric | stronger identity                  |
+| 5    | Trust Passport  | profile/QR/share                   |
+| 6    | Safety Check    | verify another user                |
+| 7    | Reputation      | flags/resolution/appeal            |
+| 8    | B2B + pilot     | API/dashboard/real users           |
+
+---
+
+# 51. WHAT I WOULD NOT BUILD IN THESE 8 WEEKS
+
+Do not waste the MVP window on:
+
+```text
+❌ Escrow
+❌ Full credit bureau
+❌ Complex AI fraud model
+❌ Bank-account integration
+❌ Pan-African expansion
+❌ Large social feed
+❌ Cryptocurrency
+❌ Complex referral economy
+```
+
+They distract from the core.
+
+---
+
+# 52. MVP SUCCESS METRIC
+
+The single most important test:
+
+> **Can two strangers complete a high-value interaction more confidently because TrustScore verifies one of them?**
+
+Measure:
+
+```text
+identity verification completion
+Safety Check completion
+QR scans
+trust-link visits
+repeat verification
+user retention
+appeal rate
+false-positive rate
+B2B conversion
+cost per verification
+```
+
+---
+
+# 53. THE FIRST REAL USE CASE
+
+I would launch with:
+
+## **“Verify Me Before You Deal With Me.”**
+
+Target:
+
+* online sellers;
+* freelancers;
+* artisans;
+* service providers;
+* buyers;
+* marketplace users;
+* small businesses.
+
+Why?
+
+Because it doesn't require bank data.
+
+The user simply shares:
+
+```text
+TrustScore QR
+or
+TrustScore link
+```
+
+The other party verifies identity and trust signals.
+
+That's an extremely clear consumer proposition.
+
+---
+
+# 54. SECOND USE CASE
+
+## **“Check Before You Hire.”**
+
+Employers/clients can verify:
+
+```text
+Identity
+Professional credentials
+Contact
+Trust profile
+```
+
+This creates a natural B2B route.
+
+---
+
+# 55. THIRD USE CASE
+
+## **“Check Before You Buy.”**
+
+Marketplace seller:
+
+```text
+✓ Identity Verified
+✓ TrustScore
+✓ Seller since
+✓ Verified credentials
+✓ Reputation
+```
+
+This creates the transaction-safety wedge.
+
+---
+
+# 56. FOURTH USE CASE
+
+## **“Verify Your Customer.”**
+
+B2B:
+
+```text
+Customer
+   ↓
+NINAuth
+   ↓
+Trust Identity
+   ↓
+Trust Check
+```
+
+This becomes monetization.
+
+---
+
+# 57. FIFTH USE CASE
+
+## **“Build Your Digital Reputation.”**
+
+Instead of users only being checked:
+
+> **Users actively build a portable identity/reputation profile.**
+
+That creates consumer demand.
+
+---
+
+# 58. THE NETWORK EFFECT
+
+This is what we should ultimately build:
+
+```text
+                TRUSTSCORE
+                    │
+              NIN-backed ID
+                    │
+        ┌───────────┼───────────┐
+        │           │           │
+      Users      Businesses   Platforms
+        │           │           │
+        └───────────┼───────────┘
+                    │
+              Trust events
+                    │
+            Verified outcomes
+                    │
+             Trust network
+                    │
+              Better signals
+                    │
+            More useful Trust
+                    │
+              More adoption
+```
+
+The NIN creates the initial identity foundation.
+
+The **network of verified interactions creates the moat.**
+
+---
+
+# 59. CRITICAL STRATEGIC WARNING
+
+There is one direction I would actively prevent the team from taking:
+
+> **“Let's collect as much NIN information as possible and build a giant identity database.”**
+
+That is not the opportunity.
+
+NINAuth itself emphasizes user-controlled sharing, and its current retention policy states that NINAuth's underlying identity records remain within NIMC-authorized infrastructure rather than being independently owned by NINAuth.
+
+TrustScore should therefore strive for:
+
+**verified evidence without unnecessary possession of raw identity data.**
+
+That is both a better security architecture and a stronger product proposition.
+
+---
+
+# 60. FINAL TRUSTSCORE PRODUCT ARCHITECTURE
+
+I would now lock this as the strategic north star:
+
+```text
+                         NINAuth
+                            │
+                            ▼
+                  GOVERNMENT-VERIFIED
+                       IDENTITY
+                            │
+                            ▼
+                    ┌──────────────┐
+                    │ TRUST IDENTITY│
+                    └──────┬───────┘
+                           │
+             ┌─────────────┼─────────────┐
+             │             │             │
+          PHONE          SELFIE      CREDENTIALS
+             │             │             │
+             └─────────────┼─────────────┘
+                           │
+                           ▼
+                    TRUST EVIDENCE
+                           │
+                 ┌─────────┴─────────┐
+                 │                   │
+             REPUTATION             RISK
+                 │                   │
+                 └─────────┬─────────┘
+                           │
+                     RESOLUTION
+                           │
+                           ▼
+                   TRUST DECISION
+                           │
+                ┌──────────┴──────────┐
+                │                     │
+           TRUST PASSPORT          B2B API
+                │                     │
+             QR / LINK             Fintech
+             Consumer              Marketplace
+             Hire                   SMEs
+             Buy                    Platforms
+```
+
+## The product should have three layers
+
+### Layer 1 — **Identity**
+
+Powered by NIN/NINAuth.
+
+> Who are you?
+
+### Layer 2 — **Evidence**
+
+Powered by credentials, phone, biometric verification, verified interactions and dispute outcomes.
+
+> What can be established about you?
+
+### Layer 3 — **Trust**
+
+Powered by our own reputation/risk/decision engine.
+
+> What does the evidence reasonably imply for this situation?
+
+That separation is the **central architecture and product principle**.
+
+---
+
+## My recommended immediate execution
+
+Before the AI agent writes another significant amount of code, give it this directive:
+
+> **“Audit the existing TrustScore repository against the NIN-First TrustScore architecture above. Do not implement yet. Research and validate our actual NIN/NINAuth access, available scopes, permitted purposes, provider/partner requirements, cost, response fields, retention obligations and integration method. Then produce a gap analysis and a staged implementation blueprint for Web + Flutter Mobile + FastAPI backend. After the audit, implement only Stage 1, test it completely, re-audit it, and proceed stage-by-stage.”**
+
+This is important because NINAuth's current official documentation shows a very specific enterprise integration model—approved verification partners, informed consent, scoped access, OAuth/PKCE, backend token handling and compliance/audit requirements.
+
+**I would make “Trust Passport + Check Before You Deal” the consumer MVP, and “Trust Decision API” the B2B MVP.** That gives us a concrete product users understand, a viral sharing mechanism, a path to revenue, and a much stronger differentiation from Dojah/Smile ID/Youverify than trying to compete with them on raw identity verification.

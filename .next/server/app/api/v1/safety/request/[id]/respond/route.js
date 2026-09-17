@@ -1,0 +1,12 @@
+var R=require("../../../../../../../chunks/[turbopack]_runtime.js")("server/app/api/v1/safety/request/[id]/respond/route.js")
+R.c("server/chunks/src_lib_services_safety-service_ts_bcf52f2f._.js")
+R.c("server/chunks/src_lib_services_trustscore-service_ts_71af2c5e._.js")
+R.c("server/chunks/[root-of-the-server]__198301ec._.js")
+R.c("server/chunks/_93e93869._.js")
+R.c("server/chunks/src_lib_services_passport-service_ts_64e83470._.js")
+R.c("server/chunks/[root-of-the-server]__f408c708._.js")
+R.c("server/chunks/src_lib_services_b584c8c2._.js")
+R.c("server/chunks/node_modules_zod_v4_classic_external_fa90cebf.js")
+R.c("server/chunks/ce889_server_app_api_v1_safety_request_[id]_respond_route_actions_b4d35593.js")
+R.m(26021)
+module.exports=R.m(26021).exports
