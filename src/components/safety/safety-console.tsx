@@ -54,6 +54,7 @@ import type {
   IdentityMe,
 } from "@/lib/types";
 import { FlagDialog } from "@/components/reputation/file-flag-card";
+import { TabIntro, TabSurface } from "@/components/dashboard/tab-intro";
 import { cn } from "@/lib/utils";
 
 type Method = "handle" | "phone" | "link" | "qr";
@@ -169,7 +170,7 @@ function AssessmentPanel({
             {METHOD_LABEL[assessment.method] ?? assessment.method}
           </span>
         </div>
-        <p className="mt-3 text-lg font-bold leading-snug tracking-tight" data-testid="safety-headline">
+        <p className="font-display mt-3 text-lg font-semibold leading-snug tracking-tight" data-testid="safety-headline">
           {assessment.headline}
         </p>
         {(assessment.subject?.displayName || assessment.subject?.handle) && (
@@ -427,7 +428,13 @@ export function SafetyConsole() {
   const unavailableHandle = result?.outcome === "UNAVAILABLE" && method === "handle" && value.trim();
 
   return (
-    <div className="grid min-w-0 gap-6 lg:grid-cols-5">
+    <>
+      <TabIntro
+        eyebrow="Stage 6 · Verifier console"
+        title="Check before you deal"
+        description="Run a consented check by handle, phone fingerprint, Trust Link or QR — sanitized assessments only, with a receipt written to both sides."
+      />
+      <TabSurface className="grid min-w-0 gap-6 lg:grid-cols-5">
       {/* Check runner */}
       <div className="min-w-0 lg:col-span-3">
         <Card className="ts-card-hover min-w-0">
@@ -804,6 +811,7 @@ export function SafetyConsole() {
           onFiled={() => undefined}
         />
       </div>
-    </div>
+      </TabSurface>
+    </>
   );
 }

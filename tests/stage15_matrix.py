@@ -43,15 +43,15 @@ try:
     b = json.loads(raw)
 except Exception:
     b = {}
-check("health reports Stage 15 / v1.14.0",
-      s == 200 and b.get("version") == "1.14.0" and "15" in b.get("stage", ""),
+check("health reports Stage 16 / v1.15.0",
+      s == 200 and b.get("version") == "1.15.0" and "16" in b.get("stage", ""),
       str(b.get("stage")))
 s, raw = call("GET", "/api")
 try:
     b = json.loads(raw)
 except Exception:
     b = {}
-check("api index: v1.14.0 + Stage 15", b.get("version") == "1.14.0" and "15" in b.get("stage", ""))
+check("api index: v1.15.0 + Stage 16", b.get("version") == "1.15.0" and "16" in b.get("stage", ""))
 
 # ---------------------------------------------------------------------------
 print("== 2) design system SSR wiring (landing) ==")
@@ -63,12 +63,12 @@ check("display-serif utility applied to server-rendered headings (h1/h2)",
       html.count('font-display') >= 6, f"font-display count={html.count('font-display')}")
 check("roadmap carries the Stage 15 'Design elevation' entry",
       "Design elevation" in html)
-check("hero carries the honest Stage 15 preview note",
-      "(Stage 15)" in html)
-check("nav badge says Stage 15 · Design Elevation",
-      "Stage 15 · Design Elevation" in html)
-check("footer badge says Stage 15 · Design Elevation",
-      html.count("Stage 15 · Design Elevation") >= 2)
+check("hero carries the honest stage preview note",
+      "(Stage 16)" in html)
+check("nav badge says Stage 16 · Surface Elevation",
+      "Stage 16 · Surface Elevation" in html)
+check("footer badge says Stage 16 · Surface Elevation",
+      html.count("Stage 16 · Surface Elevation") >= 2)
 check("all six landing sections present",
       all(f'id="{sid}"' in html for sid in
           ["product", "how-it-works", "scoring", "architecture", "roadmap", "security"]))

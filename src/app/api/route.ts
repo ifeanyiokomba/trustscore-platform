@@ -5,14 +5,17 @@ import { NextResponse } from "next/server";
 export async function GET() {
   return NextResponse.json({
     name: "TrustScore Platform API",
-    stage: "15 — Design Elevation (professional typography system, shared motion design language, scroll choreography and micro-interactions across the product)",
-    version: "1.14.0",
+    stage: "16 — Surface Elevation (the display voice in every deep dashboard surface, plain/technical policy transparency, and cursor-paginated score insights over a 50-snapshot retention horizon)",
+    version: "1.15.0",
     notice:
       "NINAuth integration is implemented contract-first behind a runtime-switchable provider POSTURE: MOCK (default, in-process, honestly labeled), SANDBOX LOOPBACK (the real transport path — HMAC-signed calls, timeouts, retries, per-provider circuit breakers, latency metrics — proven against the local provider simulator on :3032), and LIVE (honestly gated on partner credentials + base URLs; the API refuses the flip until they exist). Phone (SMS OTP) and biometric (liveness) follow the same posture. The credential vault stores provider secrets AES-256-GCM encrypted and write-only. The B2B Trust Decision API and webhook deliveries are real integrations against that same platform; plan billing is an honest mock-up (no payment processor is connected).",
     endpoints: [
       { method: "GET", path: "/api/health", auth: false, description: "Liveness + database readiness" },
       { method: "POST", path: "/api/v1/auth/register", auth: false, description: "Create an account (rate-limited)" },
       { method: "POST", path: "/api/v1/auth/login", auth: false, description: "Sign in (rate-limited)" },
+      { method: "POST", path: "/api/v1/auth/ninauth/start", auth: false, description: "Stage 16: begin passwordless 'Continue with NINAuth' — OAuth authorize flow with server-side PKCE (rate-limited)" },
+      { method: "POST", path: "/api/v1/auth/ninauth/:id/approve", auth: false, description: "Stage 16: the mock NINAuth app side — confirm the binding email + grant/deny scopes; issues a one-time code (retired in LIVE posture)" },
+      { method: "POST", path: "/api/v1/auth/ninauth/:id/callback", auth: false, description: "Stage 16: the OAuth callback — state check, PKCE code exchange, signed-assertion validation, scope-guard pipeline, then account bind/link/create + session cookie" },
       { method: "POST", path: "/api/v1/auth/logout", auth: "session", description: "Revoke session (idempotent)" },
       { method: "GET", path: "/api/v1/auth/me", auth: "session", description: "Current user" },
       { method: "GET", path: "/api/v1/auth/activity", auth: "session", description: "Recent audited auth events (redacted)" },
@@ -39,7 +42,7 @@ export async function GET() {
       { method: "GET", path: "/api/v1/passport/dsr/:id/export", auth: "session", description: "Stage 5: download a completed data export" },
       { method: "GET", path: "/api/v1/passport/notifications", auth: "session", description: "Stage 5: notification feed (change alerts)" },
       { method: "POST", path: "/api/v1/passport/notifications", auth: "session", description: "Stage 5: mark notifications read ({id} or {all:true})" },
-      { method: "GET", path: "/api/v1/passport/score-history", auth: "session", description: "Stage 11: score history — snapshot series, component deltas between consecutive snapshots, audited window events (correlated context, not a verdict)" },
+      { method: "GET", path: "/api/v1/passport/score-history", auth: "session", description: "Stage 11/16: score history — snapshot series, component deltas, audited window events; cursor-paginated (?before=<snapshotId>&limit=5..20, default newest 20 of the 50-snapshot retained window)" },
       { method: "GET", path: "/api/v1/passport/score-history/export", auth: "session", description: "Stage 11: self-service series export — ?format=csv|json (audited SCORE_HISTORY_EXPORTED)" },
       { method: "POST", path: "/api/v1/internal/webhook-tick", auth: "internal-token", description: "Stage 12 (internal): timer-driven webhook retry tick — called by the webhook-worker mini-service every 60s; bounded (≤5 due deliveries per call). Stage 14: the tick also persists transport snapshots + circuit transitions and evaluates sustained-open alerts" },
       { method: "POST", path: "/api/v1/security/sessions/:id/revoke", auth: "session", description: "Stage 5: remote sign-out of another active session" },

@@ -11,6 +11,7 @@
 import * as React from "react";
 import { Loader2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { TabIntro, TabSurface } from "@/components/dashboard/tab-intro";
 import { MembershipCard } from "@/components/network/membership-card";
 import { GraphCard } from "@/components/network/graph-card";
 import { StandingCard } from "@/components/network/standing-card";
@@ -83,7 +84,13 @@ export function NetworkTab() {
   }
 
   return (
-    <div className="grid min-w-0 gap-6 lg:grid-cols-3">
+    <>
+      <TabIntro
+        eyebrow="Stage 10 · Cross-platform trust"
+        title="The Trust Network"
+        description="Mutual attestations between verified members, k-anonymized shared signals, and a pan-African provider registry — trust that travels."
+      />
+      <TabSurface className="grid min-w-0 gap-6 lg:grid-cols-3">
       {/* Membership + consent (opt-in control) */}
       <div className="min-w-0 lg:col-span-1">
         <MembershipCard me={data.me} onChanged={data.refresh} />
@@ -113,6 +120,7 @@ export function NetworkTab() {
       <div className="min-w-0 lg:col-span-3">
         <ProvidersCard registry={data.providers} />
       </div>
-    </div>
+      </TabSurface>
+    </>
   );
 }

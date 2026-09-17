@@ -91,7 +91,7 @@ export function DashboardView() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.2em] text-primary">
-            Stage 15 · Design Elevation
+            Stage 16 · Surface Elevation
           </p>
           <h1 id="dash-heading" className="font-display mt-1 text-3xl font-semibold tracking-tight">
             Welcome back, {user.displayName.split(" ")[0]}

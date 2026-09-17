@@ -8,6 +8,7 @@
 import * as React from "react";
 import { Loader2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { TabIntro } from "@/components/dashboard/tab-intro";
 import { DsrCard } from "@/components/passport/dsr-card";
 import { SecurityCenter } from "@/components/passport/security-center";
 import { ReceiptsCard } from "@/components/passport/receipts-card";
@@ -41,7 +42,13 @@ export function PrivacyTab({ onOpenScoreInsights }: { onOpenScoreInsights?: () =
   }
 
   return (
-    <div className="grid min-w-0 gap-6 lg:grid-cols-3">
+    <>
+      <TabIntro
+        eyebrow="Your data, your rules"
+        title="Privacy & Security"
+        description="Sessions, trust receipts, consent records and DSR self-service — your NDPA rights, one tap away, with an audit trail behind every action."
+      />
+      <div className="grid min-w-0 gap-6 lg:grid-cols-3">
       {/* Stage 6 — Safety Check consent + received checks */}
       <SafetySettingsCard />
 
@@ -71,6 +78,7 @@ export function PrivacyTab({ onOpenScoreInsights }: { onOpenScoreInsights?: () =
           onOpenScoreInsights={onOpenScoreInsights}
         />
       </div>
-    </div>
+      </div>
+    </>
   );
 }

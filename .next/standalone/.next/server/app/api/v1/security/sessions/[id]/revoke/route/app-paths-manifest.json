@@ -1,3 +1,0 @@
-{
-  "/api/v1/security/sessions/[id]/revoke/route": "app/api/v1/security/sessions/[id]/revoke/route.js"
-}

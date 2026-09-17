@@ -23,6 +23,8 @@ import {
   Info,
   History,
   ShieldQuestion,
+  ChevronDown,
+  Loader2,
 } from "lucide-react";
 import {
   Card,
@@ -33,16 +35,18 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import type { ScoreChange, ScoreHistory } from "@/lib/types";
+import type { ScoreChange, ScoreHistory, ScoreHistoryPagination } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 // ---------------------------------------------------------------------------
-// Data hook — fetched once on mount, refreshable.
+// Data hook — fetched once on mount, refreshable; Stage 16 adds cursor
+// pagination ("load older" pages backwards through the retained window).
 // ---------------------------------------------------------------------------
 
 export function useScoreHistory() {
   const [data, setData] = React.useState<ScoreHistory | null>(null);
   const [loading, setLoading] = React.useState(true);
+  const [loadingMore, setLoadingMore] = React.useState(false);
 
   const refresh = React.useCallback(() => {
     let cancelled = false;
@@ -64,7 +68,40 @@ export function useScoreHistory() {
 
   React.useEffect(() => refresh(), [refresh]);
 
-  return { data, loading, refresh };
+  // Stage 16 — fetch the next older page and merge it in front. Summary and
+  // spark come from the full window server-side, so they arrive identical.
+  const loadOlder = React.useCallback(async () => {
+    const cursor = data?.pagination?.nextBefore;
+    if (!cursor || !data?.pagination?.hasMore || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const res = await fetch(
+        `/api/v1/passport/score-history?before=${encodeURIComponent(cursor)}`,
+        { cache: "no-store" }
+      );
+      if (res.ok) {
+        const page = (await res.json()) as ScoreHistory;
+        setData((prev) =>
+          prev
+            ? {
+                ...prev,
+                history: [...page.history, ...prev.history],
+                changes: [...page.changes, ...prev.changes],
+                summary: page.summary,
+                spark: page.spark,
+                pagination: page.pagination,
+              }
+            : page
+        );
+      }
+    } catch {
+      // Older pages are best-effort — the current view stays intact.
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [data, loadingMore]);
+
+  return { data, loading, refresh, loadOlder, loadingMore };
 }
 
 // ---------------------------------------------------------------------------
@@ -539,11 +576,16 @@ function ChangeEntry({ change }: { change: ScoreChange }) {
 export function ScoreHistoryCard({
   data,
   loading,
+  loadOlder,
+  loadingMore,
 }: {
   data: ScoreHistory | null;
   loading: boolean;
+  loadOlder?: () => Promise<void>;
+  loadingMore?: boolean;
 }) {
   const summary = data?.summary;
+  const pagination: ScoreHistoryPagination | null = data?.pagination ?? null;
   const [materialOnly, setMaterialOnly] = React.useState(false);
   const changesDesc = React.useMemo(
     () => (data ? [...data.changes].reverse() : []), // newest first
@@ -717,7 +759,7 @@ export function ScoreHistoryCard({
                     <History className="h-3.5 w-3.5" aria-hidden="true" />
                     Change timeline
                     <span className="font-medium normal-case tracking-normal">
-                      (newest first · last {data.history.length} snapshots retained)
+                      (newest first · showing {data.history.length} of {summary?.snapshotCount ?? data.history.length} retained)
                     </span>
                   </p>
                   {changesDesc.some((c) => Math.abs(c.delta) >= MATERIAL_POINTS) ? (
@@ -772,6 +814,42 @@ export function ScoreHistoryCard({
                 ) : null}
               </div>
             ) : null}
+
+            {/* Stage 16 — cursor pagination footer: renders whenever there
+                IS history (even a single snapshot — the horizon note is the
+                honest contract), independent of the change timeline. */}
+            {pagination?.hasMore && pagination.nextBefore ? (
+              <div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full gap-2 border-dashed text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                  onClick={() => void loadOlder?.()}
+                  disabled={loadingMore || !loadOlder}
+                  data-testid="load-older-snapshots"
+                >
+                  {loadingMore ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                  ) : (
+                    <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />
+                  )}
+                  {loadingMore ? "Loading older snapshots…" : "Load older snapshots"}
+                  <span className="text-[10px] text-muted-foreground">
+                    {(summary?.snapshotCount ?? 0) - data.history.length} more retained
+                  </span>
+                </Button>
+              </div>
+            ) : (
+              <p
+                className="flex items-center justify-center gap-1.5 text-[10px] text-muted-foreground"
+                data-testid="history-beginning"
+              >
+                <span className="h-1 w-1 rounded-full bg-muted-foreground/50" aria-hidden="true" />
+                Beginning of your retained history — {summary?.snapshotCount ?? 0} of a rolling{" "}
+                {pagination?.retainedMax ?? 50}-snapshot horizon
+                <span className="h-1 w-1 rounded-full bg-muted-foreground/50" aria-hidden="true" />
+              </p>
+            )}
 
             {/* Honest-language note + export hint */}
             <p className="flex items-start gap-2 rounded-lg border border-primary/25 bg-primary/5 px-3 py-2.5 text-[11px] leading-relaxed text-muted-foreground">

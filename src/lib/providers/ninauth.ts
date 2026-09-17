@@ -425,7 +425,7 @@ export interface ConsentScreen {
   mode: "MOCK" | "LIVE";
 }
 
-export function consentScreenFor(scopes: string[]): ConsentScreen {
+export function consentScreenFor(scopes: string[], purpose: string = PURPOSE): ConsentScreen {
   const fields = scopes
     .filter((s) => SCOPE_CATALOG[s])
     .map((s) => ({
@@ -436,7 +436,7 @@ export function consentScreenFor(scopes: string[]): ConsentScreen {
     }));
   return {
     requester: REQUESTER,
-    purpose: PURPOSE,
+    purpose,
     fields: fields.length
       ? fields
       : [

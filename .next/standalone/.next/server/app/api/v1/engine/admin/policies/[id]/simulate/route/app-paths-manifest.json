@@ -1,3 +1,0 @@
-{
-  "/api/v1/engine/admin/policies/[id]/simulate/route": "app/api/v1/engine/admin/policies/[id]/simulate/route.js"
-}

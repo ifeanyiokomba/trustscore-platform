@@ -62,7 +62,9 @@ const LOGIN_TERMINAL = new Set(["COMPLETED", "DENIED", "EXPIRED"]);
 const AUTH_ALLOWED_SCOPES = [...AUTH_SCOPES, "profile.name"];
 
 export function authConsentScreen() {
-  return consentScreenFor(AUTH_ALLOWED_SCOPES);
+  // The auth consent screen declares the AUTHENTICATION purpose (not the
+  // verification purpose) — the same contract the real NINAuth app shows.
+  return consentScreenFor(AUTH_ALLOWED_SCOPES, AUTH_PURPOSE);
 }
 
 // ---------------------------------------------------------------------------

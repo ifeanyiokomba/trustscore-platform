@@ -13,6 +13,7 @@ import { CredentialsCard } from "@/components/passport/credentials-card";
 import { TrustShareCard } from "@/components/passport/trust-share-card";
 import { VerificationHistory } from "@/components/passport/verification-history";
 import { ScoreHistoryCard, useScoreHistory } from "@/components/passport/score-history-card";
+import { TabIntro } from "@/components/dashboard/tab-intro";
 import type { DsrRequestInfo, IdentityMe, PassportMe } from "@/lib/types";
 
 export function usePassportData() {
@@ -93,7 +94,13 @@ export function PassportTab({
   }
 
   return (
-    <div className="grid min-w-0 gap-6 lg:grid-cols-3">
+    <>
+      <TabIntro
+        eyebrow="Stage 5 · Your portable trust"
+        title="Your Trust Passport"
+        description="A score with its evidence attached — credentials, share controls, receipts and the full history of how your trust was earned."
+      />
+      <div className="grid min-w-0 gap-6 lg:grid-cols-3">
       {/* Score + how to read it */}
       <div className="min-w-0 lg:col-span-2">
         <ScoreCard score={passport.score} trend={history.data?.spark} />
@@ -104,7 +111,12 @@ export function PassportTab({
 
       {/* Stage 11 — Score Insights (full-width): history, deltas, events, export */}
       <div className="min-w-0 lg:col-span-3">
-        <ScoreHistoryCard data={history.data} loading={history.loading} />
+        <ScoreHistoryCard
+          data={history.data}
+          loading={history.loading}
+          loadOlder={history.loadOlder}
+          loadingMore={history.loadingMore}
+        />
       </div>
 
       {/* Credentials + history */}
@@ -114,6 +126,7 @@ export function PassportTab({
       <div className="min-w-0 lg:col-span-1">
         <VerificationHistory identity={identityLoading ? null : identity} />
       </div>
-    </div>
+      </div>
+    </>
   );
 }
