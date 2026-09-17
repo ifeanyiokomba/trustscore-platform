@@ -6,17 +6,18 @@
 
 ---
 
-## Batch 0 — Deep Audit + Research — ✅ **THIS ROUND (gate: PASS)**
+## Batch 0 — Deep Audit + Research — ✅ DONE (gate: PASS)
 Audits (11 docs), research (5 docs incl. contract matrix), architecture (4 docs), this roadmap. Corrections: security headers + CSP (G1), purpose-aware Trust Decision API (G2), brand-compliance CI test (G3). Gate: no P0/P1 open after corrections; full regression green.
 
-## Batch 1 — NINAuth Production Alignment — ⬜ (partially ⛔)
-- Externalize capability→scope mapping as config (G5/PV2)
-- Tripwire depth-bound regression test (G6/A2)
-- Purpose↔requestReason adapter mapping stub (G18 — blocked on catalog confirmation)
-- API catalog drift test (AP2)
-- Everything else waits on partner credentials; the 20 UNCONFIRMED matrix rows are the LIVE-readiness checklist (G4)
+## Batch 1 — NINAuth Production Alignment — ✅ **DONE (gate: PASS)**
+- ✅ Externalize capability→scope mapping as config (G5/PV2) — `scope-mapping.config.ts`; SCOPE_CATALOG now DERIVED from it; the LIVE posture gate refuses to flip while any `liveScope` is null (`LIVE_SCOPE_MAPPING_UNCONFIRMED`, 422)
+- ✅ Tripwire depth-bound regression test (G6/A2) — `tests/batch1_tripwire.ts` (36 checks); **caught + fixed a real bug**: the raw-identifier set stored un-normalized keys, so `nimc_nin`/`voters_number` payloads bypassed the tripwire
+- ✅ Purpose↔requestReason adapter mapping stub (G18) — `request-reasons.config.ts`: 37/39 documented keys enumerated (2 honestly unconfirmed), 7/7 purposes mapped with rationale, fail-closed resolver
+- ✅ API catalog drift test (AP2) — `tests/batch1_matrix.py` §1 walks disk routes vs the `/api` index both directions (405-guard-stub exclusion rule documented); **found + fixed live drift** (`GET /api/v1/engine/admin/policies` undocumented)
+- ✅ G4 LIVE-readiness checklist machine-readable + operator-visible: `live-readiness.config.ts` → `ninauthAlignment` on the admin provider console (collapsible section: scope gaps, request-reason readiness, 16 contract-matrix items)
+- Everything else waits on partner credentials; the 20 UNCONFIRMED matrix rows remain the LIVE-readiness checklist (G4) — now surfaced in the admin console
 
-## Batch 2 — Trust Identity Hardening — ⬜
+## Batch 2 — Trust Identity Hardening — ⬜ NEXT
 - Duplicate-identity handling depth + account recovery flows (G7)
 - Business/RC model (G8 — schema + UI slot, no provider claims)
 - DSR erasure-cascade invariant test (PR2)

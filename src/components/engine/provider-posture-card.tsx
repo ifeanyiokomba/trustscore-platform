@@ -30,6 +30,9 @@ import {
   XCircle,
   Activity,
   Lock,
+  Compass,
+  ChevronDown,
+  ListChecks,
 } from "lucide-react";
 import {
   Card,
@@ -58,7 +61,11 @@ import {
 } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import type { EngineAdminProviders, ProviderAdminEntry } from "@/lib/types";
+import type {
+  EngineAdminProviders,
+  NinauthAlignmentReport,
+  ProviderAdminEntry,
+} from "@/lib/types";
 
 const FAULT_MODES = [
   { mode: "none", label: "Healthy", hint: "Calls succeed normally" },
@@ -271,6 +278,189 @@ function ProviderRow({
           </Button>
         )}
       </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Batch 1 — NINAuth LIVE alignment (G4/G5/G18): the operator-visible
+// readiness checklist. Scope-mapping gaps, request-reason readiness, and the
+// contract-matrix UNCONFIRMED/PARTIAL items — the honest path from MOCK to
+// LIVE, nothing pretended.
+// ---------------------------------------------------------------------------
+
+function AlignmentStat({
+  label,
+  value,
+  hint,
+  tone = "neutral",
+}: {
+  label: string;
+  value: string;
+  hint: string;
+  tone?: "neutral" | "warn" | "good";
+}) {
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div
+            className={cn(
+              "min-w-0 cursor-help rounded-lg border px-3 py-2",
+              tone === "warn"
+                ? "border-amber-500/40 bg-amber-500/5"
+                : tone === "good"
+                  ? "border-emerald-500/40 bg-emerald-500/5"
+                  : "border-border bg-muted/20"
+            )}
+            tabIndex={0}
+            role="note"
+          >
+            <p className="truncate text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              {label}
+            </p>
+            <p
+              className={cn(
+                "truncate font-mono text-sm font-semibold",
+                tone === "warn"
+                  ? "text-amber-700 dark:text-amber-300"
+                  : tone === "good"
+                    ? "text-emerald-700 dark:text-emerald-300"
+                    : "text-foreground"
+              )}
+            >
+              {value}
+            </p>
+          </div>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="max-w-xs">
+          <p className="text-xs">{hint}</p>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
+
+function NinauthAlignmentSection({ report }: { report: NinauthAlignmentReport }) {
+  const [open, setOpen] = React.useState(false);
+  const sm = report.scopeMapping;
+  const rr = report.requestReasons;
+  const ci = report.contractItems;
+
+  return (
+    <div
+      className="min-w-0 rounded-xl border border-border bg-muted/10"
+      data-testid="ninauth-alignment"
+    >
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        className="flex w-full min-w-0 items-center gap-3 rounded-xl p-3.5 text-left transition-colors hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+          <Compass className="h-4.5 w-4.5" aria-hidden="true" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="flex flex-wrap items-center gap-2">
+            <span className="text-sm font-semibold">NINAuth LIVE alignment</span>
+            <Badge variant="outline" className="border-amber-500/50 bg-amber-500/10 text-[10px] text-amber-700 dark:text-amber-300">
+              {ci.unconfirmed} unconfirmed · {ci.partial} partial
+            </Badge>
+          </span>
+          <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">
+            Scope mapping, request-reason catalog, and the contract-matrix checklist the LIVE flip must clear —
+            nothing here is guessed, every gap is labeled.
+          </span>
+        </span>
+        <ChevronDown
+          className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-transform", open && "rotate-180")}
+          aria-hidden="true"
+        />
+      </button>
+
+      {open && (
+        <motion.div
+          initial={{ opacity: 0, y: -4 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.15 }}
+          className="space-y-4 border-t border-border p-3.5"
+        >
+          {/* Readiness stats */}
+          <div className="grid min-w-0 grid-cols-2 gap-2 sm:grid-cols-4">
+            <AlignmentStat
+              label="Live scopes"
+              value={`${sm.liveScopeConfirmed}/${sm.totalCapabilities}`}
+              hint={`Capability→scope mapping ${sm.configVersion}: ${sm.missingLiveScopes.length ? `unconfirmed: ${sm.missingLiveScopes.join(", ")}` : "complete"} — zero scope names are published officially; the LIVE gate refuses while any is null.`}
+              tone={sm.liveScopeConfirmed === sm.totalCapabilities ? "good" : "warn"}
+            />
+            <AlignmentStat
+              label="Request reasons"
+              value={`${rr.enumerated}/${rr.officialCount}`}
+              hint={`Documented catalog keys enumerated of the officially counted ${rr.officialCount} — ${rr.unconfirmed} remain UNCONFIRMED until the live endpoint is reachable (never guessed).`}
+              tone={rr.unconfirmed === 0 ? "good" : "warn"}
+            />
+            <AlignmentStat
+              label="Purposes mapped"
+              value={`${rr.purposesMapped}/${rr.purposeOptions}`}
+              hint={`Trust Decision purposes carrying a requestReason mapping (${rr.mappingsConfirmed} confirmed so far — all stubs until the partner sandbox validates them).`}
+              tone={rr.allPurposesMapped ? "good" : "warn"}
+            />
+            <AlignmentStat
+              label="Contract rows"
+              value={`${ci.documented} doc`}
+              hint={`Of the 33-row NINAuth contract matrix: ${ci.documented} DOCUMENTED (safe to build on), ${ci.partial} PARTIAL (missing URL/field/format), ${ci.unconfirmed} UNCONFIRMED (absent from all official sources).`}
+            />
+          </div>
+
+          {/* The checklist */}
+          <div className="min-w-0 space-y-1.5">
+            <p className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              <ListChecks className="h-3 w-3" aria-hidden="true" />
+              Sandbox-verification checklist ({report.items.length} items)
+            </p>
+            <ul className="max-h-72 space-y-1.5 overflow-y-auto pr-1" data-testid="ninauth-alignment-items">
+              {report.items.map((item) => (
+                <li
+                  key={item.id}
+                  className="min-w-0 rounded-lg border border-border/70 bg-background/60 p-2.5"
+                  data-testid={`alignment-item-${item.id}`}
+                >
+                  <div className="flex min-w-0 flex-wrap items-center gap-2">
+                    <Badge
+                      variant="outline"
+                      className={cn(
+                        "shrink-0 text-[9px] font-semibold uppercase tracking-wide",
+                        item.status === "UNCONFIRMED"
+                          ? "border-red-500/40 bg-red-500/10 text-red-600 dark:text-red-400"
+                          : "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300"
+                      )}
+                    >
+                      {item.status}
+                    </Badge>
+                    <span className="truncate text-xs font-semibold">{item.area}</span>
+                    <span className="truncate font-mono text-[10px] text-muted-foreground">{item.id}</span>
+                  </div>
+                  <p className="mt-1 text-[11px] leading-snug text-foreground/80">{item.missing}</p>
+                  <p className="mt-1 text-[10px] leading-snug text-muted-foreground">
+                    <span className="font-semibold text-foreground/60">Today:</span> {item.posture}
+                  </p>
+                  <p className="mt-0.5 text-[10px] leading-snug text-muted-foreground">
+                    <span className="font-semibold text-foreground/60">Resolve:</span> {item.resolution}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <p className="text-[10px] leading-relaxed text-muted-foreground">
+            Checklist version {report.version} — sourced row-by-row from the NINAuth contract matrix
+            (docs/research/NINAUTH_CONTRACT_MATRIX.md, fetched from official sources 2026-09-17). The LIVE posture
+            gate enforces the scope-mapping half at flip time; the rest is the sandbox-verification agenda for when
+            partner credentials exist.
+          </p>
+        </motion.div>
+      )}
     </div>
   );
 }
@@ -514,6 +704,9 @@ export function ProviderPostureCard({
             {data.constants.circuitOpenMs / 1000}s open
           </span>
         </div>
+
+        {/* NINAuth LIVE alignment (Batch 1) */}
+        {data.ninauthAlignment && <NinauthAlignmentSection report={data.ninauthAlignment} />}
 
         {/* Provider rows */}
         <div className="grid min-w-0 grid-cols-1 gap-3">

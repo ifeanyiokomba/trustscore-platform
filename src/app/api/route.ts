@@ -63,6 +63,7 @@ export async function GET() {
       { method: "GET", path: "/api/v1/engine/public", auth: "public", description: "Stage 8: PUBLIC trust-engine view — active scoring policy (rules, budgets), policy history, DPIA registry status, automated-decision gate" },
       { method: "GET", path: "/api/v1/engine/me", auth: "session", description: "Stage 8: my score's lifecycle state (ACTIVE/STALE/FROZEN), policy provenance, gate state, freeze note" },
       { method: "GET", path: "/api/v1/engine/admin/overview", auth: "session+admin", description: "Stage 8: admin console — snapshot-state distribution, policies, DPIA registry, gate" },
+      { method: "GET", path: "/api/v1/engine/admin/policies", auth: "session+admin", description: "Stage 8: list all scoring-policy versions (ACTIVE + retired) with the default ruleset" },
       { method: "POST", path: "/api/v1/engine/admin/policies", auth: "session+admin", description: "Stage 8: create a DRAFT policy version (rules validated + clamped server-side; change summary published)" },
       { method: "POST", path: "/api/v1/engine/admin/policies/:id/activate", auth: "session+admin", description: "Stage 8: activate a draft — REQUIRES a completed DPIA (NDPC gate); retires the previous version; scores recompute" },
       { method: "POST", path: "/api/v1/engine/admin/policies/:id/simulate", auth: "session+admin", description: "Stage 8: read-only impact dry-run — recompute the cohort under draft rules vs active; buckets, transitions, masked movers; nothing is written" },

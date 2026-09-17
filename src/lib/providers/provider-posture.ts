@@ -25,6 +25,11 @@ import {
   type ProviderKey,
 } from "@/lib/providers/transport";
 import { listCredentials } from "@/lib/providers/credential-vault";
+import {
+  liveScopeGaps,
+  SCOPE_MAPPING_CONFIG_VERSION,
+} from "@/lib/providers/scope-mapping.config";
+import { liveReadinessReport } from "@/lib/providers/live-readiness.config";
 
 export const PROVIDER_POSTURE_KEY = "providers.posture";
 
@@ -141,6 +146,20 @@ export async function setProviderPosture(posture: ProviderPosture): Promise<void
         );
       }
     }
+    // Batch 1 (G5) — the capability→scope mapping must be COMPLETE before the
+    // flip: every capability needs its partner-confirmed liveScope string.
+    // Zero scope names are published officially today, so this ALWAYS refuses
+    // in the sandbox — by design, not by accident.
+    const scopeGaps = liveScopeGaps();
+    if (scopeGaps.length > 0) {
+      throw new PostureError(
+        "LIVE_SCOPE_MAPPING_UNCONFIRMED",
+        422,
+        `LIVE posture requires a confirmed partner scope string for every capability (scope-mapping.config.ts ${SCOPE_MAPPING_CONFIG_VERSION}); still unconfirmed: ${scopeGaps
+          .map((c) => c.capability)
+          .join(", ")}. Zero scope names are published in any official NINAuth source — fill the liveScope column from the partner contract first.`
+      );
+    }
   }
 
   await db.platformSetting.upsert({
@@ -237,6 +256,10 @@ export async function getProvidersAdmin() {
     vault,
     simulator: sim,
     vaultDefaultKey: !process.env.VAULT_MASTER_KEY,
+    // Batch 1 (G4/G5/G18) — the NINAuth LIVE-alignment surface: scope-mapping
+    // gaps, request-reason readiness, and the contract-matrix checklist the
+    // LIVE flip + sandbox verification must clear.
+    ninauthAlignment: liveReadinessReport(),
     constants: {
       requestTimeoutMs: 4_000,
       retries: 2,

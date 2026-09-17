@@ -21,6 +21,7 @@ import {
   randomBytes,
   timingSafeEqual,
 } from "crypto";
+import { CAPABILITIES } from "@/lib/providers/scope-mapping.config";
 
 // ---------------------------------------------------------------------------
 // Contract constants (to be replaced with partner-supplied values — audit §2.2)
@@ -51,42 +52,32 @@ export const SESSION_TTL_MS = 10 * 60_000; // verification session TTL (authoriz
 export const CODE_TTL_MS = 60_000; // one-time authorization code TTL
 export const IDENTITY_FRESHNESS_DAYS = 90; // re-verification horizon
 
-// Proposed scope catalog (contract-first). The real partner scope strings will
-// replace these identifiers; the consent UX contract stays the same.
-// CORE scopes are always required for verification; OPTIONAL scopes unlock
-// consent-scoped identity attributes (Stage 3) — the user opts in per field.
+// Proposed scope catalog — DERIVED from the externalized capability→scope
+// mapping config (Batch 1, G5/PV2: the mapping is config, not code). The real
+// partner scope strings replace the mockScope column in
+// scope-mapping.config.ts when the contract publishes them; the consent UX
+// contract stays the same. CORE scopes are always required for verification;
+// OPTIONAL scopes unlock consent-scoped identity attributes (Stage 3) — the
+// user opts in per field.
 export const SCOPE_CATALOG: Record<
   string,
   { label: string; description: string; core?: boolean; attributeKeys?: string[] }
-> = {
-  "identity.basic": {
-    label: "Basic identity",
-    description: "Verification status and masked identity reference only",
-    core: true,
-  },
-  "identity.nin_status": {
-    label: "NIN verification status",
-    description: "Whether your government identity record is verified — never the NIN itself",
-    core: true,
-  },
-  "profile.name": {
-    label: "Name details",
-    description: "Given name and family name as held on your NIN record",
-    attributeKeys: ["given_name", "family_name"],
-  },
-  "profile.demographics": {
-    label: "Demographics",
-    description: "Birth year and state of origin as held on your NIN record",
-    attributeKeys: ["birth_year", "state_of_origin"],
-  },
-  "identity.phone_status": {
-    label: "Phone binding status",
-    description: "Whether a phone number is bound to the identity (Stage 4)",
-  },
-};
+> = Object.fromEntries(
+  CAPABILITIES.map((c) => [
+    c.mockScope,
+    {
+      label: c.label,
+      description: c.description,
+      ...(c.core ? { core: c.core } : {}),
+      ...(c.attributeKeys.length ? { attributeKeys: [...c.attributeKeys] } : {}),
+    },
+  ])
+);
 
-export const CORE_SCOPES = ["identity.basic", "identity.nin_status"];
-export const OPTIONAL_SCOPES = ["profile.name", "profile.demographics"];
+export const CORE_SCOPES = CAPABILITIES.filter((c) => c.core).map((c) => c.mockScope);
+export const OPTIONAL_SCOPES = CAPABILITIES.filter(
+  (c) => !c.core && c.attributeKeys.length > 0
+).map((c) => c.mockScope);
 export const DEFAULT_SCOPES = [...CORE_SCOPES];
 export const PURPOSE = "SELF_IDENTITY_VERIFICATION";
 export const REQUESTER = "TrustScore";

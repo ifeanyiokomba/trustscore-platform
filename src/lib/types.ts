@@ -910,6 +910,47 @@ export interface ProviderAdminEntry {
   credential: VaultEntryInfo | null;
 }
 
+// Batch 1 — NINAuth LIVE-alignment surface (G4/G5/G18) on the admin console.
+export interface NinauthAlignmentItem {
+  id: string;
+  area: string;
+  status: "UNCONFIRMED" | "PARTIAL";
+  missing: string;
+  posture: string;
+  resolution: string;
+}
+
+export interface NinauthAlignmentReport {
+  version: string;
+  scopeMapping: {
+    configVersion: string;
+    totalCapabilities: number;
+    liveScopeConfirmed: number;
+    missingLiveScopes: string[];
+  };
+  requestReasons: {
+    catalogVersion: string;
+    enumerated: number;
+    officialCount: number;
+    unconfirmed: number;
+    purposesMapped: number;
+    purposeOptions: number;
+    allPurposesMapped: boolean;
+    mappingsConfirmed: number;
+  };
+  contractItems: {
+    total: number;
+    unconfirmed: number;
+    partial: number;
+    documented: number;
+  };
+  liveGate: {
+    scopeMappingComplete: boolean;
+    requestReasonCatalogComplete: boolean;
+  };
+  items: NinauthAlignmentItem[];
+}
+
 export interface EngineAdminProviders {
   posture: string;
   postureNote: string;
@@ -924,6 +965,7 @@ export interface EngineAdminProviders {
     detail?: string;
   };
   vaultDefaultKey: boolean;
+  ninauthAlignment?: NinauthAlignmentReport;
   constants: {
     requestTimeoutMs: number;
     retries: number;

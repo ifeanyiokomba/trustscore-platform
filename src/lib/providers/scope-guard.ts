@@ -34,24 +34,30 @@ import {
   type ProfileClaims,
 } from "@/lib/providers/ninauth";
 
-// Keys that must NEVER appear in a provider payload. Case-insensitive; keys
-// are matched exactly and with snake/camel variants. This list is deliberately
+// Keys that must NEVER appear in a provider payload. Lookups compare the
+// NORMALIZED key (lowercased, non-alphanumerics stripped), so the set itself
+// must store normalized entries — Batch 1's depth-bound regression test
+// (tests/batch1_tripwire.ts) caught the original raw-string set missing
+// `nimc_nin`/`voters_number` after normalization. Case-insensitive; keys are
+// matched exactly and with snake/camel variants. This list is deliberately
 // narrow and key-based (not value-based) so it can never false-positive on
 // legitimate data like phone numbers or timestamps.
-const RAW_IDENTIFIER_KEYS = new Set([
-  "nin",
-  "n_number",
-  "ninnumber",
-  "nin_number",
-  "nimc_nin",
-  "national_id",
-  "nationalidnumber",
-  "nationalid",
-  "identity_number",
-  "identitynumber",
-  "bvn",
-  "voters_number",
-]);
+const RAW_IDENTIFIER_KEYS = new Set(
+  [
+    "nin",
+    "n_number",
+    "ninnumber",
+    "nin_number",
+    "nimc_nin",
+    "national_id",
+    "nationalidnumber",
+    "nationalid",
+    "identity_number",
+    "identitynumber",
+    "bvn",
+    "voters_number",
+  ].map((k) => k.toLowerCase().replace(/[^a-z0-9]/g, ""))
+);
 
 export class RawIdentifierLeakError extends Error {
   readonly code = "RAW_IDENTIFIER_BLOCKED";
