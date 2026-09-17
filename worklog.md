@@ -680,3 +680,25 @@ Stage Summary:
 - Key decisions: (1) scope mapping is now single-source config with posture-aware resolution — filling the liveScope column is the entire LIVE scope-side change; (2) the LIVE gate enforces scope completeness (LIVE_SCOPE_MAPPING_UNCONFIRMED) in addition to env/base-URL/credential checks; (3) 39-minus-37 request-reason keys are recorded as UNCONFIRMED rather than guessed; (4) version stays v1.15.0 until a dedicated version-bump batch (historical matrices pin it).
 - Files: NEW src/lib/providers/{scope-mapping,request-reasons,live-readiness}.config.ts, tests/{batch1_matrix.py,batch1_tripwire.ts}, docs/screenshots/batch1-alignment.png. EDITED src/lib/providers/{ninauth,scope-guard,provider-posture}.ts, src/lib/types.ts, src/components/engine/provider-posture-card.tsx, src/app/api/route.ts, docs/audit/MASTER_GAP_MATRIX.md, docs/roadmap/MASTER_ROADMAP.md.
 - Next (Batch 2 — Trust Identity Hardening): G7 duplicate-identity handling + account-recovery depth; G8 Business/RC model (schema + UI slot only, no provider claims); PR2 DSR erasure-cascade invariant test. Matrix-ordering rules still apply (rate-limit cooldowns between stage9/batch0-style suites).
+
+---
+Task ID: restart-fix-1
+Agent: Z.ai Code (main session)
+Task: Fix user-reported Turbopack SSR runtime error: "Failed to load chunk server/chunks/ssr/src_components_ui_bea846a5._.js" on /.
+
+Work Log:
+- Read worklog tail + dev.log: project is TrustScore v1.15.0, Batch 1 complete, Batch 2 (G7/G8/PR2) is next. Dev log showed the page serving 200s but ALSO contained "Error: listen EADDRINUSE: address already in use :::3000" — a second dev-server instance had been launched while one was already running.
+- Root cause identified: .next/ (356MB) contained BOTH production build artifacts (BUILD_ID, standalone/, build-manifests — evidence a forbidden `bun run build` ran at some point) AND dev artifacts. Mixed manifests + a raced second dev instance corrupted Turbopack's chunk graph → SSR chunk load failure for src_components_ui_bea846a5._.js.
+- Surgical kill of the main dev-server chain ONLY (bash tee wrapper → node next dev → next-server v16.1.3 PID 1166); mini-services preserved (provider-simulator :3031 PID 955, webhook-worker :3032 PID 954 — both still healthy and ticking).
+- Wiped the entire stale .next/ directory.
+- Relaunched dev server fully detached via `setsid bash -c 'bun run dev ...'` so it survives shell-session exit (first attempt with plain nohup+& died when the tool session ended — setsid is the reliable pattern here).
+- Fresh startup: ✓ Ready in 900ms, GET / 200.
+
+Stage Summary:
+- VERIFICATION (agent-browser E2E, golden path): landing renders with title "TrustScore — Verify before you deal", all sections (hero, 9-step NINAuth flow, scoring rules plain/technical, architecture, roadmap, security); zero page errors, console clean (HMR only).
+- Signed in through the real UI as ada@example.com (seeded USER) → "Welcome back, Ada" dashboard with all 8 tabs (Overview, Trust Passport, Safety Check, Reputation, Trust Engine, Developers, Trust Network, Privacy & Security); consent-management buttons render.
+- API flow verified in dev.log: POST /api/v1/auth/login 200, GET /api/v1/identity/me 200, GET /api/v1/engine/me 200, GET /api/v1/engine/admin/overview 403 (correct RBAC for USER role), POST /api/v1/internal/webhook-tick 200 (webhook-worker mini-service alive).
+- Responsive: 390px viewport NO horizontal overflow; dark mode toggles and renders (screenshots docs/screenshots/restart-verify-{landing,mobile-dark}.png).
+- Ops: 15-minute webDevReview cron job recreated (job_id 394074, fixed_rate 900s, tz Africa/Lagos) — the previous session's cron was lost with its context.
+- OPERATOR NOTE: never run `bun run build` in this sandbox (it contaminates .next with production artifacts and breaks Turbopack dev chunking — this was the failure mode). If chunk errors reappear: kill only the next dev chain (pids via `ss -tlnp | grep :3000`), `rm -rf .next`, relaunch with setsid. Do NOT kill the mini-services on 3031/3032.
+- Next: Batch 2 — Trust Identity Hardening (G7 duplicate-identity handling + account recovery; G8 Business/RC model schema+UI slot, no provider claims; PR2 DSR erasure-cascade invariant test).
