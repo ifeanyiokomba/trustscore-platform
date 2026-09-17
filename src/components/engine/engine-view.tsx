@@ -13,6 +13,7 @@
 import * as React from "react";
 import { Loader2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { TabIntro, TabSurface } from "@/components/dashboard/tab-intro";
 import { PolicyPublicCard } from "@/components/engine/policy-public-card";
 import { MyEngineCard } from "@/components/engine/my-engine-card";
 import { AdminConsoleCard } from "@/components/engine/admin-console-card";
@@ -115,7 +116,13 @@ export function EngineTab() {
   }
 
   return (
-    <div className="grid min-w-0 gap-6 lg:grid-cols-3">
+    <>
+      <TabIntro
+        eyebrow="Stage 8 · The rules, published"
+        title="The Trust Engine"
+        description="Versioned scoring policies under DPIA governance — every number on the platform traces back to a rule you can read, and automated significant decisions stay gated."
+      />
+      <TabSurface className="grid min-w-0 gap-6 lg:grid-cols-3">
       {/* My snapshot lifecycle — state, policy provenance, freeze note */}
       <div className="min-w-0 lg:col-span-1">
         <MyEngineCard me={data.me} />
@@ -146,6 +153,7 @@ export function EngineTab() {
           <TransportHistoryCard data={data.history} onChanged={data.refresh} />
         </div>
       ) : null}
-    </div>
+      </TabSurface>
+    </>
   );
 }

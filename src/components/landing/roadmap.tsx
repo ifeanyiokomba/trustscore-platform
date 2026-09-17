@@ -103,8 +103,14 @@ const STAGES: { id: string; title: string; status: StageStatus; detail: string }
   {
     id: "15",
     title: "Design elevation",
-    status: "active",
+    status: "done",
     detail: "A professional typographic voice (Fraunces display over Geist), a shared motion design language with scroll choreography and micro-interactions, and a visual- polish pass across every surface — trust you can feel.",
+  },
+  {
+    id: "16",
+    title: "Surface elevation",
+    status: "active",
+    detail: "The design language extended into every deep console: display-voice tab intros across all eight dashboard surfaces, a plain ⇄ technical toggle on the public policy explainer, and cursor-paginated score insights over a 50-snapshot retention horizon.",
   },
 ];
 

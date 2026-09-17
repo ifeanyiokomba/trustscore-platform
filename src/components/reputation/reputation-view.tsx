@@ -10,6 +10,7 @@
 import * as React from "react";
 import { Loader2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { TabIntro, TabSurface } from "@/components/dashboard/tab-intro";
 import { StandingCard } from "@/components/reputation/standing-card";
 import { FlagsAgainstCard } from "@/components/reputation/flags-against-card";
 import { FileFlagCard } from "@/components/reputation/file-flag-card";
@@ -113,7 +114,13 @@ export function ReputationTab() {
   };
 
   return (
-    <div className="grid min-w-0 gap-6 lg:grid-cols-3">
+    <>
+      <TabIntro
+        eyebrow="Stage 7 · Flags & resolution"
+        title="Reputation, done fairly"
+        description="Flags carry evidence, humans decide, appeals freeze the score — and a cleared record leaves you slightly better off, never worse."
+      />
+      <TabSurface className="grid min-w-0 gap-6 lg:grid-cols-3">
       {/* Standing: verified interactions + resolution + risk */}
       <div className="min-w-0 lg:col-span-1">
         <StandingCard
@@ -142,6 +149,7 @@ export function ReputationTab() {
           />
         </div>
       ) : null}
-    </div>
+      </TabSurface>
+    </>
   );
 }

@@ -87,7 +87,17 @@ export type AuditAction =
   | "SIGNAL_LIVENESS_TRANSPORT_FAILED"
   // Stage 14 — transport observability (snapshots, sustained-open alerting)
   | "TRANSPORT_SNAPSHOT_TAKEN"
-  | "PROVIDER_ALERTING_CHANGED";
+  | "PROVIDER_ALERTING_CHANGED"
+  // Stage 16 — NINAuth passwordless authentication ("Continue with NINAuth")
+  // + the scope-enforcement pipeline's SYSTEM-side block event.
+  | "AUTH_NINAUTH_START"
+  | "AUTH_NINAUTH_DENIED"
+  | "AUTH_NINAUTH_APPROVED"
+  | "AUTH_NINAUTH_FAILED"
+  | "AUTH_NINAUTH_LOGIN"
+  | "AUTH_NINAUTH_LINKED"
+  | "AUTH_NINAUTH_REGISTERED"
+  | "SCOPE_GUARD_BLOCKED";
 
 interface AuditInput {
   actorType: "USER" | "SYSTEM" | "ANONYMOUS";

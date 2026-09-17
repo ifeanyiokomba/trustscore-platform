@@ -18,6 +18,12 @@
 // level only), and a pan-African country-provider registry (honest
 // MOCK_LIVE / PLANNED labels).
 
+// Stage 16 adds the NINAuth identity-rail pivot (developer-guide directive):
+// passwordless "Continue with NINAuth" authentication. UserAccount gains the
+// NINAuth subject binding (masked provider reference — NEVER a raw NIN); the
+// login session carries its own PKCE + one-time-code lifecycle, mirroring the
+// identity verification contract.
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -41,6 +47,11 @@ model UserAccount {
   status          String   @default("ACTIVE") // ACTIVE | SUSPENDED | PENDING_DELETION
   role            String   @default("USER") // USER | REVIEWER — reviewer role grants human-review queue access (operational grant, never self-service)
   acceptedTermsAt DateTime @default(now())
+  // Stage 16 — NINAuth identity rail: the masked provider subject bound to
+  // this account by a "Continue with NINAuth" authentication assertion.
+  // This is an opaque NINAUTH-****-XXXX reference — never a raw NIN.
+  ninauthSubject  String?  @unique
+  ninauthLinkedAt DateTime?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -557,6 +568,31 @@ model Session {
 
   @@index([userId])
   @@index([expiresAt])
+}
+
+// Stage 16 — NINAuth passwordless login sessions ("Continue with NINAuth").
+// Owns the full OAuth authorize-flow contract for authentication: PKCE
+// verifier (server-side only), one-time hashed authorization code, 10-minute
+// TTL. `authEmail` is the MOCK binding surface — the identity the simulated
+// NINAuth app acts for (production: the biometrically-bound NINAuth identity;
+// the backend never sees or stores a raw NIN).
+model NinAuthLoginSession {
+  id                    String    @id @default(cuid())
+  state                 String    @unique // OAuth state / anti-CSRF (also the token nonce)
+  codeVerifier          String // PKCE verifier — SERVER-SIDE ONLY
+  codeChallenge         String // S256(verifier)
+  status                String    @default("AWAITING_APPROVAL") // AWAITING_APPROVAL | APPROVED | DENIED | COMPLETED | EXPIRED
+  scopes                String    @default("[\"identity.basic\",\"identity.nin_status\"]") // JSON array granted at approval
+  authEmail             String? // normalized email confirmed inside the (mock) NINAuth app
+  authorizationCodeHash String? // one-time code issued on approval
+  authorizationCodeExp  DateTime?
+  errorReason           String?
+  expiresAt             DateTime // 10-minute TTL
+  completedAt           DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([status])
 }
 
 

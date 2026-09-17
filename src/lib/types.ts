@@ -394,11 +394,23 @@ export interface ScoreHistorySummary {
   flatChanges: number;
 }
 
+export interface ScoreHistoryPagination {
+  /** Snapshots in the page just returned. */
+  pageSize: number;
+  /** Older retained snapshots exist beyond this page. */
+  hasMore: boolean;
+  /** Cursor for the next older page — the oldest snapshot id in this page. */
+  nextBefore: string | null;
+  /** The retention horizon (rolling) — how many snapshots are kept at most. */
+  retainedMax: number;
+}
+
 export interface ScoreHistory {
   history: ScoreHistorySnapshot[];
   changes: ScoreChange[];
   summary: ScoreHistorySummary;
   spark: { at: string; score: number }[];
+  pagination: ScoreHistoryPagination;
 }
 
 export interface CredentialInfo {

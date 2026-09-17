@@ -79,7 +79,7 @@ export function Footer() {
           <p>© {new Date().getFullYear()} TrustScore. All rights reserved.</p>
           <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <span className="rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 font-semibold text-primary">
-              Stage 15 · Design Elevation (typography + motion design language)
+              Stage 16 · Surface Elevation (display voice everywhere + paginated insights)
             </span>
             <span>Privacy-first · Consent-first · Explainable-by-design</span>
           </p>

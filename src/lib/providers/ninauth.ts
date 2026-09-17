@@ -92,6 +92,16 @@ export const PURPOSE = "SELF_IDENTITY_VERIFICATION";
 export const REQUESTER = "TrustScore";
 export const CONSENT_POLICY_VERSION = "consent-policy-2026.09";
 
+// Stage 16 — NINAuth authentication ("Continue with NINAuth"). The developer
+// guide models authentication as a first-class NINAuth flow: the service
+// initiates authentication, the user approves in the NINAuth app, and the
+// application receives a signed, scoped assertion. Auth requests the core
+// identity scopes; profile.name is optional (used only to name a new account
+// on first sign-in — declining it falls back to a neutral display name).
+export const AUTH_PURPOSE = "NINAUTH_AUTHENTICATION";
+export const AUTH_SCOPES = [...CORE_SCOPES];
+export const AUTH_LOGIN_TTL_MS = 10 * 60_000;
+
 // Attributes a scope produces (used by the Stage 3 attribute writer).
 export function attributeKeysForScopes(scopes: string[]): string[] {
   return scopes.flatMap((s) => SCOPE_CATALOG[s]?.attributeKeys ?? []);
@@ -177,6 +187,9 @@ export interface IdTokenClaims {
   nonce: string;
   verified: boolean;
   profile?: ProfileClaims; // consent-scoped claims — only keys the scopes allow
+  // Stage 16 — authentication assertions carry the account-binding email the
+  // user confirmed inside the NINAuth app (MOCK binding surface). Never a NIN.
+  email?: string;
   iat: number;
   exp: number;
 }
@@ -412,7 +425,7 @@ export interface ConsentScreen {
   mode: "MOCK" | "LIVE";
 }
 
-export function consentScreenFor(scopes: string[]): ConsentScreen {
+export function consentScreenFor(scopes: string[], purpose: string = PURPOSE): ConsentScreen {
   const fields = scopes
     .filter((s) => SCOPE_CATALOG[s])
     .map((s) => ({
@@ -423,7 +436,7 @@ export function consentScreenFor(scopes: string[]): ConsentScreen {
     }));
   return {
     requester: REQUESTER,
-    purpose: PURPOSE,
+    purpose,
     fields: fields.length
       ? fields
       : [
@@ -452,4 +465,90 @@ export function authorizationUrlFor(state: string, codeChallenge: string): strin
     redirect_uri: "https://trustscore.ng/api/v1/identity/sessions/callback",
   });
   return `https://ninauth.nimc.gov.ng/mock/authorize?${params.toString()}`;
+}
+
+// ---------------------------------------------------------------------------
+// Stage 16 — NINAuth authentication contract ("Continue with NINAuth").
+// Same OAuth 2.0 + PKCE discipline as identity verification, scoped to
+// authentication: the user approves in the (mock) NINAuth app and TrustScore
+// receives a signed assertion whose subject binds to a UserAccount.
+// ---------------------------------------------------------------------------
+
+// The auth authorize URL shape (mock endpoint — displayed, never fetched).
+export function authAuthorizationUrlFor(state: string, codeChallenge: string): string {
+  const params = new URLSearchParams({
+    client_id: NINAUTH_CLIENT_ID,
+    response_type: "code",
+    scope: AUTH_SCOPES.join(" "),
+    state,
+    code_challenge: codeChallenge,
+    code_challenge_method: "S256",
+    redirect_uri: "https://trustscore.ng/api/v1/auth/ninauth/callback",
+    prompt: "login",
+  });
+  return `https://ninauth.nimc.gov.ng/mock/authorize?${params.toString()}`;
+}
+
+// Auth subject — the masked NINAuth reference an authentication assertion
+// carries. In MOCK posture the simulated NINAuth app binds to the confirmed
+// email (the stand-in for the biometrically-bound NINAuth identity); in LIVE
+// posture the partner's stable subject arrives in the assertion and this
+// derivation disappears. Same shape as the verification subject: opaque.
+export function maskedSubjectForAuthKey(authKey: string): string {
+  const h = createHash("sha256")
+    .update(`${NINAUTH_CLIENT_SECRET}:authsubject:${authKey}`)
+    .digest("hex")
+    .slice(0, 4)
+    .toUpperCase();
+  return `NINAUTH-****-${h}`;
+}
+
+// The mock /token exchange for the AUTH flow. Identical one-time-code + PKCE
+// discipline to mockTokenExchange; issues an authentication assertion with the
+// account-binding email claim and (optionally) the consented name claims.
+export function mockAuthTokenExchange(input: {
+  code: string;
+  storedCodeHash: string;
+  codeExpiresAt: Date;
+  codeVerifier: string;
+  codeChallenge: string;
+  nonce: string;
+  maskedSubject: string;
+  authEmail: string;
+  scopes: string[];
+  profile: ProfileClaims;
+}): TokenResponse {
+  if (!codeMatches(input.storedCodeHash, input.code)) {
+    throw new TokenValidationError("bad_code");
+  }
+  if (input.codeExpiresAt.getTime() < Date.now()) {
+    throw new TokenValidationError("code_expired");
+  }
+  if (!pkceChallengeMatches(input.codeVerifier, input.codeChallenge)) {
+    throw new TokenValidationError("pkce_mismatch");
+  }
+
+  const profile: ProfileClaims = {};
+  if (input.scopes.includes("profile.name")) {
+    profile.given_name = input.profile.given_name;
+    profile.family_name = input.profile.family_name;
+  }
+
+  const id_token = issueMockIdToken({
+    iss: MOCK_ISSUER,
+    aud: NINAUTH_CLIENT_ID,
+    sub: input.maskedSubject,
+    scopes: input.scopes,
+    nonce: input.nonce,
+    verified: true,
+    profile,
+    email: input.authEmail,
+  });
+
+  return {
+    access_token: `ts_mock_at_${randomBytes(24).toString("base64url")}`,
+    token_type: "Bearer",
+    expires_in: 3600,
+    id_token,
+  };
 }

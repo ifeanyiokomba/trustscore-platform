@@ -34,7 +34,10 @@ import {
 } from "@/lib/services/policy-service";
 
 export const SCORE_VERSION = 1;
-export const SNAPSHOT_RETAIN = 20; // last N snapshots kept per user
+// Stage 16 — the retention horizon is now 50 snapshots (was 20): a deeper
+// explainable history, still bounded. The insights read model pages through
+// it (20 per page) so the surface stays fast no matter how full the window.
+export const SNAPSHOT_RETAIN = 50; // last N snapshots kept per user
 
 export type ScoreStatus =
   | "NEW"

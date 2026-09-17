@@ -11,7 +11,7 @@
 //   • if the policy can't be loaded we say so — never silent placeholders.
 
 import * as React from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Scale,
   Fingerprint,
@@ -25,8 +25,10 @@ import {
   Loader2,
   RotateCcw,
   Info,
+  MessageSquareText,
+  Braces,
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -168,12 +170,114 @@ function BudgetBar({
 const LADDER_LABELS = ["L0", "L1", "L2", "L3", "L4"];
 
 // ---------------------------------------------------------------------------
+// Stage 16 — the technical view: the exact ruleset object the engine loads,
+// serialized from the ACTIVE policy record, unmodified. Plain language is
+// the default; this is for the engineers, auditors and the curious.
+// ---------------------------------------------------------------------------
+
+function TechnicalSheet({ data }: { data: PublicEngineView }) {
+  const rules = data.activePolicy?.rules;
+  if (!rules) return null;
+  const gov: { k: string; v: string }[] = [
+    {
+      k: "policyVersion",
+      v: data.activePolicy ? `v${data.activePolicy.version} · ACTIVE` : "—",
+    },
+    {
+      k: "activatedAt",
+      v: data.activePolicy?.activatedAt
+        ? new Date(data.activePolicy.activatedAt).toISOString()
+        : "—",
+    },
+    { k: "changeSummary", v: data.activePolicy?.changeSummary ?? "—" },
+    { k: "dpia.status", v: data.dpia.status ?? "—" },
+    {
+      k: "dpia.completedAt",
+      v: data.dpia.completedAt ? new Date(data.dpia.completedAt).toISOString() : "—",
+    },
+    { k: "dpia.residualRisk", v: data.dpia.residualRisk ?? "—" },
+    {
+      k: "automatedSignificantDecisions",
+      v: data.automatedSignificantDecisions ? "true" : "false (gated)",
+    },
+  ];
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 14 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -8 }}
+      transition={{ duration: 0.35 }}
+      className="space-y-4"
+      data-testid="policy-technical-sheet"
+    >
+      <Card>
+        <CardHeader className="flex-row flex-wrap items-center gap-3 space-y-0 p-5">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <Braces className="h-4 w-4" aria-hidden="true" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <CardTitle className="font-mono text-sm">scoringPolicy.rules</CardTitle>
+            <CardDescription className="font-mono text-[11px]">
+              serialized from the ACTIVE policy record — the exact object the engine loads
+            </CardDescription>
+          </div>
+          <Badge variant="outline" className="border-primary/40 bg-primary/10 font-mono font-bold text-primary">
+            v{data.activePolicy?.version}
+          </Badge>
+        </CardHeader>
+        <CardContent className="p-5 pt-0">
+          <dl className="grid gap-x-10 font-mono text-xs sm:grid-cols-2">
+            {Object.entries(rules).map(([k, v]) => (
+              <div
+                key={k}
+                className="flex items-baseline justify-between gap-4 border-b border-dashed border-border/70 py-2"
+              >
+                <dt className="min-w-0 truncate text-muted-foreground" title={k}>
+                  {k}
+                </dt>
+                <dd className="shrink-0 font-bold tabular-nums text-foreground">
+                  {Array.isArray(v) ? `[${v.join(", ")}]` : String(v)}
+                </dd>
+              </div>
+            ))}
+          </dl>
+          <div className="mt-5 grid gap-x-10 gap-y-1 font-mono text-[11px] sm:grid-cols-2">
+            {gov.map((g) => (
+              <div key={g.k} className="flex items-baseline justify-between gap-4 border-b border-dashed border-border/50 py-1.5">
+                <dt className="min-w-0 truncate text-muted-foreground/80" title={g.k}>
+                  {g.k}
+                </dt>
+                <dd className="min-w-0 truncate font-semibold text-foreground/85" title={g.v}>
+                  {g.v}
+                </dd>
+              </div>
+            ))}
+          </div>
+          <p className="mt-4 flex items-start gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2.5 font-sans text-[11px] leading-relaxed text-muted-foreground">
+            <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" />
+            <span>
+              Every value above is read live from the transparency endpoint — nothing here is a
+              cached or hardcoded copy. Policy values only change through a new versioned policy
+              covered by a completed DPIA; the engine refuses to score without one.
+            </span>
+          </p>
+        </CardContent>
+      </Card>
+    </motion.div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Section
 // ---------------------------------------------------------------------------
 
 export function PolicyExplainer() {
   const { data, state, reload } = usePublicPolicy();
   const rules = data?.activePolicy?.rules;
+  // Stage 16 — plain language by default; the technical sheet is one tap
+  // away for engineers and auditors. No persistence: every visit starts
+  // plain, which is also what SSR renders.
+  const [view, setView] = React.useState<"plain" | "technical">("plain");
 
   return (
     <section id="scoring" className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20" aria-labelledby="scoring-heading">
@@ -190,6 +294,45 @@ export function PolicyExplainer() {
           Trust Passport explains against.
         </p>
       </div>
+
+      {/* Stage 16 — the view toggle: plain language ⇄ technical sheet */}
+      <motion.div {...fadeUp} transition={{ duration: 0.4 }} className="mt-8 flex justify-center">
+        <div
+          role="group"
+          aria-label="Policy explainer view"
+          className="ts-inset inline-flex items-center gap-1 rounded-full p-1"
+          data-testid="policy-view-toggle"
+        >
+          <button
+            type="button"
+            onClick={() => setView("plain")}
+            aria-pressed={view === "plain"}
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              view === "plain"
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <MessageSquareText className="h-3.5 w-3.5" aria-hidden="true" />
+            Plain language
+          </button>
+          <button
+            type="button"
+            onClick={() => setView("technical")}
+            aria-pressed={view === "technical"}
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              view === "technical"
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <Braces className="h-3.5 w-3.5" aria-hidden="true" />
+            Technical
+          </button>
+        </div>
+      </motion.div>
 
       {/* Version + governance strip */}
       <motion.div {...fadeUp} transition={{ duration: 0.45 }} className="mt-10">
@@ -235,7 +378,9 @@ export function PolicyExplainer() {
         </div>
       </motion.div>
 
-      {/* The five components, budgets and rules — live values */}
+      {/* The five components, budgets and rules — live values (plain) or the
+          exact serialized ruleset (technical). AnimatePresence keeps the swap
+          soft; reduced-motion users get an instant switch via MotionConfig. */}
       <div className="mt-6">
         {state === "loading" && <PolicySkeleton />}
         {state === "error" && (
@@ -252,8 +397,19 @@ export function PolicyExplainer() {
           </div>
         )}
         {state === "ready" && rules && (
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
-            {/* Identity Assurance */}
+          <AnimatePresence mode="wait" initial={false}>
+            {view === "technical" && data ? (
+              <TechnicalSheet key="technical" data={data} />
+            ) : (
+              <motion.div
+                key="plain"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.3 }}
+              >
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
+              {/* Identity Assurance */}
             <motion.div {...fadeUp} transition={{ duration: 0.4, delay: 0.03 }}>
               <Card className="h-full">
                 <CardHeader className="space-y-2.5 p-5">
@@ -384,12 +540,16 @@ export function PolicyExplainer() {
                 </CardContent>
               </Card>
             </motion.div>
-          </div>
+              </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         )}
       </div>
 
-      {/* Thresholds + governance detail */}
-      {state === "ready" && rules && (
+      {/* Thresholds + governance detail — plain view only (the technical
+          sheet carries its own governance block) */}
+      {state === "ready" && rules && view === "plain" && (
         <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
           <motion.div {...fadeUp} transition={{ duration: 0.45, delay: 0.05 }}>
             <Card className="h-full">
@@ -408,8 +568,9 @@ export function PolicyExplainer() {
                   </li>
                   <li className="flex items-start gap-2">
                     <ShieldCheck className="mt-0.5 h-3 w-3 shrink-0 text-primary" aria-hidden="true" />
-                    Snapshots stay fresh for {rules.snapshotTtlHours}h; the last 20 are retained so
-                    every historical score stays explainable forever.
+                    Snapshots stay fresh for {rules.snapshotTtlHours}h; the last 50 are retained so
+                    every historical score stays explainable — page back through them in Score
+                    Insights.
                   </li>
                   <li className="flex items-start gap-2">
                     <ShieldCheck className="mt-0.5 h-3 w-3 shrink-0 text-primary" aria-hidden="true" />

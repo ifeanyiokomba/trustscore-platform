@@ -29,6 +29,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { ClientCard } from "@/components/dev/client-card";
 import { ApiDocsCard } from "@/components/dev/api-docs-card";
+import { TabIntro } from "@/components/dashboard/tab-intro";
 import type { DevClient, DevPortal } from "@/lib/types";
 
 export interface DevData {
@@ -203,6 +204,12 @@ export function DevTab() {
       transition={{ duration: 0.4 }}
       className="space-y-6"
     >
+      <TabIntro
+        eyebrow="Stage 9 · B2B platform"
+        title="Build on verified trust"
+        description="API keys, webhooks, teams and the Trust Decision endpoint — the same engine that powers the passport, behind your own product."
+      />
+
       {/* Honesty banner — the B2B surface states its own limits */}
       <div className="rounded-xl border border-amber-500/40 bg-amber-500/5 px-4 py-3.5" role="note">
         <p className="flex items-start gap-2.5 text-xs leading-relaxed">

@@ -21,6 +21,11 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTrustStore } from "@/lib/store";
 import { apiLogin, apiRegister } from "@/lib/api-client";
+import {
+  NinAuthModal,
+  type NinAuthSessionInfo,
+} from "@/components/auth/ninauth-modal";
+import type { ConsentScreenInfo } from "@/lib/types";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const HANDLE_RE = /^[a-z0-9_]{3,24}$/;
@@ -50,6 +55,32 @@ export function AuthView() {
 
   const [submitting, setSubmitting] = React.useState(false);
   const [validation, setValidation] = React.useState<Record<string, string | null>>({});
+
+  // Stage 16 — passwordless "Continue with NINAuth" sign-in state.
+  const [ninOpen, setNinOpen] = React.useState(false);
+  const [ninSession, setNinSession] = React.useState<NinAuthSessionInfo | null>(null);
+  const [ninConsent, setNinConsent] = React.useState<ConsentScreenInfo | null>(null);
+  const [ninStarting, setNinStarting] = React.useState(false);
+
+  async function startNinAuth() {
+    setNinStarting(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/v1/auth/ninauth/start", { method: "POST" });
+      const body = await res.json();
+      if (!res.ok) {
+        setError(body?.error?.message ?? "Could not start NINAuth sign-in.");
+        return;
+      }
+      setNinSession(body.session as NinAuthSessionInfo);
+      setNinConsent(body.consentScreen as ConsentScreenInfo);
+      setNinOpen(true);
+    } catch {
+      setError("Network error — try again.");
+    } finally {
+      setNinStarting(false);
+    }
+  }
 
   React.useEffect(() => {
     setError(null);
@@ -139,6 +170,35 @@ export function AuthView() {
             </CardDescription>
           </CardHeader>
           <CardContent>
+            {/* Stage 16 — the flagship sign-in: passwordless via NINAuth.
+                Brand treatment per the NINAuth guide: white, green accents. */}
+            <Button
+              type="button"
+              onClick={() => void startNinAuth()}
+              disabled={ninStarting}
+              className="mt-1 w-full gap-2.5 border border-emerald-600/40 bg-white py-5 text-emerald-700 shadow-sm transition-all hover:-translate-y-px hover:bg-emerald-50 hover:text-emerald-800 dark:bg-white dark:text-emerald-700 dark:hover:bg-emerald-50"
+              size="lg"
+              data-testid="ninauth-signin-button"
+            >
+              {ninStarting ? (
+                <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
+              ) : (
+                <span
+                  className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-white"
+                  aria-hidden="true"
+                >
+                  <ShieldCheck className="h-3 w-3" />
+                </span>
+              )}
+              Continue with NINAuth
+            </Button>
+            <div className="my-5 flex items-center gap-3" aria-hidden="true">
+              <span className="h-px flex-1 bg-border" />
+              <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                or use email
+              </span>
+              <span className="h-px flex-1 bg-border" />
+            </div>
             <Tabs value={tab} onValueChange={(t) => setTab(t as "signin" | "signup")}>
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="signup">Create account</TabsTrigger>
@@ -278,7 +338,9 @@ export function AuthView() {
                     )}
                   </div>
 
-                  <Button type="submit" className="w-full" size="lg" disabled={submitting}>
+                  {/* Email is the fallback path — outline styling keeps the
+                      NINAuth action (above) visually primary. */}
+                  <Button type="submit" variant="outline" className="w-full" size="lg" disabled={submitting}>
                     {submitting ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -334,7 +396,7 @@ export function AuthView() {
                     )}
                   </div>
 
-                  <Button type="submit" className="w-full" size="lg" disabled={submitting}>
+                  <Button type="submit" variant="outline" className="w-full" size="lg" disabled={submitting}>
                     {submitting ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -348,13 +410,27 @@ export function AuthView() {
               </TabsContent>
             </Tabs>
 
-            <p className="mt-4 text-center text-[11px] leading-relaxed text-muted-foreground">
-              Stage 1 accounts use email &amp; password with hardened sessions. NINAuth
-              identity verification is live in your dashboard (mock provider).
+            <p className="mt-5 text-center text-[11px] leading-relaxed text-muted-foreground">
+              NINAuth sign-in is passwordless — your identity is asserted by
+              NIMC&apos;s NINAuth (mock provider in this build) and no raw NIN is
+              ever collected. Email accounts remain available as a fallback.
             </p>
           </CardContent>
         </Card>
       </motion.div>
+
+      {/* Stage 16 — the simulated NINAuth app consent screen */}
+      <NinAuthModal
+        open={ninOpen}
+        session={ninSession}
+        consent={ninConsent}
+        initialEmail={email.trim().toLowerCase()}
+        onDismiss={() => {
+          setNinOpen(false);
+          setNinSession(null);
+          setNinConsent(null);
+        }}
+      />
     </section>
   );
 }

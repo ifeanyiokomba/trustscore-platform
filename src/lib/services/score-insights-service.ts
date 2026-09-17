@@ -17,6 +17,7 @@
 
 import { db } from "@/lib/db";
 import { deriveState } from "@/lib/services/engine-service";
+import { SNAPSHOT_RETAIN } from "@/lib/services/trustscore-service";
 import type { ScoreComponent } from "@/lib/services/trustscore-service";
 
 export interface HistorySnapshot {
@@ -81,12 +82,19 @@ export interface ScoreHistorySummary {
   flatChanges: number;
 }
 
+export interface ScoreHistoryPagination {
+  pageSize: number;
+  hasMore: boolean;
+  nextBefore: string | null;
+  retainedMax: number;
+}
+
 export interface ScoreHistory {
-  history: HistorySnapshot[]; // oldest → newest (max SNAPSHOT_RETAIN)
-  changes: ScoreChange[]; // newest → newest-1 … oldest pair first? NO:
-  // chronological (oldest change first) — the UI renders newest on top.
-  summary: ScoreHistorySummary;
-  spark: { at: string; score: number }[]; // oldest → newest, for the sparkline
+  history: HistorySnapshot[]; // this page, oldest → newest
+  changes: ScoreChange[]; // chronological, within this page
+  summary: ScoreHistorySummary; // over the FULL retained window
+  spark: { at: string; score: number }[]; // full retained window
+  pagination: ScoreHistoryPagination;
 }
 
 // ---------------------------------------------------------------------------
@@ -134,7 +142,23 @@ const EVENT_CATALOG: Record<string, { label: string; componentKey: string | null
 };
 
 const EVENTS_WINDOW_LIMIT = 8; // events shown per change before "+N more"
-const HISTORY_LIMIT = 20; // mirrors SNAPSHOT_RETAIN
+
+// Stage 16 — cursor pagination over the retained window. The DEFAULT page
+// is the newest 20 snapshots; `before` (the oldest snapshot id of the page
+// you hold) pages backwards in time. Summary + sparkline are always computed
+// over the FULL retained window so they stay stable across pages.
+export const HISTORY_PAGE_DEFAULT = 20;
+export const HISTORY_PAGE_MIN = 5;
+export const HISTORY_PAGE_MAX = 20;
+
+/** Thrown when a `before` cursor is unknown (or belongs to someone else —
+ * the error is deliberately identical so ids can't be probed). */
+export class InvalidHistoryCursorError extends Error {
+  constructor() {
+    super("INVALID_CURSOR");
+    this.name = "InvalidHistoryCursorError";
+  }
+}
 
 function parseComponents(raw: string): ScoreComponent[] {
   try {
@@ -145,12 +169,59 @@ function parseComponents(raw: string): ScoreComponent[] {
   }
 }
 
-export async function getScoreHistory(userId: string): Promise<ScoreHistory> {
-  const rows = await db.trustScoreSnapshot.findMany({
-    where: { userId },
-    orderBy: { computedAt: "asc" },
-    take: HISTORY_LIMIT,
+export async function getScoreHistory(
+  userId: string,
+  opts: { before?: string; limit?: number; full?: boolean } = {}
+): Promise<ScoreHistory> {
+  // `full` (the export path) reads the entire retained window in one page.
+  let limit: number;
+  if (opts.full) {
+    limit = SNAPSHOT_RETAIN;
+  } else {
+    const raw = opts.limit ?? HISTORY_PAGE_DEFAULT;
+    limit = Math.max(HISTORY_PAGE_MIN, Math.min(HISTORY_PAGE_MAX, raw));
+  }
+
+  // Resolve the cursor (oldest snapshot id of the page the caller holds).
+  let cursor: { computedAt: Date; id: string } | null = null;
+  if (opts.before) {
+    const c = await db.trustScoreSnapshot.findUnique({
+      where: { id: opts.before },
+      select: { id: true, userId: true, computedAt: true },
+    });
+    if (!c || c.userId !== userId) throw new InvalidHistoryCursorError();
+    cursor = { computedAt: c.computedAt, id: c.id };
+  }
+
+  // Page fetch: newest-first with one look-ahead row to detect `hasMore`,
+  // then reversed to chronological. The cursor tiebreak (same-second rows)
+  // keeps paging deterministic when snapshots share a timestamp.
+  const pageRowsDesc = await db.trustScoreSnapshot.findMany({
+    where: {
+      userId,
+      ...(cursor
+        ? {
+            OR: [
+              { computedAt: { lt: cursor.computedAt } },
+              { computedAt: cursor.computedAt, id: { lt: cursor.id } },
+            ],
+          }
+        : {}),
+    },
+    orderBy: [{ computedAt: "desc" }, { id: "desc" }],
+    take: limit + 1,
   });
+  const hasMore = !opts.full && pageRowsDesc.length > limit;
+  const rows = pageRowsDesc.slice(0, limit).reverse(); // oldest → newest
+
+  // Full-window read (scores only — cheap) for the stable summary + spark.
+  const windowDesc = await db.trustScoreSnapshot.findMany({
+    where: { userId },
+    orderBy: [{ computedAt: "desc" }, { id: "desc" }],
+    take: SNAPSHOT_RETAIN,
+    select: { score: true, computedAt: true },
+  });
+  const windowAsc = [...windowDesc].reverse();
 
   // Policy provenance: resolve policyId → version once (few policies exist).
   const policyIds = [...new Set(rows.map((r) => r.policyId).filter((p): p is string => !!p))];
@@ -245,29 +316,48 @@ export async function getScoreHistory(userId: string): Promise<ScoreHistory> {
     });
   }
 
-  const scores = rows.map((r) => r.score);
-  const first = rows[0];
-  const latest = rows[rows.length - 1];
+  // Summary over the FULL retained window (stable across pages) — computed
+  // from scores alone; every consecutive pair is a change (flat counts too).
+  const windowScores = windowAsc.map((r) => r.score);
+  const first = windowAsc[0];
+  const latestW = windowAsc[windowAsc.length - 1];
+  let up = 0;
+  let down = 0;
+  let flat = 0;
+  for (let i = 1; i < windowAsc.length; i++) {
+    const d = windowAsc[i].score - windowAsc[i - 1].score;
+    if (d > 0) up++;
+    else if (d < 0) down++;
+    else flat++;
+  }
   const summary: ScoreHistorySummary = {
-    snapshotCount: rows.length,
-    changeCount: changes.length,
+    snapshotCount: windowAsc.length,
+    changeCount: Math.max(0, windowAsc.length - 1),
     firstAt: first?.computedAt.toISOString() ?? null,
-    latestAt: latest?.computedAt.toISOString() ?? null,
+    latestAt: latestW?.computedAt.toISOString() ?? null,
     firstScore: first?.score ?? null,
-    latestScore: latest?.score ?? null,
-    minScore: rows.length ? Math.min(...scores) : null,
-    maxScore: rows.length ? Math.max(...scores) : null,
-    netChange: rows.length ? latest.score - first.score : 0,
-    upChanges: changes.filter((c) => c.delta > 0).length,
-    downChanges: changes.filter((c) => c.delta < 0).length,
-    flatChanges: changes.filter((c) => c.delta === 0).length,
+    latestScore: latestW?.score ?? null,
+    minScore: windowAsc.length ? Math.min(...windowScores) : null,
+    maxScore: windowAsc.length ? Math.max(...windowScores) : null,
+    netChange: windowAsc.length ? latestW!.score - first!.score : 0,
+    upChanges: up,
+    downChanges: down,
+    flatChanges: flat,
   };
 
   return {
     history,
-    changes, // chronological (oldest change first)
+    changes, // chronological (oldest change first) — within this page
     summary,
-    spark: rows.map((r) => ({ at: r.computedAt.toISOString(), score: r.score })),
+    // Sparkline spans the full retained window — it never shrinks as you
+    // page backwards, so the trend line stays the whole truth.
+    spark: windowAsc.map((r) => ({ at: r.computedAt.toISOString(), score: r.score })),
+    pagination: {
+      pageSize: limit,
+      hasMore,
+      nextBefore: hasMore && rows.length > 0 ? rows[0].id : null,
+      retainedMax: SNAPSHOT_RETAIN,
+    },
   };
 }
 
@@ -302,7 +392,9 @@ export async function buildScoreHistoryExport(
   userId: string,
   format: "csv" | "json"
 ): Promise<{ filename: string; contentType: string; body: string; records: number }> {
-  const data = await getScoreHistory(userId);
+  // Stage 16 — the export always carries the FULL retained window (up to
+  // SNAPSHOT_RETAIN snapshots), independent of the paged read model.
+  const data = await getScoreHistory(userId, { full: true });
   const date = new Date().toISOString().slice(0, 10);
   const records = data.history.length;
 
@@ -313,7 +405,7 @@ export async function buildScoreHistoryExport(
       body: JSON.stringify(
         {
           exportedAt: new Date().toISOString(),
-          note: "Your TrustScore snapshot history (up to the 20 most recent snapshots retained). Component values are the engine's five-part breakdown; deltas compare consecutive snapshots. Events are the audited actions recorded between snapshots — correlated context, not a causal verdict (NDPA §37).",
+          note: "Your TrustScore snapshot history (up to the 50 most recent snapshots retained). Component values are the engine's five-part breakdown; deltas compare consecutive snapshots. Events are the audited actions recorded between snapshots — correlated context, not a causal verdict (NDPA §37).",
           summary: data.summary,
           history: data.history,
           changes: data.changes,
