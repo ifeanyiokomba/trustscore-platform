@@ -1,10 +1,10 @@
-// GET /api/v1/auth/me — resolve the current session (used to hydrate the client).
-// AUTH batch: also returns the caller's authentication identifiers (masked)
-// so the client can render the sign-in methods state.
+// GET /api/v1/auth/identifiers — the caller's authentication identifiers
+// (masked view model — raw phones and Google subjects never leave the server)
+// + a phone-link OTP can be started via /auth/phone/start (purpose LINK).
 
 import { NextRequest } from "next/server";
 import { jsonOk, jsonError, newRequestId } from "@/lib/platform/http";
-import { getSessionUser, toPublicUser } from "@/lib/platform/session";
+import { getSessionUser } from "@/lib/platform/session";
 import { listIdentifiers } from "@/lib/services/auth-identifier-service";
 
 export async function GET(req: NextRequest) {
@@ -16,5 +16,5 @@ export async function GET(req: NextRequest) {
   }
 
   const identifiers = await listIdentifiers(user.id);
-  return jsonOk({ user: toPublicUser(user), identifiers });
+  return jsonOk({ identifiers, requestId });
 }

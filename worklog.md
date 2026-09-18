@@ -702,3 +702,111 @@ Stage Summary:
 - Ops: 15-minute webDevReview cron job recreated (job_id 394074, fixed_rate 900s, tz Africa/Lagos) — the previous session's cron was lost with its context.
 - OPERATOR NOTE: never run `bun run build` in this sandbox (it contaminates .next with production artifacts and breaks Turbopack dev chunking — this was the failure mode). If chunk errors reappear: kill only the next dev chain (pids via `ss -tlnp | grep :3000`), `rm -rf .next`, relaunch with setsid. Do NOT kill the mini-services on 3031/3032.
 - Next: Batch 2 — Trust Identity Hardening (G7 duplicate-identity handling + account recovery; G8 Business/RC model schema+UI slot, no provider claims; PR2 DSR erasure-cascade invariant test).
+
+---
+Task ID: auth-batch-A (audit+design)
+Agent: Z.ai Code (main session)
+Task: Multi-Identifier Login + Google OAuth (user directive): audit current auth, design unified identifier architecture.
+
+Work Log (AUDIT FINDINGS — sound parts to REUSE):
+- Session mgmt (src/lib/platform/session.ts): httpOnly cookie, sha256 token hash, revocation, 30d TTL, UA + salted IP hash. SOLID — reuse unchanged.
+- Password crypto (src/lib/platform/crypto.ts): scrypt N=16384, per-user salt, timing-safe equal. SOLID — reuse.
+- Rate limiting (src/lib/platform/http.ts): in-memory fixed window per IP+scope + GENERIC_LOGIN_ERROR enumeration resistance. Reuse, extend scopes.
+- OAuth2.0+PKCE+state pattern (NinAuthLoginSession + ninauth-auth-service.ts + ninauth.ts): exact template for Google OAuth. Reuse pattern.
+- phone-provider.ts: normalizePhoneE164 (+234 NG), maskPhoneHint, phoneFingerprint (peppered sha256 SIGNAL_PEPPER:phone:E164). Reuse for phone auth identifiers.
+- Account resolution order in ninauth-auth-service (subject → email-link → register) is the model for Google resolution.
+- Audit events (recordAudit), notifications (notifyUser), Security Center sign-in alerts exist.
+- /api/v1/identity/sessions exists (device mgmt surface).
+- GAPS: login accepts email only; no username/phone login; no Google OAuth; registration requires email+password always; no forgot-password; identifiers scattered (email+handle on UserAccount, ninauthSubject on UserAccount, phone only at identity layer); no reserved-username list; no linking/unlinking flows.
+
+DESIGN DECISIONS (Batch: AUTH — supersedes roadmap order per explicit user directive):
+- D1: NEW model AuthIdentifier {userId, type: USERNAME|EMAIL|PHONE|GOOGLE, value(normalized; PHONE=phoneFingerprint, GOOGLE=stable sub), hint(masked), verified, verifiedAt, isPrimary, lastUsedAt} @@unique([type,value]). UserAccount.email/handle stay as denormalized display fields (all existing code keeps working); AuthIdentifier is the canonical auth registry; backfilled for existing accounts. UserAccount.email becomes NULLABLE (phone-only/Google-only accounts).
+- D2: username == handle (one concept, two names). Case-insensitive uniqueness via existing lowercase-normalized unique handle + RESERVED_USERNAMES list. Username change NOT supported this batch (documented; auditable-change design belongs to its own batch).
+- D3: Google = OAuth 2.0 + PKCE + state, code hashed one-time 60s, mock provider honestly labeled (no real credentials in sandbox — same posture discipline as NINAuth). Mock sub = deterministic sha256("google:"+normalizedEmail). LIVE gated on GOOGLE_CLIENT_ID/SECRET env.
+- D4: Google resolution: (1) GOOGLE identifier bound → LOGIN; (2) sub unbound + email matches account with VERIFIED EMAIL identifier → auto-LINK + login (Google's verified email = secure ownership proof); (3) email matches UNVERIFIED → LINK_REQUIRED (user signs in with password, then confirms linking — never silent merge); (4) no match → REGISTER (passwordless, unguessable scrypt password).
+- D5: Phone login = OTP (5min TTL, hashed, max 5 attempts / 3 resends, per-IP + per-phone rate limits). Mock delivery honestly labeled. PhoneLoginSession purpose LOGIN|REGISTER|LINK|RECOVERY. Raw phone NEVER persisted (fingerprint only) — never in URLs/logs/analytics.
+- D6: Recovery: PasswordResetSession (token hash, 15min, single-use); request is identifier-based + always-generic response; confirm resets password + revokes ALL sessions. Phone recovery via OTP. Google re-auth = google login itself.
+- D7: Login route accepts {identifier} (username|email|phone, backend detects type) + {password}; legacy {email} still accepted (stage matrices pin it).
+- D8: Product principle enforced: login ≠ NINAuth-verified ≠ trustworthy. Auth methods NEVER surface as trust signals.
+- D9: Unlink rules: cannot unlink the ONLY remaining identifier when the account has no password; audited.
+
+---
+Task ID: auth-batch-B (backend complete)
+Agent: Z.ai Code (main session)
+Task: AUTH batch backend — schema migration + identifier registry + multi-method login/register + Google OAuth + phone OTP + recovery.
+
+Work Log:
+- Schema (prisma db push OK): NEW AuthIdentifier, PhoneLoginSession, GoogleLoginSession, PasswordResetSession models; UserAccount.email now NULLABLE (phone-only/Google-only accounts); authIdentifiers/passwordResets relations added.
+- NEW src/lib/auth/identifiers.ts — pure normalization/detection: normalizeUsername (lowercase, 3-24 [a-z0-9_], RESERVED_USERNAMES list), normalizeEmail, normalizePhoneIdentifier (reuses phone-provider E.164+fingerprint+hint), detectIdentifierType (shape-based, never existence-based), googleSubForEmail (deterministic mock sub).
+- NEW src/lib/services/auth-identifier-service.ts — canonical registry: resolveIdentifier (AuthIdentifier @@unique lookup + legacy fallback), linkIdentifier/unlinkIdentifier (LAST_IDENTIFIER guard, audited), listIdentifiers (masked), backfillIdentifiers (idempotent), deriveHandle.
+- NEW src/lib/providers/google.ts — Google OAuth provider: MOCK/LIVE posture (env-gated GOOGLE_CLIENT_ID/SECRET), PKCE+state (reuses ninauth primitives), one-time hashed codes 60s, HMAC-signed mock ID-token validated (iss/aud/exp/nonce), googleConsentScreen.
+- NEW src/lib/services/google-auth-service.ts — resolution rules D4: sub bound → LOGIN; verified-email match → auto-LINK; unverified-email match → LINK_REQUIRED (explicit confirm flow); else REGISTER (passwordless). confirmGoogleLink (session-authenticated, never silent merge). Crash-safe session consumption ordering.
+- NEW src/lib/services/phone-auth-service.ts — OTP 5min TTL hashed, 5 attempts/3 resends caps, purposes LOGIN|REGISTER|LINK|RECOVERY; completePhoneLogin/completePhoneRegistration (passwordless option)/completePhoneLink.
+- NEW src/lib/services/recovery-service.ts — password reset (generic always-200 request w/ decoy tokens, single-use hashed token 15min, confirm revokes ALL sessions); email verification codes (PlatformSetting-backed, 10min TTL, capped attempts).
+- EDITED src/lib/services/account-service.ts — authenticateUser(identifier|email, password): shape-based PHONE→PHONE_OTP_REQUIRED routing, USERNAME/EMAIL resolution via registry, legacy rows auto-synced; registerUser: email OPTIONAL, HANDLE_INVALID (reserved list), identifier rows created.
+- EDITED login route (identifier field + legacy email), register route (email optional), me route (identifiers list). AuditAction union +23 AUTH_* actions. SessionUser.email → string|null (frontend types too).
+- NEW routes: phone/start, phone/verify (LOGIN completes w/ cookie; REGISTER marks verified), phone/register, google/start, google/[id]/grant (MOCK-only), google/[id]/callback (LINK_REQUIRED handled), google/link, recover/password/{request,confirm}, email/verify/{request,confirm}, logout-all, identifiers (GET), identifiers/[type]/unlink (POST).
+- Backfill run: 922 identifiers created for existing accounts.
+
+API CONTRACT (for the frontend):
+- POST /api/v1/auth/login {identifier, password} → 200 {user, identifierType} | 400 PHONE_OTP_REQUIRED | 401 INVALID_CREDENTIALS (generic msg "Invalid email or password." — wait, updated copy: single identifier UX)
+- POST /api/v1/auth/register {displayName, handle, password, email?, acceptTerms:true} → 201 {user}
+- POST /api/v1/auth/phone/start {phone, purpose} → 200 {session:{id, phoneHint, expiresAt, purpose}, mockOtp} (MOCK: code surfaced)
+- POST /api/v1/auth/phone/verify {sessionId, otp} → LOGIN: 200 {user, outcome:"LOGIN"} (sets cookie); REGISTER/LINK: 200 {verified:true, purpose}
+- POST /api/v1/auth/phone/register {sessionId, displayName, handle, password?, email?} → 201 {user, outcome:"REGISTERED"} (sets cookie)
+- POST /api/v1/auth/google/start → 200 {session:{id, status, authorizationUrl, provider:"GOOGLE_MOCK", providerMode, consentScreen, expiresAt}}
+- POST /api/v1/auth/google/[id]/grant {decision:"GRANT"|"DENY", email} → 200 {code, state} (mock Google account picker)
+- POST /api/v1/auth/google/[id]/callback {code, state} → 200 {user, outcome:"LOGIN"|"LINKED"|"REGISTERED"} (cookie) | 200 {linkRequired:true, googleSessionId, emailHint, message}
+- POST /api/v1/auth/google/link {googleSessionId} (authed) → 200 {linked:true} | 409 ALREADY_LINKED_TO_OTHER
+- POST /api/v1/auth/recover/password/request {identifier} → 200 {sent, message, mockToken} (always same shape)
+- POST /api/v1/auth/recover/password/confirm {token, newPassword} → 200 {reset:true, message} (revokes all sessions)
+- POST /api/v1/auth/email/verify/request (authed) → 200 {mockCode, expiresAt}; confirm {code} → 200 {verified, email}
+- POST /api/v1/auth/logout-all (authed) → 200 {signedOut, sessionsRevoked} (clears cookie)
+- GET /api/v1/auth/identifiers (authed) → 200 {identifiers:[{type,label,hint,verified,isPrimary,linkedAt,lastUsedAt}]}
+- POST /api/v1/auth/identifiers/[GOOGLE|PHONE]/unlink (authed) → 200 {unlinked} | 409 LAST_IDENTIFIER
+- GET /api/v1/auth/me → 200 {user (email nullable!), identifiers}
+
+Smoke-verified via curl: email login (legacy+identifier), username login, PHONE_OTP_REQUIRED routing, phone register (email:null OK), phone login, google REGISTERED + repeat LOGIN, recovery request (identical shape for unknown identifier) + confirm (sessions revoked). ada's test password restored to SuperSecret1 after recovery test. tsc 0 errors, eslint clean.
+
+---
+Task ID: auth-7
+Agent: general-purpose
+Task: AUTH batch TEST MATRIX — tests/auth_matrix.py (28 items over the auth-batch-B contract: signup/login × username/email/phone/Google, duplicates, enumeration resistance, OTP expiry/brute-force, Google OAuth failure paths, session expiry/revocation, recovery, link-steal prevention, logout-all) + regressions. Test-writing only — no backend/frontend changes.
+
+Work Log:
+- Read the auth-batch-B API CONTRACT (worklog) + all auth route/service implementations (login, register, phone/*, google/*, recover/*, logout, logout-all, me, identifiers) and the historical matrix style (stage2/batch1: python requests + check() + "===== RESULT: X passed, Y failed =====").
+- NEW tests/auth_matrix.py — 95 checks covering items 1–27 (item 28 is the browser check): unique per-run fixtures (prefix authmx_, unique phones +234 8XXXXXXXXX); per-scope rate-window PACING (login 8/min, phone-otp 5/min, phone-verify 10/min, register 10/min, reset-request 5/min, google-* 10/min) mirroring the in-memory fixed-window limiter + 429/connection-error backoff so no check ever fails on limiter noise; enumeration-resistance asserts byte-identical message bodies.
+- NEW tests/auth_matrix_db_ops.ts (bun DB fixtures, kept as the matrix's permanent helper): phone-expire / google-code-expire / session-expire (simulated clock skew for items 14/17/20), verify-email (item 9b auto-link gate), phone-status/google-status, count-users-by-email (no-new-account guards), check-ada/restore-ada (password guard), cleanup-authmx (FK-safe best-effort delete).
+- Item 9 interpretation (task wording vs design D4): linkRequired requires google email == account email with the EMAIL identifier UNVERIFIED (a google email that differs from every account email correctly yields REGISTER — covered by item 4). Both sub-cases tested: 9a linkRequired + explicit /auth/google/link confirm (authed with password); 9b verified-email auto-LINK (same account, no new user).
+- First matrix run crashed mid-run: the dev server was OOM-killed by the sandbox (next-server 2.3GB RSS — the documented Turbopack quirk; dmesg oom-kill pid confirmed). Restarted via tests/restart-dev.sh; removed my one over-strict check (USERNAME AuthIdentifier row on phone-first registration — see Stage Summary observation); added connection-error retry. Matrix then green.
+- Matrix run ×2 (idempotent, fresh suffix each time): 95/95 PASS both runs; built-in cleanup deleted all authmx_* accounts each time; ada untouched (SuperSecret1 verified working, USERNAME unverified + EMAIL verified intact — never modified by the matrix, all ada interactions read-only).
+- Item 28 via agent-browser (session auth7matrix): viewport 390×844 → hero CTA → Sign in tab → [data-testid=signin-identifier] renders (label "Username, email or phone number", placeholder "ada, you@example.com or 0803…"), document.documentElement.scrollWidth 390 ≤ 391 (no horizontal overflow), zero page errors; viewport 1280×800 → nav Sign in → identifier field renders, scrollWidth 1280 = clientWidth. Screenshots: docs/screenshots/auth7-{mobile,desktop}-signin-{390,1280}.png.
+- Regressions (in order, fresh dev server): stage2_matrix 36/36 ✓; stage9_matrix 102/102 ✓ (well under the 600s timeout); batch0_matrix first attempt 27/29 — the 2 failures ("no key -> 401 — got 429", "bad key -> 401") were the documented shared-IP rate-window collision (stage9's final auth-fail burn, 11 deliberate bad-key calls, still saturating trust-api-auth 10/min when batch0 started 10s later) — after a 75s pause batch0 re-ran 29/29 ✓. Nothing my testing left behind (authmx accounts deleted; ada intact; rate windows expire).
+- Ops hygiene: bunx tsc --noEmit clean, eslint clean, python3 -m py_compile clean; mini-services (webhook-worker :3031, provider-simulator :3032) were DOWN at round start (machine-reboot quirk) — restored via their idempotent start.sh runbook; dev server left healthy.
+
+Stage Summary:
+- tests/auth_matrix.py: 95/95 checks PASS (items 1–27 all green; run twice idempotently). Item 28 (agent-browser mobile 390 + desktop 1280): PASS — sign-in form renders with the identifier field, no horizontal overflow either viewport.
+- Regressions: stage2 36/36, stage9 102/102, batch0 29/29 (first attempt 27/29 purely from the stage9→batch0 rate-window collision; clean after the documented 65–70s pause).
+- Genuine backend bugs found: NONE. Two documented observations (not bugs, no code changed — backend frozen):
+  (1) Phone-first registration (completePhoneRegistration) creates the PHONE identifier but NO USERNAME AuthIdentifier row (registerUser does create one); username login for such accounts still works via the registry's legacy fallback (UserAccount.handle) and is backfilled on the first successful password login (authenticateUser syncs it). Registry-hygiene inconsistency only.
+  (2) Task-item-9 wording ("google flow with a DIFFERENT google email → linkRequired") does not match design D4 — a different google email correctly REGISTERs a fresh account; LINK_REQUIRED requires google email == an existing account's UNVERIFIED email. Tested per design.
+- ada preserved: SuperSecret1 working, identifiers (USERNAME 'ada' unverified, EMAIL verified) exactly as at round start. authmx_* accounts all deleted. tests/tmp_*.ts: none left (helper renamed to tests/auth_matrix_db_ops.ts, the matrix's permanent fixture script).
+
+---
+Task ID: auth-batch-C (frontend + matrix + fixes — AUTH BATCH COMPLETE)
+Agent: Z.ai Code (main session)
+Task: AUTH batch completion — frontend E2E verification, security fix on the Google link modal, identifier registry completeness fix, 28-item test matrix green.
+
+Work Log:
+- Frontend (delivered by subagent auth-6, then verified + fixed by main): auth-view.tsx rewritten (unified "Username, email or phone number" field, PHONE_OTP_REQUIRED auto-routing to the OTP step, phone sign-in/registration sub-flows with MOCK SMS chips, forgot-password flow with MOCK token preview, optional email on signup, "Prefer your phone number?" path); NEW google-consent-modal.tsx (mock Google account picker + consent, GRANT/DENY, LINK_REQUIRED password-confirm continuation, signin|link modes); NEW phone-otp-step.tsx; NEW passport/sign-in-methods-card.tsx wired into privacy-view (masked identifier list, email verification flow, Link Google/phone, Remove w/ confirm dialog, Sign out from all devices); api-client.ts extended with all typed auth helpers.
+- SECURITY FIX (found by main-session E2E): the Google modal in LINK mode called the anonymous callback — a google email ≠ account email would REGISTER A NEW ACCOUNT AND SILENTLY SWITCH THE SESSION (account-takeover-by-UX). Fixed: link mode now calls /api/v1/auth/google/link directly against the granted session (binds to the authenticated account). Re-verified: linking ada.obi@gmail.com from Ada's Security Center keeps the session on Ada and adds the Google identifier.
+- REGISTRY FIX (matrix observation auth-7 #1): phone-first and Google registrations now also create the USERNAME AuthIdentifier row (handle as login identifier from day one; registry single-source per D1). Verified: fresh google registration → USERNAME✓, GOOGLE✓, EMAIL✓.
+- Test matrix (subagent auth-7): NEW tests/auth_matrix.py (95 checks, all 28 required items + cleanup) → 95/95 PASS ×2 runs; NEW tests/auth_matrix_db_ops.ts (clock-skew/verification fixtures). Regressions: stage2 36/36, stage9 102/102, batch0 29/29 (after the documented stage9→batch0 rate-window pause — shared-IP limiter saturation, not a bug).
+- Browser E2E (main session, agent-browser): unified identifier sign-in (email + username), PHONE_OTP_REQUIRED routing, Continue with Google (sign-in + link modes + LINK_REQUIRED confirm), phone registration (Ngozi) + phone OTP login (Tunde), forgot-password reset + confirm + session revocation, sign-in-methods card (list/verify/link/unlink Google w/ confirm), mobile 390 no-overflow + desktop 1280. Zero page errors; console clean. ada preserved (SuperSecret1, identifiers intact).
+- tsc 0 errors; eslint clean; dev server healthy (:3000), mini-services restored (:3031 provider-simulator, :3032 webhook-worker).
+
+Stage Summary:
+- AUTH BATCH GATE: PASS. All 14 requirement sections delivered: 4 login methods on one unified field + one UserAccount; username discipline (case-insensitive, reserved list, no enumeration); email verification tracking; phone OTP (E.164 normalization, hashed storage, brute-force caps, never in URLs/logs); Google OAuth 2.0 + PKCE + state (mock provider honestly labeled, LIVE env-gated); unified identifier architecture (AuthIdentifier registry, 922 rows backfilled); one onboarding path per auth entry; explicit conflict handling (LINK_REQUIRED, ALREADY_LINKED_TO_OTHER, PHONE_TAKEN, LAST_IDENTIFIER guard — never silent merges); recovery (password reset w/ decoy tokens + all-session revocation, email verify, phone recovery, logout-all); full security stack (scrypt, httpOnly cookies, PKCE/state, rate limits, audit events, suspicious-login notifications, generic errors); 28/28 matrix items PASS.
+- Product principle enforced end-to-end: login ≠ NINAuth-verified ≠ trustworthy — auth methods never surface as trust signals.
+- Files: NEW src/lib/{auth/identifiers.ts, services/{auth-identifier,google-auth,phone-auth,recovery}-service.ts, providers/google.ts}, 15 auth routes, {google-consent-modal,phone-otp-step,sign-in-methods-card}.tsx, tests/{auth_matrix.py,auth_matrix_db_ops.ts}. EDITED schema.prisma (4 models + nullable email), account-service, audit-service, session, types, login/register/me routes, auth-view, api-client, privacy-view.
+- Next (roadmap resumption): Batch 2 — Trust Identity Hardening (G7 duplicate-identity handling + account recovery depth; G8 Business/RC model schema+UI slot; PR2 DSR erasure-cascade invariant test). Also recommended: username-change auditable flow (deferred by design), LIVE posture checklist for Google (client id/secret + redirect URI), consider moving the in-memory rate limiter keys to include identifier values for per-account lockout.

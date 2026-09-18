@@ -2,12 +2,25 @@
 
 export interface SessionUser {
   id: string;
-  email: string;
+  // AUTH batch — nullable: phone-only and Google-only accounts have no email.
+  email: string | null;
   displayName: string;
   handle: string;
   status: string;
   role: string; // USER | REVIEWER (Stage 7) | ADMIN (Stage 8 — operational grants)
   createdAt: string;
+}
+
+// AUTH batch — masked view of an authentication identifier (raw phones and
+// Google subjects never leave the server).
+export interface AuthIdentifierInfo {
+  type: "USERNAME" | "EMAIL" | "PHONE" | "GOOGLE";
+  label: string;
+  hint: string | null;
+  verified: boolean;
+  isPrimary: boolean;
+  linkedAt: string;
+  lastUsedAt: string | null;
 }
 
 export interface ApiErrorBody {

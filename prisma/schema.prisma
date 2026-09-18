@@ -39,7 +39,11 @@ datasource db {
 
 model UserAccount {
   id              String   @id @default(cuid())
-  email           String   @unique
+  // AUTH batch: email is OPTIONAL — phone-only and Google-only accounts exist.
+  // It stays the denormalized display field; the canonical auth registry is
+  // AuthIdentifier (backfilled for all pre-existing accounts). SQLite UNIQUE
+  // permits multiple NULLs.
+  email           String?  @unique
   passwordHash    String // scrypt output (never plaintext, never reversible)
   passwordSalt    String // per-user random salt
   displayName     String
@@ -54,6 +58,10 @@ model UserAccount {
   ninauthLinkedAt DateTime?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+
+  // AUTH batch — canonical multi-identifier registry (username/email/phone/Google)
+  authIdentifiers AuthIdentifier[]
+  passwordResets  PasswordResetSession[]
 
   sessions             Session[]
   notifications        Notification[]
@@ -94,6 +102,103 @@ model UserAccount {
 // Raw NIN / raw identifiers are NEVER stored. The provider returns only a
 // masked subject reference (providerIdentityRef) + verification outcome.
 // ---------------------------------------------------------------------------
+
+// AUTH batch — unified authentication identifier registry. One UserAccount may
+// hold several identifiers; ALL login methods resolve through this table:
+//
+//   UserAccount ── AuthIdentifier[USERNAME, EMAIL, PHONE, GOOGLE]
+//
+// value discipline per type:
+//   USERNAME — normalized lowercase handle (3–24, [a-z0-9_], reserved-list)
+//   EMAIL    — normalized lowercase email
+//   PHONE    — phoneFingerprint() = peppered sha256 of E.164 (raw phone NEVER
+//              persisted; masked hint only — never in URLs/logs/analytics)
+//   GOOGLE   — the provider's stable subject ("sub"), never the raw profile
+//
+// verified gates linking/recovery (not password login itself — the password
+// is the auth factor there). @@unique([type, value]) is the conflict detector.
+
+model AuthIdentifier {
+  id          String    @id @default(cuid())
+  userId      String
+  type        String // USERNAME | EMAIL | PHONE | GOOGLE
+  value       String
+  hint        String? // masked display hint (phone: "+234 8•• ••• ••34"; google email display)
+  verified    Boolean   @default(false)
+  verifiedAt  DateTime?
+  isPrimary   Boolean   @default(false) // one per type max; the display identifier
+  lastUsedAt  DateTime?
+  linkedAt    DateTime  @default(now())
+  createdAt   DateTime  @default(now())
+
+  user UserAccount @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([type, value])
+  @@index([userId])
+  @@index([type])
+}
+
+// AUTH batch — phone OTP login/register/link/recovery sessions. Mirrors the
+// PhoneVerification OTP discipline (hashed code, attempt + resend caps, TTL).
+model PhoneLoginSession {
+  id          String    @id @default(cuid())
+  phoneHash   String // phoneFingerprint(E.164) — never raw phone
+  phoneHint   String // masked display hint
+  purpose     String    @default("LOGIN") // LOGIN | REGISTER | LINK | RECOVERY
+  displayName String? // REGISTER prefill
+  handle      String? // REGISTER prefill
+  otpHash     String // sha256(pepper + code) — never plaintext
+  attempts    Int       @default(0) // wrong-OTP attempts (max 5 → FAILED)
+  resends     Int       @default(0) // resend count (max 3)
+  status      String    @default("PENDING") // PENDING | VERIFIED | FAILED | EXPIRED
+  expiresAt   DateTime // OTP TTL (5 minutes)
+  verifiedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([phoneHash])
+  @@index([status])
+}
+
+// AUTH batch — "Continue with Google" OAuth 2.0 + PKCE login sessions. Same
+// contract shape as NinAuthLoginSession: state = anti-CSRF, verifier is
+// SERVER-ONLY, authorization codes are one-time + hashed + 60s TTL.
+// googleSub is the provider's stable subject (mock: deterministic from email).
+model GoogleLoginSession {
+  id                    String    @id @default(cuid())
+  state                 String    @unique // OAuth state / anti-CSRF
+  codeVerifier          String // PKCE verifier — SERVER-SIDE ONLY
+  codeChallenge         String // S256(verifier)
+  status                String    @default("AWAITING_CONSENT") // AWAITING_CONSENT | GRANTED | DENIED | COMPLETED | EXPIRED
+  googleEmail           String? // normalized email confirmed inside the (mock) Google consent
+  googleSub             String? // stable Google subject
+  authorizationCodeHash String? // one-time code issued on grant
+  authorizationCodeExp  DateTime?
+  errorReason           String?
+  expiresAt             DateTime // 10-minute TTL
+  completedAt           DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([status])
+}
+
+// AUTH batch — password reset sessions (forgot-password). Single-use token
+// (sha256 at rest), 15-minute TTL; confirming rotates the password and
+// revokes EVERY active session for the account.
+model PasswordResetSession {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  status    String    @default("PENDING") // PENDING | USED | EXPIRED
+  expiresAt DateTime // 15 minutes
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user UserAccount @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
 
 model TrustIdentity {
   id                    String    @id @default(cuid())

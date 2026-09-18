@@ -872,7 +872,9 @@ const SIMULATION_NOTE =
 
 // Mask an email for governance reporting: keep the first two characters of
 // the local part + domain. Trends visible, identities shielded.
-export function maskEmail(email: string): string {
+export function maskEmail(email: string | null): string {
+  // AUTH batch — phone-only/Google-only accounts have no email; use the handle.
+  if (!email) return "member";
   const at = email.indexOf("@");
   if (at <= 0) return "member";
   const local = email.slice(0, at);

@@ -7,12 +7,15 @@ import { createSession, setSessionCookie, toPublicUser } from "@/lib/platform/se
 import { registerUser, getUserById } from "@/lib/services/account-service";
 
 const RegisterSchema = z.object({
+  // AUTH batch — email is OPTIONAL (username+password registration path).
   email: z
     .string()
     .trim()
     .toLowerCase()
     .email("Enter a valid email address")
-    .max(254),
+    .max(254)
+    .optional()
+    .or(z.literal("")),
   password: z
     .string()
     .min(8, "Password must be at least 8 characters")
@@ -49,12 +52,27 @@ export async function POST(req: NextRequest) {
     return jsonError(422, "VALIDATION_ERROR", first?.message ?? "Invalid input.", requestId);
   }
 
-  const result = await registerUser(parsed.data, requestId);
+  const result = await registerUser(
+    {
+      email: parsed.data.email || undefined,
+      password: parsed.data.password,
+      displayName: parsed.data.displayName,
+      handle: parsed.data.handle,
+      acceptTerms: parsed.data.acceptTerms,
+    },
+    requestId
+  );
   if (!result.ok) {
     if (result.code === "EMAIL_TAKEN") {
       return jsonError(409, "EMAIL_TAKEN", "An account with this email already exists.", requestId);
     }
-    return jsonError(409, "HANDLE_TAKEN", "That handle is already reserved.", requestId);
+    if (result.code === "HANDLE_INVALID") {
+      return jsonError(422, "HANDLE_INVALID", "That username is not available.", requestId);
+    }
+    if (result.code === "EMAIL_INVALID") {
+      return jsonError(422, "EMAIL_INVALID", "Enter a valid email address.", requestId);
+    }
+    return jsonError(409, "HANDLE_TAKEN", "That username is already reserved.", requestId);
   }
 
   const user = await getUserById(result.userId);

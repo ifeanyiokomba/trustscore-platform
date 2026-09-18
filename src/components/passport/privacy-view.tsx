@@ -11,6 +11,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { TabIntro } from "@/components/dashboard/tab-intro";
 import { DsrCard } from "@/components/passport/dsr-card";
 import { SecurityCenter } from "@/components/passport/security-center";
+import { SignInMethodsCard } from "@/components/passport/sign-in-methods-card";
 import { ReceiptsCard } from "@/components/passport/receipts-card";
 import { SafetySettingsCard } from "@/components/safety/safety-settings-card";
 import { usePassportData } from "@/components/passport/passport-view";
@@ -77,6 +78,11 @@ export function PrivacyTab({ onOpenScoreInsights }: { onOpenScoreInsights?: () =
           onChanged={refresh}
           onOpenScoreInsights={onOpenScoreInsights}
         />
+      </div>
+
+      {/* AUTH batch — sign-in & recovery methods (identifier registry) */}
+      <div className="min-w-0 lg:col-span-1">
+        <SignInMethodsCard />
       </div>
       </div>
     </>

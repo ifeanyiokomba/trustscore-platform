@@ -11,7 +11,8 @@ export const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
 export interface SessionUser {
   id: string;
-  email: string;
+  // AUTH batch — nullable: phone-only and Google-only accounts have no email.
+  email: string | null;
   displayName: string;
   handle: string;
   status: string;
