@@ -4800,6 +4800,36 @@
     color: var(--color-amber-900);
   }
 
+  .text-amber-900\/60 {
+    color: #7b330699;
+  }
+
+  @supports (color: color-mix(in lab, red, red)) {
+    .text-amber-900\/60 {
+      color: color-mix(in oklab, var(--color-amber-900) 60%, transparent);
+    }
+  }
+
+  .text-amber-900\/70 {
+    color: #7b3306b3;
+  }
+
+  @supports (color: color-mix(in lab, red, red)) {
+    .text-amber-900\/70 {
+      color: color-mix(in oklab, var(--color-amber-900) 70%, transparent);
+    }
+  }
+
+  .text-amber-900\/80 {
+    color: #7b3306cc;
+  }
+
+  @supports (color: color-mix(in lab, red, red)) {
+    .text-amber-900\/80 {
+      color: color-mix(in oklab, var(--color-amber-900) 80%, transparent);
+    }
+  }
+
   .text-blue-500 {
     color: var(--color-blue-500);
   }
@@ -6403,6 +6433,12 @@
   }
 
   @media (hover: hover) {
+    .hover\:text-amber-900:hover {
+      color: var(--color-amber-900);
+    }
+  }
+
+  @media (hover: hover) {
     .hover\:text-destructive:hover {
       color: var(--destructive);
     }
@@ -7897,6 +7933,12 @@
   }
 
   @media (min-width: 40rem) {
+    .sm\:p-5 {
+      padding: calc(var(--spacing) * 5);
+    }
+  }
+
+  @media (min-width: 40rem) {
     .sm\:p-6 {
       padding: calc(var(--spacing) * 6);
     }
@@ -8832,6 +8874,36 @@
 
   .dark\:text-amber-200:is(.dark *) {
     color: var(--color-amber-200);
+  }
+
+  .dark\:text-amber-200\/60:is(.dark *) {
+    color: #fee68599;
+  }
+
+  @supports (color: color-mix(in lab, red, red)) {
+    .dark\:text-amber-200\/60:is(.dark *) {
+      color: color-mix(in oklab, var(--color-amber-200) 60%, transparent);
+    }
+  }
+
+  .dark\:text-amber-200\/70:is(.dark *) {
+    color: #fee685b3;
+  }
+
+  @supports (color: color-mix(in lab, red, red)) {
+    .dark\:text-amber-200\/70:is(.dark *) {
+      color: color-mix(in oklab, var(--color-amber-200) 70%, transparent);
+    }
+  }
+
+  .dark\:text-amber-200\/80:is(.dark *) {
+    color: #fee685cc;
+  }
+
+  @supports (color: color-mix(in lab, red, red)) {
+    .dark\:text-amber-200\/80:is(.dark *) {
+      color: color-mix(in oklab, var(--color-amber-200) 80%, transparent);
+    }
   }
 
   .dark\:text-amber-300:is(.dark *) {

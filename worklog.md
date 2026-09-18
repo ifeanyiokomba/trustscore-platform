@@ -838,3 +838,57 @@ Stage Summary:
 - Regression: 262/262 checks green post-change; ada restored to documented state (USER, SuperSecret1, USERNAME unverified + EMAIL verified); dev :3000 + mini-services :3031/:3032 healthy; zero page errors.
 - What's solid (per the review itself): PII discipline, scrypt, session tokens, webhook HMAC, B2B API-key auth — unchanged and still green.
 - Unresolved / next-phase recommendations: (a) CI workflow is authored but unrunnable in-sandbox — needs one push to GitHub to validate; (b) nonce CSP production path verified at HTTP/HTML level + dev browser, but a true production-build smoke test belongs to the deployment batch; (c) G13/G14 (Redis rate-limit swap, persistent IP-hash salt) remain deferred; (d) roadmap Batch 2 (G7 duplicate-identity handling, G8 Business/RC model, PR2 DSR erasure cascade) still queued; (e) DB-wipe-on-reboot is environmental — if it recurs, consider a seed:fixtures + smoke-matrix boot script.
+
+---
+Task ID: batch2-A (G7+G8+PR2 implementation)
+Agent: Z.ai Code (main session)
+Task: Batch 2 — Trust Identity Hardening: G7 duplicate-identity guard + account-recovery routing, G8 Business/RC model (schema + UI, no provider claims), PR2 prep + API catalog drift fix (19 undocumented routes).
+
+Work Log:
+- G7 BACKEND: completeCallback (identity-service.ts) now checks, right after ID-token validation, whether the SAME providerIdentityRef (claims.sub) is already status=VERIFIED on a DIFFERENT account → fail-closed: session FAILED (errorReason identity_taken), audit IDENTITY_DUPLICATE_BLOCKED (metadata: reason/outcome/holderIdentity — whitelisted in audit-service), SECURITY notification to the HOLDING account ("Your government identity was used elsewhere"), new CallbackResult variant IDENTITY_TAKEN, callback route maps it to 409 with recovery-guidance message. Revoked/expired claims do NOT block (freshness gone = claim released). Same-user re-verification unaffected (userId: { not: userId } filter).
+- G7 FRONTEND: identity-card.tsx — IDENTITY_TAKEN branch renders dedicated amber IdentityTakenPanel (data-testid=identity-taken-panel) in BOTH verified/unverified branches: title "This government identity already has an account", explanation, "Sign out & sign in to that account" (store signOut), Dismiss, forgot-password guidance, honest note that the holding account was notified. BUG FOUND+FIXED during E2E: calling onChanged() in that branch flipped identityLoading → parent spinner unmounted the card and destroyed the panel state — removed the refresh (nothing identity-shaped changed server-side; the refused session appears in the timeline on the next natural refresh).
+- G8 BACKEND: prisma BusinessAccount {ownerId→UserAccount Cascade, name, rcFingerprint (SIGNAL_PEPPER-guarded peppered sha256 — raw RC NEVER stored), rcHint (masked "RC 123•••7"), status UNVERIFIED-only}. @@unique([ownerId, rcFingerprint]) (no global unique: with no provider there is no adjudication — a global constraint would let anyone squat unverified RC labels; VERIFIED uniqueness arrives with the provider). normalizeRc: RC/BN/IT prefix (case/space/dash-insensitive; bare digits default RC), 3–10 alnum tail ≥1 digit. NEW src/lib/services/business-service.ts: create (NAME_INVALID/RC_MALFORMED/LIMIT_REACHED 5/DUPLICATE P2002), list (masked), rename (P2025→NOT_FOUND), delete — all owner-scoped + audited (3 new AuditActions + rcHint metadata whitelist key).
+- G8 ROUTES: POST/GET /api/v1/businesses, PATCH/DELETE /api/v1/businesses/[id] — session-gated, rate-limited 10/min, zod-validated.
+- G8 FRONTEND: NEW src/components/passport/business-card.tsx (BusinessProfilesCard) wired full-width into passport-view grid: masked list w/ amber "unverified label" badge, create form (name + RC w/ fingerprint note), rename dialog, remove confirm dialog, honest Info callout ("Business verification isn't integrated yet — unverified labels you claim, never trust signals… don't affect your TrustScore, nobody else can see them"), 0/5 profile counter.
+- API CATALOG DRIFT FIXED (found live): the AUTH batch's 14 routes + sec-batch-A's admin/security-posture were on disk but NEVER added to /api index — batch1_matrix's drift guard would fail today. All 19 (incl. my 4 business routes) now documented; disk↔index verified closed both directions via live server (107 entries).
+- SCHEMA PUSH: db:push OK (BusinessAccount table created, data intact). NOTE: after db:push the RUNNING dev server holds a stale Prisma client → db.businessAccount undefined 500s → restart via bash tests/restart-dev.sh (done, PID 7694; mini-services untouched).
+
+VERIFIED (curl + agent-browser E2E, session on :3000):
+- Business API: create RC/BN/bare-digit (201, masked hints), malformed (422 RC_MALFORMED), same-owner duplicate (409 DUPLICATE), rename (200), delete (200), unauth (401). UI: card renders in Trust Passport tab, create via form (IT 4567821 → "IT 456•1"), rename dialog, remove confirm dialog, profile counter 3/5 → 2/5.
+- G7 flow (DB-seeded duplicate = exact LIVE condition): ada re-verify → consent GRANT → callback 409 IDENTITY_TAKEN; session FAILED/identity_taken; NO TrustIdentity created for ada; holder notified (title verified); audit event with holderIdentity metadata; cleanup + regression (normal verification → 200). UI: panel renders (title text + buttons verified), Dismiss works, screenshot docs/screenshots/batch2-identity-taken-panel.png; business card screenshots batch2-business-{card,mobile}.png.
+- Mobile 390px: scrollWidth 390 = clientWidth (no overflow). Console clean, zero page errors. tsc 0 errors, eslint clean. ada restored (business test profiles removed; g7 fixtures deleted).
+
+API CONTRACT (for the batch2 matrix):
+- POST /api/v1/businesses {name, rcNumber} → 201 {profile:{id,name,rcHint,status:"UNVERIFIED",createdAt,updatedAt}} | 401 UNAUTHENTICATED | 409 DUPLICATE|LIMIT_REACHED | 422 VALIDATION_ERROR|RC_MALFORMED|NAME_INVALID | 429 RATE_LIMITED
+- GET /api/v1/businesses → 200 {profiles:[...]} (masked; NEVER contains rcFingerprint or raw rc)
+- PATCH /api/v1/businesses/:id {name} → 200 {profile} | 404 NOT_FOUND | 422 NAME_INVALID
+- DELETE /api/v1/businesses/:id → 200 {deleted:true} | 404 NOT_FOUND
+- POST /api/v1/identity/sessions/:id/callback → 409 {error:{code:"IDENTITY_TAKEN", message w/ recovery guidance}} when the claimed subject is VERIFIED on another account (DB-seed the duplicate: TrustIdentity{userId:B, status:"VERIFIED", providerIdentityRef: maskedSubjectFor(A.id)}; maskedSubjectFor is exported from src/lib/providers/ninauth)
+- Audit actions: IDENTITY_DUPLICATE_BLOCKED, BUSINESS_PROFILE_{CREATED,UPDATED,DELETED}
+
+Stage Summary:
+- G7 CLOSED (fail-closed duplicate guard + recovery routing + holder notification), G8 CLOSED (schema + honest UI slot, no provider claims), API catalog drift (19 routes) FIXED.
+- PR2 test + full matrix delegated to subagent batch2-matrix (auth_matrix-style: G7 duplicate paths, G8 CRUD invariants incl. no-trust-signal response shape, DSR erasure-cascade DMMF-driven zero-rows invariant, regressions).
+
+---
+Task ID: batch2-matrix (+ gate)
+Agent: Z.ai Code (main session; matrix files drafted by subagent batch2-matrix, reviewed + executed by main)
+Task: Batch 2 test matrix — G7 duplicate paths, G8 CRUD + no-trust-signal invariants, PR2 DSR erasure-cascade DMMF invariant, full regression suite, batch gate.
+
+Work Log:
+- Subagent batch2-matrix delivered tests/batch2_matrix.py (59 checks) + tests/batch2_db_ops.ts (permanent DB helper: seed-duplicate / clear-duplicate / session-status / DMMF relation scan / cleanup) before hitting its context deadline; main session verified the files (py_compile OK, db ops parse+run OK — one sed-render false alarm on a destructure line that was actually correct), then executed everything.
+- MATRIX RUN 1: 59/59 PASS. MATRIX RUN 2 (fresh fixtures, idempotence): 59/59 PASS.
+  - §A G7: DB-seeded duplicate (exact LIVE condition) → callback 409 IDENTITY_TAKEN; session FAILED/identity_taken; NO TrustIdentity for claimant; holder notified; IDENTITY_DUPLICATE_BLOCKED audit; 409 body discloses nothing about the holder; released claim (REVOKED) → claimant verifies normally (also the normal-flow regression).
+  - §B G8: normalization (RC/BN/IT/bare→RC), masked hints, owner-duplicate 409, cross-account ALLOWED (no adjudication without a provider), malformed 422, cap 409 at 6th, rename/delete + foreign-id 404s, limiter 429 on the 11th rapid create (then paced), NO-TRUST-SIGNAL sweep: no score/band/level/trust keys, no rcFingerprint, NO raw RC digit string in any 2xx response (masked hint only), every profile UNVERIFIED.
+  - §C PR2: full DSR flow (EXPORT → DELETE w/ password) → session dead (401); DMMF invariant: EVERY model with a UserAccount relation (ANY FK field name) = 0 rows post-delete; stronger check: every UserAccount relation in the schema is onDelete: Cascade (future models cannot silently escape the cascade); UserAccount row gone; DsrRequest (incl. final export) cascades to 0; AuditEvent tombstone DSR_DELETE_COMPLETED survives BY DESIGN; ada per-model counts before == after (surgical cascade, negative control).
+  - Cleanup: b2mx_* fixtures + audit rows fully removed both runs; ada untouched.
+- REGRESSIONS: stage2 36/36 (first attempt hit the documented shared-IP identity-session 5/min window — 80s pause → green; not a bug), batch1 28/28 (the drift guard that would have caught the 19-route drift now passes on the closed 107-entry catalog), stage9 102/102, batch0 29/29, auth_matrix 95/95 (after the documented 65-75s pauses). tsc 0 errors, eslint clean.
+- CI (.github/workflows/ci.yml): batch1_matrix + batch2_matrix added to the quality job with the documented 75s cooldown; header comment updated (stage2 → stage9 → [pause] → batch0 → auth → [pause] → batch1 → batch2).
+- DOCS: MASTER_GAP_MATRIX.md — G7/G8 CLOSED (Batch 2) + full Batch-2 gate decision paragraph; MASTER_ROADMAP.md — Batch 2 marked ✅ DONE (gate: PASS); PR2 disposition updated via the gate record.
+
+Stage Summary:
+- BATCH 2 GATE: PASS. G7 CLOSED, G8 CLOSED (scoped: model + UI, no provider claims), PR2 CLOSED (periodic DMMF-driven erasure-cascade invariant).
+- Total regression surface this round: 59×2 + 36 + 28 + 102 + 29 + 95 = 408 checks green + tsc/eslint/browser gates.
+- Genuine bugs found by testing: ONE — the identity-card panel state was destroyed by the parent's identityLoading spinner unmount (fixed in batch2-A before the matrix; the matrix would have caught the API side regardless). No backend bugs found.
+- Project state: dev :3000 healthy (tsc/eslint clean, /api/health ok), mini-services :3031/:3032 alive, cron 396632 active, ada preserved (SuperSecret1; business test profiles removed; G7 fixtures deleted).
+- NEXT (roadmap Batch 3 — Web Identity Experience polish): NINAuth journey error states/retry/session-expiry UX; consent-screen granularity review vs the official field-level model. Deferred: username-change auditable flow; LIVE posture checklist for Google (client id/secret + redirect URI); G13/G14 (Redis, persistent salt); CI needs one real GitHub push to validate end-to-end.

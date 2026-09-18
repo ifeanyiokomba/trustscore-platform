@@ -371,7 +371,12 @@ const SAFE_METADATA_KEYS = new Set([
     "events",
     "alertsRaised",
     "recoveriesSent",
-    "provider"
+    "provider",
+    // Batch 2 (G7) — the blocking holder's TrustIdentity cuid (not a user id,
+    // not PII) so duplicate-block forensics can trace which claim won.
+    "holderIdentity",
+    // Batch 2 (G8) — masked RC display hint ("RC 1•••45" — non-reconstructable)
+    "rcHint"
 ]);
 async function recordAudit(input) {
     try {

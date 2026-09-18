@@ -61,6 +61,17 @@ export async function POST(
         return jsonError(400, "EXCHANGE_FAILED", `Code exchange failed (${result.reason ?? "unknown"}).`, requestId);
       case "TOKEN_INVALID":
         return jsonError(401, "TOKEN_INVALID", `ID token validation failed (${result.reason ?? "unknown"}).`, requestId);
+      // Batch 2 (G7) — duplicate government identity: fail-closed + account
+      // recovery routing. The message tells the legitimate owner exactly what
+      // to do and gives an attacker nothing (the subject is opaque, the holder
+      // is never identified).
+      case "IDENTITY_TAKEN":
+        return jsonError(
+          409,
+          "IDENTITY_TAKEN",
+          "This government identity is already linked to a different TrustScore account. If that account is yours, sign in to it instead — or recover its access from the sign-in page (Forgot password). If you believe this is an error, contact support.",
+          requestId
+        );
     }
   }
 

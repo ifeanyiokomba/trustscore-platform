@@ -17,6 +17,8 @@ import {
   Lock,
   Ban,
   Hash,
+  AlertTriangle,
+  LifeBuoy,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -33,6 +35,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { ConsentModal } from "@/components/auth/consent-modal";
 import { toast } from "sonner";
+import { useTrustStore } from "@/lib/store";
 import type {
   ConsentRecord,
   ConsentScreenInfo,
@@ -120,6 +123,73 @@ function Timeline({ events }: { events: VerificationTimelineEvent[] }) {
   );
 }
 
+// Batch 2 (G7) — duplicate-identity conflict panel: the verification was
+// refused because the NINAuth subject is already VERIFIED on a different
+// account. This routes the legitimate owner to that account (or its recovery
+// paths). One physical identity → one account: no merging, no transfers, no
+// disclosure of the holding account.
+function IdentityTakenPanel({
+  onSignOut,
+  onDismiss,
+}: {
+  onSignOut: () => void;
+  onDismiss: () => void;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 sm:p-5"
+      role="alert"
+      data-testid="identity-taken-panel"
+    >
+      <div className="flex items-start gap-3">
+        <span
+          className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400"
+          aria-hidden="true"
+        >
+          <AlertTriangle className="h-5 w-5" />
+        </span>
+        <div className="min-w-0 flex-1 space-y-3">
+          <p className="text-sm font-semibold text-amber-900 dark:text-amber-200">
+            This government identity already has an account
+          </p>
+          <p className="text-sm leading-relaxed text-amber-900/80 dark:text-amber-200/80">
+            Your NINAuth identity is verified on a different TrustScore account, so it
+            can&apos;t be verified here — one identity, one account. If that account is
+            yours, sign in to it instead (or recover access to it) and manage the
+            identity from there.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="min-h-11 border-amber-500/40 text-amber-900 hover:bg-amber-500/15 dark:text-amber-200"
+              onClick={onSignOut}
+            >
+              <LifeBuoy className="mr-2 h-4 w-4" aria-hidden="true" />
+              Sign out &amp; sign in to that account
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="min-h-11 text-amber-900/70 hover:text-amber-900 dark:text-amber-200/70 dark:hover:text-amber-200"
+              onClick={onDismiss}
+            >
+              Dismiss
+            </Button>
+          </div>
+          <p className="text-xs leading-relaxed text-amber-900/60 dark:text-amber-200/60">
+            Lost access to it? Use “Forgot password?” on the sign-in page — it works
+            with your username, email or phone. Nothing was changed on either account,
+            and the account holding this identity has been notified of the attempt.
+          </p>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
 export function IdentityCard({
   data,
   onChanged,
@@ -135,12 +205,18 @@ export function IdentityCard({
   const [flowError, setFlowError] = React.useState<string | null>(null);
   const [withdrawingId, setWithdrawingId] = React.useState<string | null>(null);
   const [confirmWithdraw, setConfirmWithdraw] = React.useState<ConsentRecord | null>(null);
+  // Batch 2 (G7) — duplicate-identity conflict: the claimed government
+  // identity is already VERIFIED on another account. The verification was
+  // refused; this panel routes the (legitimate) owner to recovery instead.
+  const [identityTaken, setIdentityTaken] = React.useState(false);
+  const signOut = useTrustStore((s) => s.signOut);
 
   // Request ALL known scopes (core + optional) so the consent modal can offer
   // granular opt-ins — the user trims to the granted subset at consent time.
   async function startVerification() {
     setStarting(true);
     setFlowError(null);
+    setIdentityTaken(false);
     try {
       const res = await fetch("/api/v1/identity/sessions", {
         method: "POST",
@@ -209,6 +285,26 @@ export function IdentityCard({
       );
       const cbBody = await cbRes.json();
       if (!cbRes.ok) {
+        // Batch 2 (G7) — duplicate government identity: fail-closed by the
+        // backend. Surface the dedicated recovery panel instead of a bare
+        // error string — the legitimate owner needs routing, not a dead end.
+        if (cbBody?.error?.code === "IDENTITY_TAKEN") {
+          setIdentityTaken(true);
+          setModalOpen(false);
+          setSession(null);
+          setConsent(null);
+          toast.error("Identity already linked to another account", {
+            description:
+              "This government identity is verified on a different TrustScore account. Recover that account to use it here.",
+          });
+          // NOTE: deliberately NO onChanged() here — the verification was
+          // REFUSED, so nothing identity-shaped changed server-side; and the
+          // parent's refresh flips identityLoading, which unmounts this card
+          // (spinner branch) and would destroy the conflict panel state.
+          // The failed session shows up in the timeline on the next natural
+          // refresh (tab switch / re-mount).
+          return;
+        }
         setFlowError(cbBody?.error?.message ?? "Verification failed.");
         onChanged();
         return;
@@ -467,7 +563,13 @@ export function IdentityCard({
                 Re-verify
                 <span className="hidden sm:inline">(refreshes validity to 90 days)</span>
               </Button>
-              {flowError && (
+              {identityTaken && (
+                <IdentityTakenPanel
+                  onSignOut={() => void signOut()}
+                  onDismiss={() => setIdentityTaken(false)}
+                />
+              )}
+              {flowError && !identityTaken && (
                 <p
                   className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive"
                   role="alert"
@@ -516,7 +618,13 @@ export function IdentityCard({
                   partner access.
                 </p>
               </div>
-              {flowError && (
+              {identityTaken && (
+                <IdentityTakenPanel
+                  onSignOut={() => void signOut()}
+                  onDismiss={() => setIdentityTaken(false)}
+                />
+              )}
+              {flowError && !identityTaken && (
                 <p
                   className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive"
                   role="alert"

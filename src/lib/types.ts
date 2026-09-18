@@ -499,6 +499,17 @@ export interface DsrRequestInfo {
   expiresAt: string | null;
 }
 
+// Batch 2 (G8) — business profiles: owner-claimed RC/BN/IT labels. UNVERIFIED
+// by construction (no provider exists); nothing here is a trust signal.
+export interface BusinessProfileInfo {
+  id: string;
+  name: string;
+  rcHint: string;
+  status: "UNVERIFIED";
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface PassportMe {
   profile: {
     displayName: string;

@@ -92,6 +92,9 @@ model UserAccount {
   edgesA              TrustEdge[]       @relation("EdgesA")
   edgesB              TrustEdge[]       @relation("EdgesB")
   sharedSignals       SharedSignal[]
+  // Batch 2 (G8) — business profiles (RC/BN/IT labels the OWNER claims;
+  // UNVERIFIED until a CAC-class provider is integrated — never trust signals)
+  businesses          BusinessAccount[]
 
   @@index([email])
   @@index([status])
@@ -1145,4 +1148,40 @@ model CircuitEvent {
   createdAt DateTime @default(now())
 
   @@index([provider, createdAt])
+}
+
+// Batch 2 (G8) — Business profile (directive §53: "business identity by RC
+// number — model now, integrate on the provider contract later").
+//
+// HONESTY CONTRACT (the whole point of this model):
+//   - status is UNVERIFIED and STAYS UNVERIFIED until a CAC-class business
+//     verification provider exists. Nothing on this row is a trust signal.
+//   - No score, no band, no trust claims are attached — ever (enforced by
+//     the test matrix invariant: responses expose status only).
+//   - The RC number itself is NEVER persisted raw: a peppered fingerprint
+//     (SIGNAL_PEPPER — same discipline as phone fingerprints) + a masked
+//     display hint. Future business lookups by RC resolve via the
+//     fingerprint (exact-match on the normalized form).
+//
+// Cross-account duplicates of the same RC are ALLOWED at this stage: with
+// no provider there is no adjudication mechanism, and a global unique
+// constraint would let anyone squat unverified RC labels — a claim with
+// zero verification behind it. When the provider lands, verification
+// becomes the scarce, adjudicated resource (and VERIFIED rows get their
+// uniqueness there). Unique per OWNER prevents accidental double-claims.
+model BusinessAccount {
+  id            String   @id @default(cuid())
+  ownerId       String
+  name          String // display name as entered by the owner (rectifiable)
+  rcFingerprint String // peppered sha256 of the normalized RC/BN/IT number — raw never stored
+  rcHint        String // masked display hint, e.g. "RC 123•••" — non-reconstructable
+  status        String   @default("UNVERIFIED") // UNVERIFIED — the only reachable state in this batch
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  owner UserAccount @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@unique([ownerId, rcFingerprint])
+  @@index([rcFingerprint])
+  @@index([ownerId])
 }

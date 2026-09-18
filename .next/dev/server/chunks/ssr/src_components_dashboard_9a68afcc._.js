@@ -24,14 +24,18 @@ var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$re
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$lock$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__Lock$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/lock.js [app-ssr] (ecmascript) <export default as Lock>");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$ban$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__Ban$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/ban.js [app-ssr] (ecmascript) <export default as Ban>");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$hash$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__Hash$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/hash.js [app-ssr] (ecmascript) <export default as Hash>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$triangle$2d$alert$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__AlertTriangle$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/triangle-alert.js [app-ssr] (ecmascript) <export default as AlertTriangle>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$life$2d$buoy$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__LifeBuoy$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/life-buoy.js [app-ssr] (ecmascript) <export default as LifeBuoy>");
 var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$button$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/src/components/ui/button.tsx [app-ssr] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$card$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/src/components/ui/card.tsx [app-ssr] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$badge$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/src/components/ui/badge.tsx [app-ssr] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$alert$2d$dialog$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/src/components/ui/alert-dialog.tsx [app-ssr] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$auth$2f$consent$2d$modal$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/src/components/auth/consent-modal.tsx [app-ssr] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$sonner$2f$dist$2f$index$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/sonner/dist/index.mjs [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$store$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/src/lib/store.ts [app-ssr] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$utils$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/src/lib/utils.ts [app-ssr] (ecmascript)");
 "use client";
+;
 ;
 ;
 ;
@@ -117,7 +121,7 @@ function Timeline({ events }) {
             children: "No verification events yet."
         }, void 0, false, {
             fileName: "[project]/src/components/dashboard/identity-card.tsx",
-            lineNumber: 78,
+            lineNumber: 81,
             columnNumber: 7
         }, this);
     }
@@ -130,7 +134,7 @@ function Timeline({ events }) {
                 "aria-hidden": "true"
             }, void 0, false, {
                 fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                lineNumber: 85,
+                lineNumber: 88,
                 columnNumber: 7
             }, this),
             events.map((e, i)=>{
@@ -151,12 +155,12 @@ function Timeline({ events }) {
                                 "aria-hidden": "true"
                             }, void 0, false, {
                                 fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                lineNumber: 104,
+                                lineNumber: 107,
                                 columnNumber: 15
                             }, this)
                         }, void 0, false, {
                             fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                            lineNumber: 95,
+                            lineNumber: 98,
                             columnNumber: 13
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -167,7 +171,7 @@ function Timeline({ events }) {
                                     children: meta.label
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                    lineNumber: 107,
+                                    lineNumber: 110,
                                     columnNumber: 15
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("time", {
@@ -180,26 +184,148 @@ function Timeline({ events }) {
                                     })
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                    lineNumber: 108,
+                                    lineNumber: 111,
                                     columnNumber: 15
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                            lineNumber: 106,
+                            lineNumber: 109,
                             columnNumber: 13
                         }, this)
                     ]
                 }, e.id, true, {
                     fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                    lineNumber: 94,
+                    lineNumber: 97,
                     columnNumber: 11
                 }, this);
             })
         ]
     }, void 0, true, {
         fileName: "[project]/src/components/dashboard/identity-card.tsx",
-        lineNumber: 84,
+        lineNumber: 87,
+        columnNumber: 5
+    }, this);
+}
+// Batch 2 (G7) — duplicate-identity conflict panel: the verification was
+// refused because the NINAuth subject is already VERIFIED on a different
+// account. This routes the legitimate owner to that account (or its recovery
+// paths). One physical identity → one account: no merging, no transfers, no
+// disclosure of the holding account.
+function IdentityTakenPanel({ onSignOut, onDismiss }) {
+    return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$framer$2d$motion$2f$dist$2f$es$2f$render$2f$components$2f$motion$2f$proxy$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["motion"].div, {
+        initial: {
+            opacity: 0,
+            y: 8
+        },
+        animate: {
+            opacity: 1,
+            y: 0
+        },
+        className: "rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 sm:p-5",
+        role: "alert",
+        "data-testid": "identity-taken-panel",
+        children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+            className: "flex items-start gap-3",
+            children: [
+                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
+                    className: "mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400",
+                    "aria-hidden": "true",
+                    children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$triangle$2d$alert$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__AlertTriangle$3e$__["AlertTriangle"], {
+                        className: "h-5 w-5"
+                    }, void 0, false, {
+                        fileName: "[project]/src/components/dashboard/identity-card.tsx",
+                        lineNumber: 151,
+                        columnNumber: 11
+                    }, this)
+                }, void 0, false, {
+                    fileName: "[project]/src/components/dashboard/identity-card.tsx",
+                    lineNumber: 147,
+                    columnNumber: 9
+                }, this),
+                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                    className: "min-w-0 flex-1 space-y-3",
+                    children: [
+                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                            className: "text-sm font-semibold text-amber-900 dark:text-amber-200",
+                            children: "This government identity already has an account"
+                        }, void 0, false, {
+                            fileName: "[project]/src/components/dashboard/identity-card.tsx",
+                            lineNumber: 154,
+                            columnNumber: 11
+                        }, this),
+                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                            className: "text-sm leading-relaxed text-amber-900/80 dark:text-amber-200/80",
+                            children: "Your NINAuth identity is verified on a different TrustScore account, so it can't be verified here — one identity, one account. If that account is yours, sign in to it instead (or recover access to it) and manage the identity from there."
+                        }, void 0, false, {
+                            fileName: "[project]/src/components/dashboard/identity-card.tsx",
+                            lineNumber: 157,
+                            columnNumber: 11
+                        }, this),
+                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                            className: "flex flex-wrap gap-2",
+                            children: [
+                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$button$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Button"], {
+                                    variant: "outline",
+                                    size: "sm",
+                                    className: "min-h-11 border-amber-500/40 text-amber-900 hover:bg-amber-500/15 dark:text-amber-200",
+                                    onClick: onSignOut,
+                                    children: [
+                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$life$2d$buoy$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__LifeBuoy$3e$__["LifeBuoy"], {
+                                            className: "mr-2 h-4 w-4",
+                                            "aria-hidden": "true"
+                                        }, void 0, false, {
+                                            fileName: "[project]/src/components/dashboard/identity-card.tsx",
+                                            lineNumber: 170,
+                                            columnNumber: 15
+                                        }, this),
+                                        "Sign out & sign in to that account"
+                                    ]
+                                }, void 0, true, {
+                                    fileName: "[project]/src/components/dashboard/identity-card.tsx",
+                                    lineNumber: 164,
+                                    columnNumber: 13
+                                }, this),
+                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$button$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Button"], {
+                                    variant: "ghost",
+                                    size: "sm",
+                                    className: "min-h-11 text-amber-900/70 hover:text-amber-900 dark:text-amber-200/70 dark:hover:text-amber-200",
+                                    onClick: onDismiss,
+                                    children: "Dismiss"
+                                }, void 0, false, {
+                                    fileName: "[project]/src/components/dashboard/identity-card.tsx",
+                                    lineNumber: 173,
+                                    columnNumber: 13
+                                }, this)
+                            ]
+                        }, void 0, true, {
+                            fileName: "[project]/src/components/dashboard/identity-card.tsx",
+                            lineNumber: 163,
+                            columnNumber: 11
+                        }, this),
+                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                            className: "text-xs leading-relaxed text-amber-900/60 dark:text-amber-200/60",
+                            children: "Lost access to it? Use “Forgot password?” on the sign-in page — it works with your username, email or phone. Nothing was changed on either account, and the account holding this identity has been notified of the attempt."
+                        }, void 0, false, {
+                            fileName: "[project]/src/components/dashboard/identity-card.tsx",
+                            lineNumber: 182,
+                            columnNumber: 11
+                        }, this)
+                    ]
+                }, void 0, true, {
+                    fileName: "[project]/src/components/dashboard/identity-card.tsx",
+                    lineNumber: 153,
+                    columnNumber: 9
+                }, this)
+            ]
+        }, void 0, true, {
+            fileName: "[project]/src/components/dashboard/identity-card.tsx",
+            lineNumber: 146,
+            columnNumber: 7
+        }, this)
+    }, void 0, false, {
+        fileName: "[project]/src/components/dashboard/identity-card.tsx",
+        lineNumber: 139,
         columnNumber: 5
     }, this);
 }
@@ -212,11 +338,17 @@ function IdentityCard({ data, onChanged }) {
     const [flowError, setFlowError] = __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"](null);
     const [withdrawingId, setWithdrawingId] = __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"](null);
     const [confirmWithdraw, setConfirmWithdraw] = __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"](null);
+    // Batch 2 (G7) — duplicate-identity conflict: the claimed government
+    // identity is already VERIFIED on another account. The verification was
+    // refused; this panel routes the (legitimate) owner to recovery instead.
+    const [identityTaken, setIdentityTaken] = __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useState"](false);
+    const signOut = (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$store$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useTrustStore"])((s)=>s.signOut);
     // Request ALL known scopes (core + optional) so the consent modal can offer
     // granular opt-ins — the user trims to the granted subset at consent time.
     async function startVerification() {
         setStarting(true);
         setFlowError(null);
+        setIdentityTaken(false);
         try {
             const res = await fetch("/api/v1/identity/sessions", {
                 method: "POST",
@@ -291,6 +423,25 @@ function IdentityCard({ data, onChanged }) {
             });
             const cbBody = await cbRes.json();
             if (!cbRes.ok) {
+                // Batch 2 (G7) — duplicate government identity: fail-closed by the
+                // backend. Surface the dedicated recovery panel instead of a bare
+                // error string — the legitimate owner needs routing, not a dead end.
+                if (cbBody?.error?.code === "IDENTITY_TAKEN") {
+                    setIdentityTaken(true);
+                    setModalOpen(false);
+                    setSession(null);
+                    setConsent(null);
+                    __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$sonner$2f$dist$2f$index$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["toast"].error("Identity already linked to another account", {
+                        description: "This government identity is verified on a different TrustScore account. Recover that account to use it here."
+                    });
+                    // NOTE: deliberately NO onChanged() here — the verification was
+                    // REFUSED, so nothing identity-shaped changed server-side; and the
+                    // parent's refresh flips identityLoading, which unmounts this card
+                    // (spinner branch) and would destroy the conflict panel state.
+                    // The failed session shows up in the timeline on the next natural
+                    // refresh (tab switch / re-mount).
+                    return;
+                }
                 setFlowError(cbBody?.error?.message ?? "Verification failed.");
                 onChanged();
                 return;
@@ -353,18 +504,18 @@ function IdentityCard({ data, onChanged }) {
                                     className: "h-5 w-5"
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                    lineNumber: 284,
+                                    lineNumber: 380,
                                     columnNumber: 27
                                 }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$key$2d$round$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__KeyRound$3e$__["KeyRound"], {
                                     className: "h-5 w-5"
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                    lineNumber: 284,
+                                    lineNumber: 380,
                                     columnNumber: 65
                                 }, this)
                             }, void 0, false, {
                                 fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                lineNumber: 278,
+                                lineNumber: 374,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -375,7 +526,7 @@ function IdentityCard({ data, onChanged }) {
                                         children: "Trust Identity"
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                        lineNumber: 287,
+                                        lineNumber: 383,
                                         columnNumber: 13
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$card$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["CardDescription"], {
@@ -383,13 +534,13 @@ function IdentityCard({ data, onChanged }) {
                                         children: "Your verified identity spine"
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                        lineNumber: 288,
+                                        lineNumber: 384,
                                         columnNumber: 13
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                lineNumber: 286,
+                                lineNumber: 382,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$badge$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Badge"], {
@@ -401,7 +552,7 @@ function IdentityCard({ data, onChanged }) {
                                             className: "mr-1 h-3 w-3"
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                            lineNumber: 303,
+                                            lineNumber: 399,
                                             columnNumber: 17
                                         }, this),
                                         "Level ",
@@ -411,13 +562,13 @@ function IdentityCard({ data, onChanged }) {
                                 }, void 0, true) : identity?.status === "REVOKED" ? "Revoked — re-verify" : identity?.status === "EXPIRED" ? "Expired — re-verify" : "MOCK provider"
                             }, void 0, false, {
                                 fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                lineNumber: 290,
+                                lineNumber: 386,
                                 columnNumber: 11
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                        lineNumber: 277,
+                        lineNumber: 373,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$card$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["CardContent"], {
@@ -443,7 +594,7 @@ function IdentityCard({ data, onChanged }) {
                                             "aria-hidden": "true"
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                            lineNumber: 325,
+                                            lineNumber: 421,
                                             columnNumber: 17
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -459,14 +610,14 @@ function IdentityCard({ data, onChanged }) {
                                                                     "aria-hidden": "true"
                                                                 }, void 0, false, {
                                                                     fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                                                    lineNumber: 329,
+                                                                    lineNumber: 425,
                                                                     columnNumber: 23
                                                                 }, this),
                                                                 "Government identity verified"
                                                             ]
                                                         }, void 0, true, {
                                                             fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                                            lineNumber: 328,
+                                                            lineNumber: 424,
                                                             columnNumber: 21
                                                         }, this),
                                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -474,13 +625,13 @@ function IdentityCard({ data, onChanged }) {
                                                             children: identity?.providerIdentityRef
                                                         }, void 0, false, {
                                                             fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                                            lineNumber: 332,
+                                                            lineNumber: 428,
                                                             columnNumber: 21
                                                         }, this)
                                                     ]
                                                 }, void 0, true, {
                                                     fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                                    lineNumber: 327,
+                                                    lineNumber: 423,
                                                     columnNumber: 19
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -491,7 +642,7 @@ function IdentityCard({ data, onChanged }) {
                                                             children: freshness
                                                         }, void 0, false, {
                                                             fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                                            lineNumber: 337,
+                                                            lineNumber: 433,
                                                             columnNumber: 21
                                                         }, this),
                                                         validityDays !== null && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -502,25 +653,25 @@ function IdentityCard({ data, onChanged }) {
                                                             ]
                                                         }, void 0, true, {
                                                             fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                                            lineNumber: 339,
+                                                            lineNumber: 435,
                                                             columnNumber: 23
                                                         }, this)
                                                     ]
                                                 }, void 0, true, {
                                                     fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                                    lineNumber: 336,
+                                                    lineNumber: 432,
                                                     columnNumber: 19
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                            lineNumber: 326,
+                                            lineNumber: 422,
                                             columnNumber: 17
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                    lineNumber: 324,
+                                    lineNumber: 420,
                                     columnNumber: 15
                                 }, this),
                                 activeIdentifiers.length > 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -531,7 +682,7 @@ function IdentityCard({ data, onChanged }) {
                                             children: "Identity fingerprints"
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                            lineNumber: 350,
+                                            lineNumber: 446,
                                             columnNumber: 19
                                         }, this),
                                         activeIdentifiers.map((id)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -542,7 +693,7 @@ function IdentityCard({ data, onChanged }) {
                                                         "aria-hidden": "true"
                                                     }, void 0, false, {
                                                         fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                                        lineNumber: 358,
+                                                        lineNumber: 454,
                                                         columnNumber: 23
                                                     }, this),
                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -553,7 +704,7 @@ function IdentityCard({ data, onChanged }) {
                                                                 children: id.hint
                                                             }, void 0, false, {
                                                                 fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                                                lineNumber: 360,
+                                                                lineNumber: 456,
                                                                 columnNumber: 25
                                                             }, this),
                                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -564,13 +715,13 @@ function IdentityCard({ data, onChanged }) {
                                                                 ]
                                                             }, void 0, true, {
                                                                 fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                                                lineNumber: 361,
+                                                                lineNumber: 457,
                                                                 columnNumber: 25
                                                             }, this)
                                                         ]
                                                     }, void 0, true, {
                                                         fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                                        lineNumber: 359,
+                                                        lineNumber: 455,
                                                         columnNumber: 23
                                                     }, this),
                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -581,13 +732,13 @@ function IdentityCard({ data, onChanged }) {
                                                         ]
                                                     }, void 0, true, {
                                                         fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                                        lineNumber: 365,
+                                                        lineNumber: 461,
                                                         columnNumber: 23
                                                     }, this)
                                                 ]
                                             }, id.id, true, {
                                                 fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                                lineNumber: 354,
+                                                lineNumber: 450,
                                                 columnNumber: 21
                                             }, this)),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -595,13 +746,13 @@ function IdentityCard({ data, onChanged }) {
                                             children: "Stored as one-way hashes — future Safety Checks match without ever seeing the raw value."
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                            lineNumber: 370,
+                                            lineNumber: 466,
                                             columnNumber: 19
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                    lineNumber: 349,
+                                    lineNumber: 445,
                                     columnNumber: 17
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -615,7 +766,7 @@ function IdentityCard({ data, onChanged }) {
                                                     "aria-hidden": "true"
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                                    lineNumber: 379,
+                                                    lineNumber: 475,
                                                     columnNumber: 19
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -623,13 +774,13 @@ function IdentityCard({ data, onChanged }) {
                                                     children: "No raw NIN stored — masked reference only"
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                                    lineNumber: 380,
+                                                    lineNumber: 476,
                                                     columnNumber: 19
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                            lineNumber: 378,
+                                            lineNumber: 474,
                                             columnNumber: 17
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -640,7 +791,7 @@ function IdentityCard({ data, onChanged }) {
                                                     "aria-hidden": "true"
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                                    lineNumber: 385,
+                                                    lineNumber: 481,
                                                     columnNumber: 19
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -654,19 +805,19 @@ function IdentityCard({ data, onChanged }) {
                                                     ]
                                                 }, void 0, true, {
                                                     fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                                    lineNumber: 386,
+                                                    lineNumber: 482,
                                                     columnNumber: 19
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                            lineNumber: 384,
+                                            lineNumber: 480,
                                             columnNumber: 17
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                    lineNumber: 377,
+                                    lineNumber: 473,
                                     columnNumber: 15
                                 }, this),
                                 data?.consents && data.consents.length > 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -677,7 +828,7 @@ function IdentityCard({ data, onChanged }) {
                                             children: "Consent records"
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                            lineNumber: 395,
+                                            lineNumber: 491,
                                             columnNumber: 19
                                         }, this),
                                         data.consents.slice(0, 3).map((c)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -698,18 +849,18 @@ function IdentityCard({ data, onChanged }) {
                                                                     children: c.policyVersion
                                                                 }, void 0, false, {
                                                                     fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                                                    lineNumber: 409,
+                                                                    lineNumber: 505,
                                                                     columnNumber: 27
                                                                 }, this)
                                                             ]
                                                         }, void 0, true, {
                                                             fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                                            lineNumber: 407,
+                                                            lineNumber: 503,
                                                             columnNumber: 25
                                                         }, this)
                                                     }, void 0, false, {
                                                         fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                                        lineNumber: 406,
+                                                        lineNumber: 502,
                                                         columnNumber: 23
                                                     }, this),
                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -724,7 +875,7 @@ function IdentityCard({ data, onChanged }) {
                                                                 })
                                                             }, void 0, false, {
                                                                 fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                                                lineNumber: 413,
+                                                                lineNumber: 509,
                                                                 columnNumber: 25
                                                             }, this),
                                                             c.withdrawnAt ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$badge$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Badge"], {
@@ -733,7 +884,7 @@ function IdentityCard({ data, onChanged }) {
                                                                 children: "Withdrawn"
                                                             }, void 0, false, {
                                                                 fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                                                lineNumber: 420,
+                                                                lineNumber: 516,
                                                                 columnNumber: 27
                                                             }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
                                                                 type: "button",
@@ -747,38 +898,38 @@ function IdentityCard({ data, onChanged }) {
                                                                         className: "h-3 w-3 animate-spin"
                                                                     }, void 0, false, {
                                                                         fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                                                        lineNumber: 433,
+                                                                        lineNumber: 529,
                                                                         columnNumber: 31
                                                                     }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$ban$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__Ban$3e$__["Ban"], {
                                                                         className: "h-3 w-3"
                                                                     }, void 0, false, {
                                                                         fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                                                        lineNumber: 435,
+                                                                        lineNumber: 531,
                                                                         columnNumber: 31
                                                                     }, this),
                                                                     "Withdraw"
                                                                 ]
                                                             }, void 0, true, {
                                                                 fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                                                lineNumber: 424,
+                                                                lineNumber: 520,
                                                                 columnNumber: 27
                                                             }, this)
                                                         ]
                                                     }, void 0, true, {
                                                         fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                                        lineNumber: 412,
+                                                        lineNumber: 508,
                                                         columnNumber: 23
                                                     }, this)
                                                 ]
                                             }, c.id, true, {
                                                 fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                                lineNumber: 399,
+                                                lineNumber: 495,
                                                 columnNumber: 21
                                             }, this))
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                    lineNumber: 394,
+                                    lineNumber: 490,
                                     columnNumber: 17
                                 }, this),
                                 data?.lastSession && data.lastSession.events.length > 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -789,20 +940,20 @@ function IdentityCard({ data, onChanged }) {
                                             children: "Verification timeline"
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                            lineNumber: 449,
+                                            lineNumber: 545,
                                             columnNumber: 19
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(Timeline, {
                                             events: data.lastSession.events
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                            lineNumber: 452,
+                                            lineNumber: 548,
                                             columnNumber: 19
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                    lineNumber: 448,
+                                    lineNumber: 544,
                                     columnNumber: 17
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$button$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Button"], {
@@ -815,13 +966,13 @@ function IdentityCard({ data, onChanged }) {
                                             className: "mr-2 h-4 w-4 animate-spin"
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                            lineNumber: 463,
+                                            lineNumber: 559,
                                             columnNumber: 19
                                         }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$refresh$2d$cw$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$export__default__as__RefreshCw$3e$__["RefreshCw"], {
                                             className: "mr-2 h-4 w-4"
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                            lineNumber: 465,
+                                            lineNumber: 561,
                                             columnNumber: 19
                                         }, this),
                                         "Re-verify",
@@ -830,28 +981,36 @@ function IdentityCard({ data, onChanged }) {
                                             children: "(refreshes validity to 90 days)"
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                            lineNumber: 468,
+                                            lineNumber: 564,
                                             columnNumber: 17
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                    lineNumber: 456,
+                                    lineNumber: 552,
                                     columnNumber: 15
                                 }, this),
-                                flowError && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                                identityTaken && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(IdentityTakenPanel, {
+                                    onSignOut: ()=>void signOut(),
+                                    onDismiss: ()=>setIdentityTaken(false)
+                                }, void 0, false, {
+                                    fileName: "[project]/src/components/dashboard/identity-card.tsx",
+                                    lineNumber: 567,
+                                    columnNumber: 17
+                                }, this),
+                                flowError && !identityTaken && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
                                     className: "rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive",
                                     role: "alert",
                                     children: flowError
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                    lineNumber: 471,
+                                    lineNumber: 573,
                                     columnNumber: 17
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                            lineNumber: 317,
+                            lineNumber: 413,
                             columnNumber: 13
                         }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                             className: "space-y-4",
@@ -865,12 +1024,12 @@ function IdentityCard({ data, onChanged }) {
                                                 className: "h-6 w-6"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                                lineNumber: 483,
+                                                lineNumber: 585,
                                                 columnNumber: 19
                                             }, this)
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                            lineNumber: 482,
+                                            lineNumber: 584,
                                             columnNumber: 17
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -878,7 +1037,7 @@ function IdentityCard({ data, onChanged }) {
                                             children: identity?.status === "REVOKED" ? "Trust Identity revoked" : identity?.status === "EXPIRED" ? "Verification expired" : "No Trust Identity established yet"
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                            lineNumber: 485,
+                                            lineNumber: 587,
                                             columnNumber: 17
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -886,7 +1045,7 @@ function IdentityCard({ data, onChanged }) {
                                             children: identity?.status === "REVOKED" || identity?.status === "EXPIRED" ? "Re-verify through Nigeria's official identity consent gateway to restore your Trust Identity." : "Verify through Nigeria's official identity consent gateway — a QR or share code, one approval in your NINAuth app, and you're done. No forms, no document uploads."
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                            lineNumber: 492,
+                                            lineNumber: 594,
                                             columnNumber: 17
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$button$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Button"], {
@@ -899,7 +1058,7 @@ function IdentityCard({ data, onChanged }) {
                                                         className: "mr-2 h-4 w-4 animate-spin"
                                                     }, void 0, false, {
                                                         fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                                        lineNumber: 504,
+                                                        lineNumber: 606,
                                                         columnNumber: 23
                                                     }, this),
                                                     "Connecting…"
@@ -910,7 +1069,7 @@ function IdentityCard({ data, onChanged }) {
                                                         className: "mr-2 h-4 w-4"
                                                     }, void 0, false, {
                                                         fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                                        lineNumber: 509,
+                                                        lineNumber: 611,
                                                         columnNumber: 23
                                                     }, this),
                                                     "Continue with NINAuth"
@@ -918,7 +1077,7 @@ function IdentityCard({ data, onChanged }) {
                                             }, void 0, true)
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                            lineNumber: 497,
+                                            lineNumber: 599,
                                             columnNumber: 17
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -926,22 +1085,30 @@ function IdentityCard({ data, onChanged }) {
                                             children: "Mock provider — the live partner transport activates with NINAuth partner access."
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                            lineNumber: 514,
+                                            lineNumber: 616,
                                             columnNumber: 17
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                    lineNumber: 481,
+                                    lineNumber: 583,
                                     columnNumber: 15
                                 }, this),
-                                flowError && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                                identityTaken && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(IdentityTakenPanel, {
+                                    onSignOut: ()=>void signOut(),
+                                    onDismiss: ()=>setIdentityTaken(false)
+                                }, void 0, false, {
+                                    fileName: "[project]/src/components/dashboard/identity-card.tsx",
+                                    lineNumber: 622,
+                                    columnNumber: 17
+                                }, this),
+                                flowError && !identityTaken && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
                                     className: "rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive",
                                     role: "alert",
                                     children: flowError
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                    lineNumber: 520,
+                                    lineNumber: 628,
                                     columnNumber: 17
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("ul", {
@@ -955,14 +1122,14 @@ function IdentityCard({ data, onChanged }) {
                                                     "aria-hidden": "true"
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                                    lineNumber: 529,
+                                                    lineNumber: 637,
                                                     columnNumber: 19
                                                 }, this),
                                                 "Government identity verification"
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                            lineNumber: 528,
+                                            lineNumber: 636,
                                             columnNumber: 17
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("li", {
@@ -973,14 +1140,14 @@ function IdentityCard({ data, onChanged }) {
                                                     "aria-hidden": "true"
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                                    lineNumber: 533,
+                                                    lineNumber: 641,
                                                     columnNumber: 19
                                                 }, this),
                                                 "Consent-scoped attributes only"
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                            lineNumber: 532,
+                                            lineNumber: 640,
                                             columnNumber: 17
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("li", {
@@ -991,14 +1158,14 @@ function IdentityCard({ data, onChanged }) {
                                                     "aria-hidden": "true"
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                                    lineNumber: 537,
+                                                    lineNumber: 645,
                                                     columnNumber: 19
                                                 }, this),
                                                 "No raw NIN ever stored"
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                            lineNumber: 536,
+                                            lineNumber: 644,
                                             columnNumber: 17
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("li", {
@@ -1009,37 +1176,37 @@ function IdentityCard({ data, onChanged }) {
                                                     "aria-hidden": "true"
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                                    lineNumber: 541,
+                                                    lineNumber: 649,
                                                     columnNumber: 19
                                                 }, this),
                                                 "Freshness tracked from day one"
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                            lineNumber: 540,
+                                            lineNumber: 648,
                                             columnNumber: 17
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                    lineNumber: 527,
+                                    lineNumber: 635,
                                     columnNumber: 15
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                            lineNumber: 480,
+                            lineNumber: 582,
                             columnNumber: 13
                         }, this)
                     }, void 0, false, {
                         fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                        lineNumber: 315,
+                        lineNumber: 411,
                         columnNumber: 9
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                lineNumber: 271,
+                lineNumber: 367,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$framer$2d$motion$2f$dist$2f$es$2f$components$2f$AnimatePresence$2f$index$2e$mjs__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["AnimatePresence"], {
@@ -1058,12 +1225,12 @@ function IdentityCard({ data, onChanged }) {
                     }
                 }, void 0, false, {
                     fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                    lineNumber: 552,
+                    lineNumber: 660,
                     columnNumber: 11
                 }, this)
             }, void 0, false, {
                 fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                lineNumber: 550,
+                lineNumber: 658,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$alert$2d$dialog$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["AlertDialog"], {
@@ -1079,20 +1246,20 @@ function IdentityCard({ data, onChanged }) {
                                     children: "Withdraw this consent?"
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                    lineNumber: 578,
+                                    lineNumber: 686,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$alert$2d$dialog$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["AlertDialogDescription"], {
                                     children: "Withdrawing revokes every attribute this consent produced. If it established your Trust Identity, your identity, evidence and fingerprints are revoked too — you can re-verify anytime. This is your NDPA right and it takes effect immediately."
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                    lineNumber: 579,
+                                    lineNumber: 687,
                                     columnNumber: 13
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                            lineNumber: 577,
+                            lineNumber: 685,
                             columnNumber: 11
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$alert$2d$dialog$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["AlertDialogFooter"], {
@@ -1102,7 +1269,7 @@ function IdentityCard({ data, onChanged }) {
                                     children: "Keep consent"
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                    lineNumber: 587,
+                                    lineNumber: 695,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$alert$2d$dialog$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["AlertDialogAction"], {
@@ -1116,31 +1283,31 @@ function IdentityCard({ data, onChanged }) {
                                             className: "mr-2 h-4 w-4 animate-spin"
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                            lineNumber: 595,
+                                            lineNumber: 703,
                                             columnNumber: 32
                                         }, this) : null,
                                         "Withdraw consent"
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                                    lineNumber: 588,
+                                    lineNumber: 696,
                                     columnNumber: 13
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                            lineNumber: 586,
+                            lineNumber: 694,
                             columnNumber: 11
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                    lineNumber: 576,
+                    lineNumber: 684,
                     columnNumber: 9
                 }, this)
             }, void 0, false, {
                 fileName: "[project]/src/components/dashboard/identity-card.tsx",
-                lineNumber: 570,
+                lineNumber: 678,
                 columnNumber: 7
             }, this)
         ]

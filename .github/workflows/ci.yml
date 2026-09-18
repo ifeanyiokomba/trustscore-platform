@@ -9,7 +9,7 @@
 #   - mini-services (provider-simulator :3032, webhook-worker :3031)
 #   - dev server on :3000, then the real HTTP integration matrices in the
 #     documented order with the documented rate-window pauses
-#     (stage2 → stage9 → [pause] → batch0 → auth_matrix).
+#     (stage2 → stage9 → [pause] → batch0 → auth_matrix → [pause] → batch1 → batch2).
 #
 # audit job:
 #   - generates a package-lock snapshot and fails on HIGH+ advisories
@@ -71,6 +71,12 @@ jobs:
         run: python3 tests/batch0_matrix.py
       - name: AUTH matrix (28-item multi-identifier suite)
         run: python3 tests/auth_matrix.py
+      - name: Rate-window cooldown
+        run: sleep 75
+      - name: Batch 1 matrix (scope mapping + API catalog drift guard)
+        run: python3 tests/batch1_matrix.py
+      - name: Batch 2 matrix (G7 duplicate guard, G8 business profiles, PR2 DSR erasure-cascade invariant)
+        run: python3 tests/batch2_matrix.py
 
   audit:
     runs-on: ubuntu-latest

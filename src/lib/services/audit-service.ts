@@ -121,6 +121,15 @@ export type AuditAction =
   // sec-batch-A — session-device drift on a live cookie (audited, not
   // enforced: hard IP/UA binding breaks mobile users; see SECURITY_AUDIT.md).
   | "SESSION_DEVICE_CHANGE"
+  // Batch 2 (G7) — duplicate government identity: another account already
+  // holds this NINAuth subject; the claim is blocked fail-closed and the
+  // owning account is notified.
+  | "IDENTITY_DUPLICATE_BLOCKED"
+  // Batch 2 (G8) — business profiles (RC/BN/IT labels; UNVERIFIED until a
+  // CAC-class provider exists — never trust signals).
+  | "BUSINESS_PROFILE_CREATED"
+  | "BUSINESS_PROFILE_UPDATED"
+  | "BUSINESS_PROFILE_DELETED"
   | "SCOPE_GUARD_BLOCKED";
 
 interface AuditInput {
@@ -210,6 +219,11 @@ const SAFE_METADATA_KEYS = new Set([
   "alertsRaised",
   "recoveriesSent",
   "provider",
+  // Batch 2 (G7) — the blocking holder's TrustIdentity cuid (not a user id,
+  // not PII) so duplicate-block forensics can trace which claim won.
+  "holderIdentity",
+  // Batch 2 (G8) — masked RC display hint ("RC 1•••45" — non-reconstructable)
+  "rcHint",
 ]);
 
 export async function recordAudit(input: AuditInput): Promise<void> {

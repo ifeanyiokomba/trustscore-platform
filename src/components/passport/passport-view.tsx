@@ -13,6 +13,7 @@ import { CredentialsCard } from "@/components/passport/credentials-card";
 import { TrustShareCard } from "@/components/passport/trust-share-card";
 import { VerificationHistory } from "@/components/passport/verification-history";
 import { ScoreHistoryCard, useScoreHistory } from "@/components/passport/score-history-card";
+import { BusinessProfilesCard } from "@/components/passport/business-card";
 import { TabIntro } from "@/components/dashboard/tab-intro";
 import type { DsrRequestInfo, IdentityMe, PassportMe } from "@/lib/types";
 
@@ -125,6 +126,12 @@ export function PassportTab({
       </div>
       <div className="min-w-0 lg:col-span-1">
         <VerificationHistory identity={identityLoading ? null : identity} />
+      </div>
+
+      {/* Batch 2 (G8) — business profiles: honest UNVERIFIED labels, never
+          trust signals. Full row so the create form never squeezes. */}
+      <div className="min-w-0 lg:col-span-3">
+        <BusinessProfilesCard />
       </div>
       </div>
     </>

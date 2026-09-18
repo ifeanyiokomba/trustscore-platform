@@ -17,10 +17,11 @@ Audits (11 docs), research (5 docs incl. contract matrix), architecture (4 docs)
 - ✅ G4 LIVE-readiness checklist machine-readable + operator-visible: `live-readiness.config.ts` → `ninauthAlignment` on the admin provider console (collapsible section: scope gaps, request-reason readiness, 16 contract-matrix items)
 - Everything else waits on partner credentials; the 20 UNCONFIRMED matrix rows remain the LIVE-readiness checklist (G4) — now surfaced in the admin console
 
-## Batch 2 — Trust Identity Hardening — ⬜ NEXT
-- Duplicate-identity handling depth + account recovery flows (G7)
-- Business/RC model (G8 — schema + UI slot, no provider claims)
-- DSR erasure-cascade invariant test (PR2)
+## Batch 2 — Trust Identity Hardening — ✅ **DONE (gate: PASS)**
+- ✅ Duplicate-identity handling depth + account recovery flows (G7) — fail-closed IDENTITY_TAKEN guard at the verification callback (same NINAuth subject already VERIFIED on another account → session FAILED, holder notified, claimant routed to recovery; revoked claims release the subject; no holder disclosure)
+- ✅ Business/RC model (G8 — schema + UI slot, no provider claims) — BusinessAccount (peppered rcFingerprint + masked hint, raw RC never stored), owner CRUD, honest UNVERIFIED-only labels; no-trust-signal invariant matrix-enforced
+- ✅ DSR erasure-cascade invariant test (PR2) — DMMF-driven zero-rows scan over EVERY UserAccount relation + cascade-coverage assertion + surgical-cascade negative control (ada)
+- ✅ Bonus: live API-catalog drift fixed (19 undocumented routes — the AUTH batch never registered in the /api index; batch1's drift guard now closes at 107 entries)
 
 ## Batch 3 — Web Identity Experience polish — ⬜
 - Continue-with-NINAuth journey refinements (error states, retry, session expiry UX)

@@ -451,7 +451,11 @@ export type CallbackResult =
         | "NOT_GRANTED"
         | "CODE_REUSED"
         | "EXCHANGE_FAILED"
-        | "TOKEN_INVALID";
+        | "TOKEN_INVALID"
+        // Batch 2 (G7): the government identity (NINAuth subject) is already
+        // VERIFIED on another account. Fail-closed — the user is routed to
+        // account recovery, never silently re-bound.
+        | "IDENTITY_TAKEN";
       reason?: string;
     };
 
@@ -551,6 +555,51 @@ export async function completeCallback(
   }
 
   await recordEvent(session.id, "TOKEN_VALIDATED", { reason: "signature_iss_aud_exp_nonce" });
+
+  // Batch 2 (G7) — duplicate-identity guard (fail-closed). A NINAuth subject
+  // is one physical person: when the SAME subject is already VERIFIED on a
+  // DIFFERENT account, this account must not silently gain a second
+  // government-verified identity (the anti-Sybil property of L1). The claim
+  // is refused and BOTH sides learn about it:
+  //   - the claiming user gets IDENTITY_TAKEN + account-recovery routing;
+  //   - the OWNING account gets a security notification (their identity was
+  //     presented elsewhere — exactly the alert a real owner needs).
+  // The owning account's identity is never moved, merged or exposed — only
+  // its existence is acknowledged to the person asserting the same identity.
+  // Revoked/expired claims do not block: their freshness is gone.
+  if (claims.verified) {
+    const holder = await db.trustIdentity.findFirst({
+      where: {
+        providerIdentityRef: claims.sub,
+        status: "VERIFIED",
+        userId: { not: userId },
+      },
+      select: { id: true, userId: true },
+    });
+    if (holder) {
+      await db.verificationSession.update({
+        where: { id: session.id },
+        data: { status: "FAILED", errorReason: "identity_taken", completedAt: new Date() },
+      });
+      await recordEvent(session.id, "SESSION_FAILED", { reason: "identity_taken" });
+      await recordAudit({
+        actorType: "USER",
+        actorId: userId,
+        action: "IDENTITY_DUPLICATE_BLOCKED",
+        subjectType: "VerificationSession",
+        subjectId: session.id,
+        requestId,
+        metadata: { reason: "identity_taken", outcome: "blocked", holderIdentity: holder.id },
+      });
+      await notifyUser(
+        holder.userId,
+        "SECURITY",
+        "Your government identity was used elsewhere",
+        "Your NINAuth-verified identity was presented in a verification attempt from a different TrustScore account. If that wasn't you, change your password and contact support. If you were trying to add your identity to a new account, first remove it from the old one or recover that account's access."
+      );
+      return { ok: false, code: "IDENTITY_TAKEN", reason: "identity_taken" };
+    }
+  }
 
   // Consent record (directive §31): who / why / what / when / provider / policy.
   const consent = await db.consent.create({

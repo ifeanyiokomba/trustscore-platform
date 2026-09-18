@@ -101,6 +101,12 @@ async function GET() {
                 description: "Revoke session (idempotent)"
             },
             {
+                method: "POST",
+                path: "/api/v1/auth/logout-all",
+                auth: "session",
+                description: "AUTH batch: sign out EVERYWHERE — revokes all sessions for the account and clears the current cookie"
+            },
+            {
                 method: "GET",
                 path: "/api/v1/auth/me",
                 auth: "session",
@@ -111,6 +117,84 @@ async function GET() {
                 path: "/api/v1/auth/activity",
                 auth: "session",
                 description: "Recent audited auth events (redacted)"
+            },
+            {
+                method: "POST",
+                path: "/api/v1/auth/phone/start",
+                auth: "session",
+                description: "AUTH batch: start a phone OTP flow {phone, purpose: LOGIN|REGISTER|LINK|RECOVERY} — E.164-normalized, fingerprinted (raw number never stored), 5-min hashed OTP, 5 attempts / 3 resends; MOCK delivery surfaces the code honestly"
+            },
+            {
+                method: "POST",
+                path: "/api/v1/auth/phone/verify",
+                auth: "session",
+                description: "AUTH batch: verify the OTP — LOGIN completes with a session cookie; REGISTER/LINK mark the phone verified for the follow-up step"
+            },
+            {
+                method: "POST",
+                path: "/api/v1/auth/phone/register",
+                auth: "session",
+                description: "AUTH batch: finish phone-first registration {displayName, handle, password?, email?} — passwordless option; creates USERNAME+PHONE identifiers"
+            },
+            {
+                method: "POST",
+                path: "/api/v1/auth/google/start",
+                auth: "session",
+                description: "AUTH batch: begin 'Continue with Google' — OAuth 2.0 + server-side PKCE (mock provider honestly labeled; LIVE gated on GOOGLE_CLIENT_ID/SECRET)"
+            },
+            {
+                method: "POST",
+                path: "/api/v1/auth/google/:id/grant",
+                auth: "session",
+                description: "AUTH batch: the mock Google account-picker/consent step — GRANT/DENY with the chosen account email; issues a one-time code (retired in LIVE posture)"
+            },
+            {
+                method: "POST",
+                path: "/api/v1/auth/google/:id/callback",
+                auth: "session",
+                description: "AUTH batch: the OAuth callback — state check, PKCE exchange, signed-assertion validation; resolution LOGIN | auto-LINK (verified email) | LINK_REQUIRED (explicit confirm) | REGISTER; never a silent merge"
+            },
+            {
+                method: "POST",
+                path: "/api/v1/auth/google/link",
+                auth: "session",
+                description: "AUTH batch: confirm a LINK_REQUIRED google binding on the AUTHENTICATED account (the grant alone never rebinds a session)"
+            },
+            {
+                method: "POST",
+                path: "/api/v1/auth/recover/password/request",
+                auth: false,
+                description: "AUTH batch: password reset request {identifier} — always the same response shape (anti-enumeration); single-use hashed token, 15-min TTL, MOCK preview in sandbox"
+            },
+            {
+                method: "POST",
+                path: "/api/v1/auth/recover/password/confirm",
+                auth: false,
+                description: "AUTH batch: reset the password with the token — revokes ALL sessions for the account"
+            },
+            {
+                method: "POST",
+                path: "/api/v1/auth/email/verify/request",
+                auth: "session",
+                description: "AUTH batch: send my own email-verification code (10-min TTL, capped attempts, MOCK code surfaced honestly)"
+            },
+            {
+                method: "POST",
+                path: "/api/v1/auth/email/verify/confirm",
+                auth: "session",
+                description: "AUTH batch: confirm the email-verification code — marks the EMAIL identifier verified (unlocks google auto-link resolution)"
+            },
+            {
+                method: "GET",
+                path: "/api/v1/auth/identifiers",
+                auth: "session",
+                description: "AUTH batch: my sign-in methods (masked — raw phones / Google subjects never leave the server)"
+            },
+            {
+                method: "POST",
+                path: "/api/v1/auth/identifiers/:type/unlink",
+                auth: "session",
+                description: "AUTH batch: unlink a GOOGLE/PHONE identifier (409 LAST_IDENTIFIER guard — an account never loses its only way in)"
             },
             {
                 method: "POST",
@@ -183,6 +267,30 @@ async function GET() {
                 path: "/api/v1/identity/signals/biometrics/complete",
                 auth: "session",
                 description: "Stage 4: submit capture → verdict (liveness + face-match vs government record) → ladder L3/L4"
+            },
+            {
+                method: "POST",
+                path: "/api/v1/businesses",
+                auth: "session",
+                description: "Batch 2 (G8): claim a business profile {name, rcNumber} — RC/BN/IT normalized, peppered fingerprint + masked hint (raw number NEVER stored); UNVERIFIED label, never a trust signal; max 5 per account"
+            },
+            {
+                method: "GET",
+                path: "/api/v1/businesses",
+                auth: "session",
+                description: "Batch 2 (G8): my business profiles (masked RC hints, status UNVERIFIED — no provider exists yet)"
+            },
+            {
+                method: "PATCH",
+                path: "/api/v1/businesses/:id",
+                auth: "session",
+                description: "Batch 2 (G8): rename a business profile (DSR rectification; owner-scoped)"
+            },
+            {
+                method: "DELETE",
+                path: "/api/v1/businesses/:id",
+                auth: "session",
+                description: "Batch 2 (G8): remove a business profile (owner-scoped, audited)"
             },
             {
                 method: "GET",
@@ -471,6 +579,12 @@ async function GET() {
                 path: "/api/v1/engine/admin/providers/alerting",
                 auth: "session+admin",
                 description: "Stage 14: tune the sustained-open alert threshold {sustainedMs 5000–600000} — audited PROVIDER_ALERTING_CHANGED"
+            },
+            {
+                method: "GET",
+                path: "/api/v1/admin/security-posture",
+                auth: "session+admin",
+                description: "sec-batch-A: security posture console — guarded-secret posture (booleans/labels only, never values), provider modes, CSP mode, rate-limit topology"
             },
             {
                 method: "POST",
