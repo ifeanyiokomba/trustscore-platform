@@ -18,13 +18,15 @@
 //     responses never echo codes.
 
 import { createHash, randomInt, timingSafeEqual } from "crypto";
+import { guardedSecret } from "@/lib/platform/boot-guard";
 
 export const PHONE_PROVIDER_NAME = "SMS_MOCK";
 export const PHONE_MODE: "MOCK" | "LIVE" = "MOCK"; // honestly labeled everywhere
 
 // Backend-only pepper — shared with the identifier fingerprint discipline.
-const PHONE_PEPPER =
-  process.env.SIGNAL_PEPPER ?? "ts_backend_only_signal_pepper";
+// sec-batch-A: guarded read — production refuses to boot on the dev default
+// (this pepper is what makes phone fingerprints irreversible).
+const PHONE_PEPPER = guardedSecret("SIGNAL_PEPPER");
 
 export const OTP_TTL_MS = 5 * 60_000; // OTP validity window
 export const MAX_OTP_ATTEMPTS = 3; // wrong attempts before lockout

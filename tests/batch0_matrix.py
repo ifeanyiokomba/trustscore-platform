@@ -43,6 +43,16 @@ def call(method, path, body=None, headers=None):
         return e.code, e.read().decode(), dict(e.headers)
 
 
+def hget(headers: dict, name: str) -> str:
+    """Case-insensitive header read — HTTP header names are case-insensitive
+    (sec-batch-A: middleware-set headers arrive lowercase from the dev
+    server; the previous case-sensitive dict lookup was a test-side bug)."""
+    for k, v in headers.items():
+        if k.lower() == name.lower():
+            return v
+    return ""
+
+
 def check(name, ok, detail=""):
     global PASS, FAIL
     mark = "PASS" if ok else "FAIL"
@@ -64,11 +74,11 @@ def jbody(raw):
 print("== 1) G1 — security headers (HTML + API surfaces) ==")
 
 status, raw, headers = call("GET", "/")
-csp = headers.get("Content-Security-Policy", "")
-xcto = headers.get("X-Content-Type-Options", "")
-rp = headers.get("Referrer-Policy", "")
-pp = headers.get("Permissions-Policy", "")
-xpb = headers.get("X-Powered-By", "")
+csp = hget(headers, "Content-Security-Policy")
+xcto = hget(headers, "X-Content-Type-Options")
+rp = hget(headers, "Referrer-Policy")
+pp = hget(headers, "Permissions-Policy")
+xpb = hget(headers, "X-Powered-By")
 
 check("landing 200", status == 200)
 check("CSP present on HTML", bool(csp))
@@ -85,8 +95,8 @@ check("Permissions-Policy denies camera/mic/geo/payment", all(
 check("X-Powered-By removed", xpb == "")
 
 status2, _, headers2 = call("GET", "/api/health")
-check("API responses carry CSP too", "default-src 'self'" in headers2.get("Content-Security-Policy", ""))
-check("API responses carry nosniff", headers2.get("X-Content-Type-Options", "").lower() == "nosniff")
+check("API responses carry CSP too", "default-src 'self'" in hget(headers2, "Content-Security-Policy"))
+check("API responses carry nosniff", hget(headers2, "X-Content-Type-Options").lower() == "nosniff")
 
 # ---------------------------------------------------------------------------
 print("== 2) G2 — purpose-aware Trust Decision API (directive §22) ==")

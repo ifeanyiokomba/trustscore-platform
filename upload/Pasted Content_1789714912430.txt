@@ -1,0 +1,2671 @@
+# TRUSTSCORE PLATFORM
+
+## MASTER CTO / PRODUCT / SECURITY / IDENTITY / UX / IMPLEMENTATION DIRECTIVE
+
+Repository:
+
+`https://github.com/ifeanyiokomba/trustscore-platform`
+
+Product:
+
+**TrustScore — the NIN-first trust layer for African digital commerce**
+
+You are acting as the combined:
+
+* Principal Software Architect
+* Senior Full-Stack Engineer
+* Identity Verification Architect
+* Security Engineer
+* Privacy/Data Protection Architect
+* Product Architect
+* UI/UX Designer
+* Brand/Design Systems Engineer
+* DevOps/SRE Engineer
+* QA/Test Engineer
+* Technical Researcher
+* Technical Product Manager
+* Platform Operations Architect
+
+Your mission is to **deeply audit what has already been built, research the relevant external standards and providers, critically compare the existing implementation against that research, identify architectural weaknesses and gaps, then strategically implement the most suitable production-grade solution**.
+
+Do not blindly follow the old roadmap.
+
+Do not blindly rewrite the existing system.
+
+Do not assume the current architecture is perfect because the repository reports passing tests.
+
+Do not assume a researched provider's capability automatically means TrustScore is authorized to use it in production.
+
+The objective is to evolve TrustScore into a **serious, extensible identity and trust infrastructure platform** that can start with NINAuth and progressively incorporate additional verification sources such as BVN, phone, document, biometric and liveness verification without repeatedly redesigning the core system.
+
+---
+
+# 1. ABSOLUTE OPERATING PRINCIPLE
+
+Work in strict batches.
+
+For every batch:
+
+```text
+RESEARCH
+↓
+AUDIT CURRENT IMPLEMENTATION
+↓
+COMPARE CURRENT STATE WITH RESEARCH
+↓
+IDENTIFY GAPS / RISKS / INCONSISTENCIES
+↓
+CRITICALLY ANALYZE OPTIONS
+↓
+SELECT STRATEGIC SOLUTION
+↓
+DESIGN BEFORE CODING
+↓
+IMPLEMENT
+↓
+TEST
+↓
+SECURITY REVIEW
+↓
+PRIVACY REVIEW
+↓
+UX/UI REVIEW
+↓
+REGRESSION AUDIT
+↓
+FIX EVERYTHING FOUND
+↓
+RETEST
+↓
+FINAL BATCH AUDIT
+↓
+DOCUMENT
+↓
+COMMIT
+↓
+ONLY THEN PROCEED
+```
+
+## HARD GATE
+
+Do NOT move forward when a batch has:
+
+* failing tests
+* broken migrations
+* broken API contracts
+* authentication regressions
+* identity inconsistencies
+* security weaknesses
+* privacy leakage
+* broken responsive UI
+* broken existing workflows
+* incomplete provider handling
+* unverified production assumptions
+* duplicate-account risks
+* notification reliability problems
+* undocumented architectural changes
+* known half-implemented features
+
+Fix the batch first.
+
+---
+
+# 2. FIRST TASK — FULL REPOSITORY AUDIT
+
+Before substantial coding, inspect the complete current repository.
+
+Audit:
+
+* application structure
+* Next.js architecture
+* API routes
+* Prisma schema
+* services
+* provider adapters
+* authentication
+* sessions
+* authorization
+* middleware
+* identity architecture
+* verification architecture
+* consent
+* evidence
+* liveness
+* phone verification
+* scoring
+* trust engine
+* notification architecture
+* email
+* SMS
+* webhooks
+* background jobs
+* queues/workers
+* UI components
+* design system
+* dashboards
+* admin surfaces
+* onboarding
+* public Trust Links
+* Safety Check
+* Trust Passport
+* developer portal
+* security controls
+* privacy controls
+* audit logs
+* DSR/privacy-request infrastructure
+* configuration
+* environment handling
+* provider credentials
+* test infrastructure
+* deployment
+* observability
+* documentation
+
+Do not trust README statements without verifying actual behavior.
+
+Create an implementation truth table:
+
+```text
+WORKING
+PARTIALLY WORKING
+MOCK
+PLACEHOLDER
+BROKEN
+DUPLICATED
+UNSAFE
+MISSING
+OVER-ENGINEERED
+UNDER-ENGINEERED
+```
+
+---
+
+# 3. CRITICALLY REASSESS THE CURRENT ARCHITECTURE
+
+The current repository already contains strong foundations such as:
+
+* `TrustIdentity`
+* `IdentityIdentifier`
+* `IdentityAttribute`
+* `Evidence`
+* `VerificationSession`
+* `Consent`
+* `PhoneVerification`
+* `LivenessSession`
+* scoring/policy structures
+* trust snapshots
+* provider posture controls
+
+Treat this as a strong starting point, NOT as final architecture.
+
+Your task is to determine whether these structures should be:
+
+* retained
+* generalized
+* split
+* renamed
+* extended
+* normalized
+* secured
+* versioned
+* connected differently
+
+Do not create duplicate domain models just because a new feature arrives.
+
+For example, do NOT automatically build:
+
+```text
+NinVerificationSession
+BvnVerificationSession
+FaceVerificationSession
+DocumentVerificationSession
+PhoneVerificationSession
+```
+
+as unrelated systems.
+
+First determine whether a generalized verification orchestration model is more appropriate.
+
+---
+
+# 4. CORE STRATEGIC ARCHITECTURE CHANGE
+
+TrustScore must evolve from:
+
+**“NIN verification product with additional features”**
+
+into:
+
+**“Identity and Trust Verification Orchestration Platform, initially anchored by NINAuth.”**
+
+NINAuth remains the foundational high-assurance government-backed identity source.
+
+But the system must be capable of combining multiple evidence sources over time.
+
+Conceptually:
+
+```text
+                   TRUSTSCORE
+                       │
+             VERIFICATION ORCHESTRATOR
+                       │
+     ┌─────────────────┼──────────────────┐
+     │                 │                  │
+   NINAuth             BVN          Phone Verification
+     │                 │                  │
+     ├──────────────┬──┴───────┬──────────┤
+     │              │          │
+   Face          Document    Liveness
+ Verification   Verification Verification
+     │              │          │
+     └──────────────┴──────────┘
+                       │
+                 Evidence Layer
+                       │
+                 Trust Identity
+                       │
+             Trust / Reputation Engine
+                       │
+             Contextual Decision API
+```
+
+This is a foundational architectural requirement.
+
+---
+
+# 5. VERIFICATION ORCHESTRATION LAYER
+
+Create or strategically refactor toward a provider-neutral verification orchestration layer.
+
+Core concepts should include something equivalent to:
+
+```text
+VerificationRequest
+VerificationAttempt
+VerificationProvider
+ProviderCapability
+VerificationEvidence
+VerificationResult
+VerificationDecision
+VerificationSession
+VerificationConsent
+VerificationPolicy
+VerificationAuditEvent
+```
+
+Do not force these exact names if a better domain model emerges during audit.
+
+The important requirement is separation of concerns.
+
+---
+
+# 6. VERIFICATION PROVIDER ABSTRACTION
+
+Every provider must be represented by a standard capability contract.
+
+Conceptually:
+
+```text
+Provider
+ ├── identity types supported
+ ├── verification types supported
+ ├── countries
+ ├── environments
+ ├── capabilities
+ ├── cost profile
+ ├── health
+ ├── latency
+ ├── availability
+ ├── quota
+ ├── compliance status
+ ├── credential configuration
+ └── routing priority
+```
+
+Capabilities may include:
+
+```text
+NIN
+BVN
+PHONE
+DOCUMENT
+FACE_MATCH
+LIVENESS
+ADDRESS
+BUSINESS
+KYC
+AML
+```
+
+Do not expose provider-specific response structures throughout the application.
+
+Normalize them into TrustScore's internal evidence model.
+
+---
+
+# 7. VERIFICATION PROVIDER ROUTING
+
+Implement provider routing using the same conceptual philosophy that will also be used for email/SMS routing.
+
+Provider tiers:
+
+```text
+PRIMARY
+SECONDARY
+FALLBACK
+CANARY
+```
+
+Routing may depend on:
+
+* verification type
+* geography
+* provider availability
+* provider health
+* cost
+* speed
+* provider capability
+* confidence
+* regulatory/contractual availability
+* quota
+* temporary degradation
+* business rules
+
+Example:
+
+```text
+BVN request
+    ↓
+Provider capability check
+    ↓
+Primary BVN provider
+    ↓
+failure / degradation
+    ↓
+Secondary BVN provider
+    ↓
+failure
+    ↓
+Fallback provider
+```
+
+Do not blindly retry a verification request when the first provider may have completed it.
+
+Maintain correlation/reference IDs and idempotency.
+
+---
+
+# 8. PROVIDER RESPONSE NORMALIZATION
+
+Every provider must be normalized into a common TrustScore result model.
+
+For example:
+
+```text
+VERIFIED
+PARTIALLY_VERIFIED
+MATCH
+PARTIAL_MATCH
+NO_MATCH
+INVALID
+EXPIRED
+REQUIRES_REVIEW
+PENDING
+PROVIDER_ERROR
+UNAVAILABLE
+UNKNOWN
+```
+
+Also capture:
+
+* provider reference
+* verification type
+* confidence where legitimately supplied
+* fields matched
+* evidence timestamp
+* evidence freshness
+* source
+* consent reference
+* policy version
+* provider mode
+* provider version where available
+
+Do not invent confidence values.
+
+---
+
+# 9. IMPORTANT: VERIFICATION ≠ TRUST
+
+Never collapse:
+
+```text
+identity verified
+```
+
+into:
+
+```text
+trustworthy
+```
+
+For example:
+
+```text
+NIN verified
++
+BVN verified
++
+Face matched
++
+Phone verified
+```
+
+does NOT automatically mean:
+
+```text
+HIGH TRUST
+```
+
+It means:
+
+```text
+More identity evidence is available.
+```
+
+The Trust Engine determines what that evidence means in context.
+
+---
+
+# 10. NINAUTH MUST REMAIN THE IDENTITY FOUNDATION
+
+Deeply research the current official NINAuth documentation before implementing live integration.
+
+Research:
+
+* OAuth
+* OIDC
+* PKCE
+* state
+* nonce
+* authorization code
+* redirect URI
+* client ID
+* app ID
+* client secret
+* token exchange
+* ID token validation
+* scope
+* consent
+* QR
+* Share Code
+* personal sign-in
+* business sign-in
+* RC number
+* mobile integration
+* Expo/React Native flow
+* provider/partner model
+* production requirements
+
+Current official NINAuth documentation shows that the backend is responsible for the authorization-code exchange and client-secret handling, while PKCE verifier management must be protected server-side. Implement the actual documented flow rather than treating the existing mock implementation as production behavior.
+
+Do NOT invent:
+
+* production scopes
+* production claims
+* undocumented endpoints
+* unsupported APIs
+* unsupported identity guarantees
+
+---
+
+# 11. NINAUTH PRODUCTION ADAPTER
+
+The current NINAuth implementation is mock-oriented.
+
+Keep the architecture capable of:
+
+```text
+MOCK
+LOOPBACK / TEST
+LIVE
+```
+
+But production LIVE must use the actual NINAuth contract.
+
+Do not simply replace the mock URL and call it finished.
+
+Audit:
+
+* request construction
+* callback
+* state verification
+* PKCE
+* nonce
+* code exchange
+* token validation
+* issuer
+* audience
+* expiry
+* scope
+* consent
+* provider errors
+* single-use code behavior
+* transaction cleanup
+
+Delete short-lived PKCE/authorization transaction material after success or expiry.
+
+Do not log secrets or tokens.
+
+---
+
+# 12. NINAUTH SHARE CODE VS TRUSTSCORE SHARE TOKEN
+
+These must remain completely separate.
+
+```text
+NINAuth Share Code
+```
+
+is a NINAuth mechanism.
+
+```text
+TrustScore Share Token
+```
+
+is a TrustScore mechanism.
+
+Never use the same database entity or semantics simply because both can be called “share codes”.
+
+---
+
+# 13. FUTURE BVN VERIFICATION
+
+TrustScore MUST be architected to introduce BVN verification as a first-class verification capability.
+
+Do not hard-code BVN to a single provider.
+
+Research, evaluate and integrate eligible providers according to the provider abstraction.
+
+Current provider research shows, for example, that:
+
+* Dojah provides BVN validation/matching APIs.
+* VerifyMe provides BVN verification and identity matching.
+* Prembly exposes BVN verification and BVN-plus-face verification capabilities.
+
+These are research examples, not an automatic instruction to choose one provider.
+
+The agent must independently evaluate:
+
+* API quality
+* reliability
+* commercial terms
+* coverage
+* data returned
+* match quality
+* face capability
+* webhook support
+* security
+* latency
+* documentation
+* operational maturity
+* legal/compliance suitability
+* geographic coverage
+
+Do not select a provider based only on documentation convenience.
+
+---
+
+# 14. BVN VERIFICATION MUST FOLLOW THE SAME VERIFICATION ROUTE
+
+A BVN request should use the same overall lifecycle:
+
+```text
+User / B2B Request
+        ↓
+Consent + Purpose
+        ↓
+Verification Request
+        ↓
+Policy Evaluation
+        ↓
+Provider Selection
+        ↓
+Provider Attempt
+        ↓
+Normalized Result
+        ↓
+Evidence
+        ↓
+Trust Identity Association
+        ↓
+Trust Engine
+```
+
+This is critical.
+
+Do NOT build BVN as a detached “BVN checker”.
+
+---
+
+# 15. IDENTITY EVIDENCE GRAPH
+
+Move toward a structured evidence graph.
+
+Example:
+
+```text
+TrustIdentity
+    │
+    ├── NINAuth Evidence
+    │
+    ├── BVN Evidence
+    │
+    ├── Phone Evidence
+    │
+    ├── Face Verification Evidence
+    │
+    ├── Liveness Evidence
+    │
+    ├── Document Evidence
+    │
+    └── Reputation Evidence
+```
+
+Every piece of evidence should have:
+
+* source
+* provider
+* type
+* result
+* confidence where applicable
+* timestamp
+* expiry/freshness
+* consent reference
+* purpose
+* evidence reference
+* verification policy version
+
+This allows TrustScore to expand without rebuilding its scoring engine each time.
+
+---
+
+# 16. FACE VERIFICATION — MAJOR NEW CAPABILITY
+
+Build a dedicated Face Verification subsystem.
+
+However:
+
+DO NOT immediately build an internally trained facial-recognition engine.
+
+DO NOT invent a proprietary biometric algorithm.
+
+DO NOT store biometric templates unnecessarily.
+
+DO NOT create a public face-search database.
+
+The safer architecture is:
+
+```text
+Capture
+↓
+Liveness
+↓
+Face Quality Check
+↓
+Face Match / Identity Proofing Provider
+↓
+Normalized Verification Result
+↓
+Evidence
+↓
+Trust Identity
+```
+
+---
+
+# 17. FACE VERIFICATION PRODUCT EXPERIENCE
+
+The user should have a guided capture experience.
+
+Example:
+
+```text
+Step 1
+Prepare your environment
+
+Step 2
+Allow camera access
+
+Step 3
+Position your face
+
+Step 4
+Complete liveness challenge
+
+Step 5
+Capture image/video signal
+
+Step 6
+Submit for verification
+
+Step 7
+Compare against the approved identity source
+
+Step 8
+Receive result
+```
+
+Keep the user informed.
+
+Do not reveal unnecessary biometric information.
+
+---
+
+# 18. FOLLOW NINAUTH-STYLE IDENTITY PRINCIPLES
+
+The face-verification design must follow the same general principles as NINAuth:
+
+* explicit consent
+* purpose limitation
+* secure identity proofing
+* liveness where appropriate
+* provider-backed verification
+* minimum necessary disclosure
+* auditable verification
+* no unnecessary exposure of raw identity records
+
+NIMC's current verification-partner material explicitly discusses ID checking, facial authentication and liveness detection as identity-verification capabilities. Use that as architectural guidance while validating the exact permitted production flow and contractual scope for the chosen providers.
+
+---
+
+# 19. FACE MATCHING MODE
+
+Default toward:
+
+**1:1 verification**
+
+Meaning:
+
+```text
+claimed identity
++
+live person
++
+approved identity evidence
+```
+
+rather than indiscriminate:
+
+**1:N facial search**
+
+unless the actual provider, legal basis and approved product scope explicitly support it.
+
+Do not turn TrustScore into a surveillance system.
+
+---
+
+# 20. FACE VERIFICATION PROVIDER ABSTRACTION
+
+Create a capability contract such as:
+
+```text
+capture()
+createSession()
+performLiveness()
+performFaceMatch()
+retrieveResult()
+handleWebhook()
+normalizeResult()
+```
+
+The actual interface can differ after audit.
+
+The architecture should support providers being swapped or added later.
+
+Potential provider types:
+
+```text
+NINAuth-connected verification partner
+BVN + face provider
+document + face provider
+independent liveness provider
+future African identity provider
+```
+
+Do not make TrustScore depend on one face vendor permanently.
+
+---
+
+# 21. BIOMETRIC DATA POLICY
+
+Critical:
+
+Do not store raw selfie images indefinitely.
+
+Do not store biometric templates unless absolutely necessary and legally/technically justified.
+
+Prefer:
+
+* provider reference
+* verification status
+* result
+* confidence where legitimately provided
+* evidence metadata
+* timestamp
+* expiry
+* consent record
+* cryptographically protected audit metadata
+
+Where raw images must temporarily exist:
+
+* encrypt
+* restrict access
+* short retention
+* lifecycle deletion
+* audit every access
+* prohibit analytics reuse unless separately authorized
+
+---
+
+# 22. ANTI-SPOOFING
+
+Face verification should consider:
+
+* photo replay
+* video replay
+* screen replay
+* masks
+* deepfake attempts
+* virtual camera abuse
+* injected media
+* low-quality captures
+* multiple people
+* face obstruction
+* presentation attacks
+
+Use provider liveness/anti-spoofing capability where available.
+
+Do not claim your system is deepfake-proof.
+
+---
+
+# 23. BIOMETRIC CONSENT
+
+Face verification requires explicit consent handling.
+
+Capture:
+
+* purpose
+* provider
+* verification type
+* timestamp
+* user/session
+* policy version
+* consent reference
+* retention policy
+* result
+* withdrawal/appeal state
+
+Do not hide biometric processing inside generic terms and conditions.
+
+---
+
+# 24. FACE + NINAUTH + BVN COMPOSITION
+
+The TrustScore engine should be able to understand combinations.
+
+Example:
+
+```text
+NINAuth
+   VERIFIED
+
+BVN
+   VERIFIED
+
+Face
+   MATCH
+
+Liveness
+   PASSED
+
+Phone
+   VERIFIED
+```
+
+This creates **identity evidence**.
+
+The Trust Engine then determines how much those signals matter for the specific context.
+
+Do not hard-code:
+
+```text
+5 checks = 100 TrustScore
+```
+
+---
+
+# 25. VERIFICATION POLICY ENGINE
+
+Create policy controls for different verification levels.
+
+Example:
+
+```text
+BASIC
+STANDARD
+HIGH_ASSURANCE
+SENSITIVE_ACTION
+B2B
+CUSTOM
+```
+
+A business could require:
+
+```text
+NINAuth + Face + Phone
+```
+
+while another use case could require:
+
+```text
+BVN + Face
+```
+
+The actual combinations must be policy-driven rather than hard-coded into pages.
+
+---
+
+# 26. STEP-UP VERIFICATION
+
+The architecture should support increasing assurance.
+
+Example:
+
+```text
+User logs in
+↓
+Normal session
+↓
+Requests sensitive action
+↓
+Additional verification required
+↓
+Face / OTP / NINAuth
+↓
+Decision approved
+```
+
+This becomes important as TrustScore evolves.
+
+---
+
+# 27. VERIFICATION FRESHNESS
+
+Verification results should not be considered permanently current.
+
+Track:
+
+* verified at
+* valid until
+* provider freshness
+* policy freshness
+* whether re-verification is required
+
+A TrustScore may need to say:
+
+```text
+Identity verified
+Last verified 4 months ago
+Fresh verification recommended
+```
+
+rather than implying the result is eternally current.
+
+---
+
+# 28. ADMIN MANAGEMENT PLATFORM — DEDICATED CONTROL PLANE
+
+Build a dedicated, first-class **TrustScore Admin Management Dashboard**.
+
+Do NOT treat the existing application dashboard as the admin system.
+
+The admin dashboard is a separate operational/control plane.
+
+Conceptually:
+
+```text
+/customer
+/admin
+/api
+/public
+/developer
+```
+
+with appropriate access boundaries.
+
+---
+
+# 29. ADMIN DASHBOARD PURPOSE
+
+The admin system exists to operate TrustScore safely.
+
+It should provide authorized administrators with visibility into:
+
+* users
+* identities
+* verification requests
+* verification providers
+* evidence
+* Trust Scores
+* scoring policies
+* disputes
+* appeals
+* reports
+* Trust Links
+* notifications
+* email providers
+* SMS providers
+* provider health
+* quotas
+* webhooks
+* support
+* security events
+* audit logs
+* privacy requests
+* organizations
+* developers/API consumers
+* system settings
+* feature flags
+* maintenance state
+* queues
+* failed jobs
+* incidents
+
+---
+
+# 30. ADMIN ROLES
+
+Do not create one universal “admin”.
+
+Design RBAC such as:
+
+```text
+SUPER_ADMIN
+PLATFORM_OPERATOR
+SECURITY_ADMIN
+COMPLIANCE_REVIEWER
+SUPPORT_AGENT
+VERIFICATION_OPERATOR
+FINANCE_OPERATOR
+DEVELOPER_ADMIN
+ANALYST
+READ_ONLY_AUDITOR
+```
+
+The exact roles should be finalized during the audit.
+
+Apply least privilege.
+
+---
+
+# 31. ADMIN SECURITY
+
+High-risk administrative actions must require strong controls.
+
+Potentially require:
+
+* MFA
+* re-authentication
+* step-up authentication
+* approval workflow
+* dual control
+* reason capture
+* immutable audit event
+
+Examples:
+
+* changing scoring policies
+* disabling a verification provider
+* changing production credentials
+* deleting identity evidence
+* approving an appeal
+* changing admin permissions
+* changing notification routing
+* changing webhook secrets
+
+---
+
+# 32. ADMIN DASHBOARD — PRIMARY AREAS
+
+Create a professional admin navigation structure such as:
+
+```text
+Overview
+
+Users
+Organizations
+
+Identity
+  Trust Identities
+  NINAuth
+  BVN
+  Phone
+  Face
+  Liveness
+  Documents
+
+Verification
+  Requests
+  Attempts
+  Providers
+  Policies
+  Failures
+
+Trust
+  Scores
+  Scoring Policies
+  Reputation
+  Disputes
+  Appeals
+  Reviews
+
+Notifications
+  Email
+  SMS
+  Templates
+  Delivery
+  Provider Health
+  Quotas
+
+Developers
+  API Keys
+  Webhooks
+  Usage
+  Applications
+
+Security
+  Events
+  Sessions
+  Admin Actions
+  Suspicious Activity
+
+Privacy
+  Consent
+  Data Requests
+  Retention
+
+System
+  Health
+  Jobs
+  Queues
+  Configuration
+  Feature Flags
+```
+
+---
+
+# 33. ADMIN OPERATIONAL DASHBOARD
+
+Take design inspiration from the operational clarity of infrastructure platforms.
+
+Surface:
+
+```text
+Verification success rate
+Provider health
+Average verification time
+Failed verifications
+Pending verifications
+Notification delivery
+Provider quota
+API usage
+Security alerts
+Open disputes
+Open reviews
+System incidents
+Queue backlog
+```
+
+Do not fill dashboards with vanity metrics.
+
+Show signals administrators can act upon.
+
+---
+
+# 34. ADMIN USER DETAIL
+
+An administrator viewing a user should be able to see a controlled timeline:
+
+```text
+Account created
+↓
+Google linked
+↓
+Phone verified
+↓
+NINAuth verification
+↓
+Face verification
+↓
+BVN verification
+↓
+Trust Passport updated
+↓
+Trust Link generated
+↓
+Safety Check requests
+↓
+Dispute
+↓
+Resolution
+```
+
+Sensitive data must remain masked/redacted according to role.
+
+Do not give every admin unrestricted raw identity access.
+
+---
+
+# 35. PROVIDER MANAGEMENT
+
+Admin users with the right privileges must be able to manage verification providers.
+
+For every provider show:
+
+```text
+Name
+Capability
+Environment
+Status
+Primary/secondary/fallback
+Health
+Latency
+Success rate
+Recent failures
+Quota
+Cost profile
+Last successful request
+Last error
+Credential status
+Webhook status
+```
+
+Never display raw secrets after creation.
+
+Use secure credential vaulting where appropriate.
+
+---
+
+# 36. PROVIDER CANARY MODE
+
+Support controlled provider rollout:
+
+```text
+MOCK
+LOOPBACK
+LIVE
+CANARY
+```
+
+Example:
+
+```text
+98% → Primary provider
+2% → New provider
+```
+
+Only where safe and explicitly configured.
+
+Monitor outcomes before increasing traffic.
+
+---
+
+# 37. EMAIL SYSTEM
+
+Build a unified notification infrastructure.
+
+Providers:
+
+### Email
+
+* Resend
+* Google Apps Script via `support@okomba.com`
+
+### SMS
+
+* Termii
+* Twilio
+* future providers
+
+Do not call providers directly from feature modules.
+
+Use:
+
+```text
+Notification Service
+↓
+Routing Engine
+↓
+Provider Adapter
+↓
+Delivery
+↓
+Webhook
+↓
+Reconciliation
+```
+
+---
+
+# 38. EMAIL QUOTA MANAGEMENT
+
+Google Apps Script currently documents a consumer-account email-recipient quota of 100/day, with quotas resetting 24 hours after the first request and subject to change.
+
+Therefore do not hard-code assumptions such as:
+
+```text
+100 forever
+```
+
+The router must instead track:
+
+```text
+configured limit
+observed remaining quota
+last quota observation
+safe threshold
+provider health
+critical reserve
+```
+
+Similarly, provider limits such as those from Resend must be configurable rather than permanently embedded in business logic.
+
+---
+
+# 39. EMAIL ROUTING
+
+Example:
+
+```text
+Notification
+↓
+Priority classification
+↓
+Provider health + quota
+↓
+Resend?
+YES → Send
+NO → Google Apps Script
+NO → Queue/Retry/Admin Alert
+```
+
+Do not send duplicate emails simply because the first provider returns an ambiguous network response.
+
+Track:
+
+* notification ID
+* idempotency key
+* provider
+* delivery attempt
+* provider message ID
+* status
+* timestamps
+* failure reason
+* retry count
+* fallback reason
+
+---
+
+# 40. EMAIL PRIORITY
+
+Create:
+
+```text
+P0 Critical
+P1 Important
+P2 Normal
+P3 Optional
+```
+
+P0 examples:
+
+* OTP
+* password reset
+* security alert
+* account takeover
+* identity verification security events
+
+When quota is constrained:
+
+```text
+P0 > P1 > P2 > P3
+```
+
+Protect reserved capacity for security-critical communication.
+
+---
+
+# 41. GOOGLE APPS SCRIPT ADAPTER
+
+Use Apps Script as a controlled email delivery bridge.
+
+Architecture:
+
+```text
+TrustScore
+↓
+Google Apps Script adapter
+↓
+Secure HTTPS POST
+↓
+Apps Script
+↓
+support@okomba.com
+```
+
+Secure the web endpoint using:
+
+* authentication
+* HMAC/shared-secret validation
+* timestamp validation
+* replay protection
+* request ID
+* idempotency
+* payload validation
+* logging
+
+Do not make Apps Script an unauthenticated public email relay.
+
+---
+
+# 42. SMS ROUTING
+
+Use a shared SMS abstraction.
+
+Termii can serve as a primary provider, with Twilio as a secondary provider, while keeping the architecture open to additional providers.
+
+Termii's current platform explicitly emphasizes signal routing, multiple channels, webhooks and automatic failover patterns, which is useful inspiration for TrustScore's messaging architecture.
+
+Routing must consider:
+
+* country
+* destination
+* message type
+* sender availability
+* provider capability
+* provider health
+* provider balance/quota
+* cost
+* latency
+* delivery history
+
+---
+
+# 43. NOTIFICATION OBSERVABILITY
+
+Admin dashboard must expose:
+
+```text
+Messages sent
+Messages delivered
+Messages failed
+Messages bounced
+Provider health
+Provider quota
+Fallback events
+Average latency
+Critical failures
+Queue backlog
+```
+
+Provider webhooks must update a normalized delivery state.
+
+---
+
+# 44. AUTHENTICATION
+
+Users must be able to:
+
+* register with username
+* register with email
+* register with phone
+* register with Google
+
+and log in with:
+
+* username
+* email
+* phone
+* Google
+
+The main login field:
+
+**Username, email or phone number**
+
+plus:
+
+**Continue with Google**
+
+---
+
+# 45. UNIFIED ACCOUNT MODEL
+
+All authentication methods resolve to one `UserAccount`.
+
+```text
+UserAccount
+ ├── Username
+ ├── Email
+ ├── Phone
+ ├── Google
+ └── Trust Identity
+```
+
+Prevent duplicate accounts.
+
+Use secure provider-account linking.
+
+Do not treat Google authentication as identity verification.
+
+---
+
+# 46. TRUST IDENTITY MODEL
+
+Maintain separation:
+
+```text
+Authentication
+↓
+UserAccount
+↓
+TrustIdentity
+↓
+Verification Evidence
+↓
+Trust Engine
+```
+
+A user's Google account is not their Trust Identity.
+
+Their phone number is not their Trust Identity.
+
+Their BVN is not their Trust Identity.
+
+Their NIN is not their public Trust Identity.
+
+Their face is not their public Trust Identity.
+
+Trust Identity is the platform's controlled identity abstraction.
+
+---
+
+# 47. PRIVACY ARCHITECTURE
+
+Never expose raw:
+
+* NIN
+* BVN
+* full phone identifiers
+* biometric templates
+* identity provider secrets
+* access tokens
+* refresh tokens
+* sensitive provider responses
+
+in:
+
+* URLs
+* public links
+* analytics
+* logs
+* screenshots
+* client-side state
+* public QR payloads
+
+Use provider references and protected internal identifiers.
+
+---
+
+# 48. CONSENT ARCHITECTURE
+
+Consent must be first-class for every sensitive verification.
+
+Capture:
+
+```text
+requester
+subject
+purpose
+scope
+provider
+verification type
+policy version
+timestamp
+session
+consent state
+withdrawal
+```
+
+Do not bundle unrelated verification permissions into one vague consent screen.
+
+---
+
+# 49. EVIDENCE ARCHITECTURE
+
+Evidence should answer:
+
+```text
+WHAT was verified?
+FROM WHERE?
+WHEN?
+USING WHICH PROVIDER?
+UNDER WHICH PURPOSE?
+UNDER WHICH POLICY?
+WITH WHAT RESULT?
+HOW LONG IS IT VALID?
+```
+
+Example:
+
+```text
+Evidence
+ type: FACE_MATCH
+ source: Provider X
+ providerRef: protected-reference
+ status: MATCH
+ verifiedAt: ...
+ freshness: ...
+ consentRef: ...
+ policyVersion: ...
+```
+
+---
+
+# 50. TRUST PASSPORT
+
+The Trust Passport should eventually combine:
+
+* identity assurance
+* verified credentials
+* phone
+* face verification
+* liveness
+* BVN where appropriately enabled
+* reputation
+* resolution history
+* evidence freshness
+* contextual trust indicators
+* controlled sharing
+
+Do not reveal raw source records.
+
+---
+
+# 51. SAFETY CHECK
+
+The Safety Check must become contextual.
+
+The system should answer:
+
+> “What can be established about this identity for this interaction?”
+
+not:
+
+> “This person is good.”
+
+Provide evidence-backed signals.
+
+Use appropriate uncertainty language.
+
+---
+
+# 52. TRUST ENGINE
+
+The Trust Engine must be:
+
+* explainable
+* versioned
+* contextual
+* evidence-based
+* freshness-aware
+* auditable
+* resistant to gaming
+
+Do not use arbitrary points simply because a new verification method is added.
+
+The addition of BVN or face evidence should be configurable through policy rather than permanently hard-coded into the mathematical model.
+
+---
+
+# 53. SCORE STATES
+
+Support states such as:
+
+```text
+UNKNOWN
+INSUFFICIENT_EVIDENCE
+NEW
+VERIFIED
+ESTABLISHED
+CAUTION
+HIGH_RISK
+REVIEW_REQUIRED
+```
+
+UNKNOWN is a valid result.
+
+Do not fabricate certainty.
+
+---
+
+# 54. ANTI-ABUSE
+
+Protect against:
+
+* account takeover
+* fake identities
+* synthetic identities
+* stolen identities
+* duplicate identities
+* false reports
+* score manipulation
+* collusion
+* reputation farming
+* fake verifications
+* QR replay
+* token replay
+* OTP abuse
+* face replay
+* deepfake attempts
+* provider abuse
+* enumeration
+* malicious insider access
+
+---
+
+# 55. APPEAL + HUMAN REVIEW
+
+Any system capable of materially affecting a person's trust status must support:
+
+* appeal
+* correction
+* evidence review
+* review states
+* administrative decision logging
+* reason capture
+
+Do not make every negative signal irreversible.
+
+---
+
+# 56. MOBILE + CAMERA EXPERIENCE
+
+Because face verification requires device camera access, the platform architecture must support mobile-friendly verification.
+
+Build the web version correctly first where appropriate, but architect the verification API so a native mobile client can consume it later.
+
+NINAuth's current developer documentation explicitly provides a React Native/Expo integration path, so do not design the backend in a way that prevents native integration.
+
+---
+
+# 57. LOGO + BRAND
+
+Perform a separate research and design exercise before settling the final TrustScore logo.
+
+Evaluate:
+
+* trust
+* identity
+* verification
+* security
+* connection
+* confidence
+* technology
+* African relevance
+* global usability
+* B2B credibility
+* consumer usability
+* memorability
+* favicon recognition
+* mobile icon recognition
+* monochrome use
+* animation
+
+Do not clone another company's logo or visual identity.
+
+Do not permanently encode “NIN” into the primary logo because TrustScore is intended to expand into additional identity sources.
+
+Create:
+
+* primary wordmark
+* symbol
+* icon
+* compact lockup
+* dark variant
+* light variant
+* monochrome variant
+* favicon
+* app icon
+* animated version
+* usage rules
+
+Affix the final brand consistently across:
+
+* website
+* dashboard
+* authentication
+* admin
+* emails
+* verification receipts
+* public Trust Links
+* QR interfaces
+* error pages
+* mobile
+* documentation
+* developer portal
+
+---
+
+# 58. TERMII-INSPIRED DESIGN DIRECTION
+
+Use Termii as design and product inspiration, NOT as a clone.
+
+Study:
+
+* clarity
+* signal-centric presentation
+* operational visibility
+* routing concepts
+* developer simplicity
+* concise product explanations
+* purposeful motion
+* modern typography
+* clean hierarchy
+* confidence-building states
+
+Termii's current product presentation strongly emphasizes signals, routing, confirmation and recovery across communication channels. Use that philosophy to improve TrustScore's UX architecture.
+
+Do NOT copy:
+
+* exact colors
+* exact layouts
+* exact copy
+* logos
+* illustrations
+* assets
+* distinctive page structures
+
+TrustScore must have its own identity.
+
+---
+
+# 59. DESIGN LANGUAGE
+
+The platform should feel:
+
+* trustworthy
+* premium
+* technical
+* modern
+* calm
+* intelligent
+* secure
+* human
+
+Avoid:
+
+* generic SaaS dashboards
+* excessive gradients
+* excessive glassmorphism
+* meaningless motion
+* fake statistics
+* visual clutter
+* overdesigned components
+* vague trust language
+
+Motion should communicate:
+
+* progress
+* verification
+* transition
+* confirmation
+* state
+* system feedback
+
+Honor reduced-motion preferences.
+
+---
+
+# 60. ADMIN UX
+
+Admin should have a different visual language from consumer-facing views while remaining in the same design system.
+
+It should prioritize:
+
+* density
+* signal clarity
+* filters
+* timelines
+* status
+* operational controls
+* auditability
+* quick investigation
+
+Use clear severity states:
+
+```text
+NORMAL
+WATCH
+DEGRADED
+CRITICAL
+```
+
+---
+
+# 61. IMPLEMENTATION BATCHES
+
+## BATCH 0
+
+### FULL AUDIT + RESEARCH
+
+Produce:
+
+* architecture audit
+* database audit
+* authentication audit
+* identity audit
+* verification audit
+* provider audit
+* security audit
+* privacy audit
+* UI/UX audit
+* admin audit
+* notification audit
+* NINAuth research
+* BVN provider research
+* face verification research
+* liveness research
+* Termii UX research
+* gap matrix
+* prioritized roadmap
+
+No major rewrite before this is complete.
+
+---
+
+## BATCH 1
+
+### CORE VERIFICATION ORCHESTRATION
+
+Generalize/refactor the verification foundation.
+
+Implement:
+
+* provider registry
+* capability model
+* verification request
+* verification attempt
+* normalized result
+* provider routing
+* consent linkage
+* evidence linkage
+* audit events
+* idempotency
+* provider health
+* provider posture
+
+Preserve working NINAuth behavior through an adapter.
+
+---
+
+## BATCH 2
+
+### NINAUTH HARDENING
+
+Implement real production-aligned architecture for:
+
+* OAuth
+* PKCE
+* state
+* nonce
+* token exchange
+* ID-token validation
+* consent
+* scopes
+* callbacks
+* error handling
+* transaction cleanup
+
+---
+
+## BATCH 3
+
+### AUTHENTICATION
+
+Implement:
+
+* username
+* email
+* phone
+* Google
+* recovery
+* OTP
+* account linking
+* session management
+* anti-enumeration
+
+---
+
+## BATCH 4
+
+### BVN PROVIDER FRAMEWORK
+
+Implement provider-neutral BVN support.
+
+First integrate mock/test adapters.
+
+Then production adapters only after:
+
+* provider credentials
+* contractual availability
+* compliance review
+* test verification
+
+Do not expose provider-specific responses directly.
+
+---
+
+## BATCH 5
+
+### FACE + LIVENESS
+
+Implement:
+
+* camera capture
+* verification sessions
+* liveness
+* face-match provider abstraction
+* provider routing
+* result normalization
+* evidence
+* consent
+* retention/deletion
+* replay protection
+* security review
+
+Do not create an internal facial-recognition database.
+
+---
+
+## BATCH 6
+
+### IDENTITY EVIDENCE GRAPH
+
+Unify:
+
+* NINAuth
+* BVN
+* phone
+* face
+* liveness
+* documents
+* credentials
+
+into the evidence layer.
+
+---
+
+## BATCH 7
+
+### TRUST PASSPORT 2.0
+
+Create the flagship identity/trust experience.
+
+---
+
+## BATCH 8
+
+### SAFETY CHECK 2.0
+
+Contextual trust evaluation.
+
+---
+
+## BATCH 9
+
+### REPUTATION + RESOLUTION
+
+Implement:
+
+* reputation
+* reports
+* dispute
+* resolution
+* appeal
+* evidence
+
+---
+
+## BATCH 10
+
+### TRUST ENGINE 2.0
+
+Implement:
+
+* policy engine
+* contextual scoring
+* evidence weighting
+* freshness
+* explanation
+* versioning
+* audit
+
+---
+
+## BATCH 11
+
+### NOTIFICATION INFRASTRUCTURE
+
+Implement:
+
+* notification service
+* email router
+* Resend
+* Google Apps Script
+* SMS router
+* Termii
+* Twilio
+* queues
+* outbox
+* delivery tracking
+* webhooks
+* provider health
+* quota tracking
+* failover
+* admin controls
+
+---
+
+## BATCH 12
+
+### ADMIN MANAGEMENT PLATFORM
+
+Build dedicated admin control plane.
+
+Implement:
+
+* RBAC
+* overview
+* user management
+* identity operations
+* verification operations
+* providers
+* trust policies
+* disputes
+* appeals
+* notifications
+* security
+* privacy
+* developer management
+* system health
+* audit logs
+* configuration
+
+---
+
+## BATCH 13
+
+### B2B TRUST DECISION API
+
+Implement:
+
+* API keys
+* developer portal
+* scoped permissions
+* webhooks
+* usage
+* rate limits
+* developer documentation
+
+---
+
+## BATCH 14
+
+### SECURITY + PRIVACY HARDENING
+
+Perform deep review of:
+
+* identity
+* biometrics
+* authentication
+* authorization
+* provider secrets
+* webhooks
+* sessions
+* tokens
+* rate limits
+* privacy
+* retention
+* deletion
+* logs
+
+---
+
+## BATCH 15
+
+### BRAND + DESIGN SYSTEM
+
+Finalize:
+
+* logo
+* design language
+* typography
+* tokens
+* components
+* responsive layout
+* email branding
+* verification UI
+* admin UI
+
+---
+
+## BATCH 16
+
+### FULL PRODUCT UI/UX ELEVATION
+
+Review every page.
+
+Use Termii-inspired principles.
+
+Ensure consistency.
+
+---
+
+## BATCH 17
+
+### PRODUCTION INFRASTRUCTURE
+
+Harden:
+
+* deployment
+* migrations
+* backups
+* observability
+* provider failover
+* secrets
+* health checks
+* workers
+* queues
+* recovery
+* incident response
+
+---
+
+## BATCH 18
+
+### COMPLETE END-TO-END RE-AUDIT
+
+Pretend a serious enterprise customer, security reviewer and identity provider are evaluating the product.
+
+Find every weakness.
+
+Fix it.
+
+---
+
+## BATCH 19
+
+### PILOT READINESS
+
+Test:
+
+```text
+Google authentication
+Username login
+Email login
+Phone login
+NINAuth verification
+BVN verification
+Face verification
+Liveness
+Trust Passport
+Safety Check
+Trust Links
+Admin
+Email
+SMS
+Provider failover
+Quota handling
+Security
+Privacy
+```
+
+---
+
+# 62. PROVIDER EXPANSION RULE
+
+As TrustScore grows, providers must be added through configuration and adapters rather than feature-specific rewrites.
+
+Future possibilities may include:
+
+```text
+NIN providers
+BVN providers
+phone providers
+identity-document providers
+face providers
+liveness providers
+address providers
+business-verification providers
+AML providers
+fraud-signal providers
+international identity providers
+```
+
+Do not add them until there is a justified product requirement and verified provider capability.
+
+---
+
+# 63. FUTURE-PROOFING
+
+The architecture should allow TrustScore to eventually expand beyond Nigeria.
+
+Do not bake:
+
+```text
+NIN
+BVN
+Nigeria
+```
+
+into every internal abstraction.
+
+Use generic concepts:
+
+```text
+Identity Credential
+Verification Provider
+Evidence Source
+Identity Attribute
+Verification Type
+Country
+Jurisdiction
+Assurance Level
+```
+
+NIN and BVN can then be specific credentials within a larger identity architecture.
+
+---
+
+# 64. WHAT NOT TO DO
+
+Do NOT:
+
+* rebuild everything from scratch without evidence
+* remove working features without migration
+* invent provider capabilities
+* claim government approval that has not been established
+* fabricate live verification
+* create a public identity blacklist
+* expose raw NIN/BVN
+* build uncontrolled biometric search
+* store biometric data indefinitely
+* create fake trust signals
+* hard-code score assumptions
+* blindly duplicate verification models
+* hard-code one provider
+* blindly retry ambiguous provider requests
+* allow low-priority notifications to consume critical quota
+* use a single unrestricted admin role
+* expose provider secrets
+* copy Termii's design
+* treat passing tests as proof that the product is production-ready
+
+---
+
+# 65. TEST MATRIX
+
+Every provider and verification capability must be tested for:
+
+* success
+* failure
+* timeout
+* duplicate request
+* provider outage
+* invalid credentials
+* malformed response
+* webhook replay
+* webhook spoofing
+* partial verification
+* unknown result
+* stale evidence
+* insufficient evidence
+* rate limits
+* quota
+* fallback
+* reconciliation
+
+---
+
+# 66. FACE TEST MATRIX
+
+At minimum:
+
+* good lighting
+* poor lighting
+* face obstruction
+* multiple faces
+* static photograph
+* replay video
+* screen replay
+* liveness success
+* liveness failure
+* face mismatch
+* provider timeout
+* camera denial
+* browser incompatibility
+* mobile permission denial
+* session replay
+* duplicate verification
+* abandoned session
+* retention expiry
+
+---
+
+# 67. ADMIN TEST MATRIX
+
+Test:
+
+* role permissions
+* least privilege
+* MFA
+* admin login
+* session expiry
+* privilege escalation
+* audit logging
+* sensitive action approval
+* disabled provider
+* accidental provider disabling
+* policy modification
+* bulk actions
+* deletion requests
+* user investigation
+* export restrictions
+
+---
+
+# 68. EMAIL/SMS TEST MATRIX
+
+Test:
+
+* primary success
+* primary failure
+* fallback
+* quota exhausted
+* rate-limited
+* network ambiguity
+* provider accepted but response lost
+* duplicate prevention
+* webhook update
+* provider disabled
+* critical notification reserve
+* queue backlog
+* retry exhaustion
+
+---
+
+# 69. SECURITY AUDIT
+
+Before final readiness, test for:
+
+* IDOR
+* authentication bypass
+* authorization bypass
+* session fixation
+* session theft
+* CSRF
+* XSS
+* SSRF
+* SQL injection
+* secret leakage
+* webhook spoofing
+* replay attacks
+* OTP abuse
+* biometric replay
+* QR replay
+* token replay
+* enumeration
+* rate-limit bypass
+* admin escalation
+* provider credential exposure
+* excessive logging
+* privacy leaks
+
+---
+
+# 70. DOCUMENTATION
+
+Update:
+
+* architecture docs
+* verification architecture
+* provider integration docs
+* NINAuth docs
+* BVN docs
+* face/liveness docs
+* admin docs
+* notification docs
+* deployment docs
+* environment docs
+* security docs
+* privacy docs
+* API docs
+* design-system docs
+* operational runbooks
+
+Everything must reflect actual code.
+
+---
+
+# 71. GIT DISCIPLINE
+
+After each successful batch:
+
+```text
+git status
+git diff
+run tests
+run security checks
+audit
+commit
+push
+```
+
+Use meaningful commits.
+
+Never commit:
+
+* secrets
+* real provider tokens
+* biometric data
+* production credentials
+* private test data
+
+---
+
+# 72. FINAL STRATEGIC PRINCIPLE
+
+TrustScore should become:
+
+```text
+Identity Infrastructure
+        +
+Verification Orchestration
+        +
+Evidence Infrastructure
+        +
+Trust Infrastructure
+        +
+Developer Platform
+        +
+Consumer Safety Product
+        +
+Operational Control Plane
+```
+
+not:
+
+```text
+NIN checker
++
+BVN checker
++
+face checker
++
+generic dashboard
+```
+
+The strength of TrustScore must come from the way all these capabilities work together under one coherent identity/evidence/trust architecture.
+
+---
+
+# 73. FINAL INSTRUCTION TO THE AGENT
+
+After each batch, do not merely ask:
+
+> “Did I implement the requested feature?”
+
+Instead ask:
+
+> “Did I implement the most technically sound, secure, extensible and product-appropriate solution after considering the existing code, official provider documentation, security implications, privacy implications, operational requirements and future growth?”
+
+Then:
+
+**Research.**
+
+**Compare.**
+
+**Challenge the assumption.**
+
+**Design.**
+
+**Implement.**
+
+**Test.**
+
+**Audit.**
+
+**Fix.**
+
+**Retest.**
+
+**Document.**
+
+**Commit.**
+
+Only then move forward.
+
+The goal is not to finish a list of features.
+
+The goal is to build a coherent **TrustScore identity and trust infrastructure platform that can evolve for years without requiring architectural reinvention every time a new verification provider or identity signal is introduced.**

@@ -6,11 +6,31 @@
 
 import { NextRequest } from "next/server";
 import { z } from "zod";
-import { jsonError, jsonOk, newRequestId, rateLimit, clientKey, GENERIC_LOGIN_ERROR } from "@/lib/platform/http";
+import {
+  jsonError,
+  jsonOk,
+  newRequestId,
+  rateLimit,
+  clientKey,
+  failureLimitExhausted,
+  recordFailure,
+  GENERIC_LOGIN_ERROR,
+} from "@/lib/platform/http";
 import { createSession, setSessionCookie, toPublicUser } from "@/lib/platform/session";
+import { sha256Hex } from "@/lib/platform/crypto";
 import { authenticateUser, getUserById } from "@/lib/services/account-service";
 import { notifyUser } from "@/lib/services/notification-service";
 import { detectIdentifierType } from "@/lib/auth/identifiers";
+
+// sec-batch-A — per-account failure throttle. The per-IP limit (8/min) stops
+// one attacker; a distributed stuffing run across many IPs against ONE
+// account was previously unlimited beyond scrypt cost. 8 FAILURES per 15 min
+// per identifier caps any distributed run at ~768 guesses/day/account. The
+// bucket key is the hash of the raw (normalized) identifier string, so the
+// 429 response is identical whether or not the account exists — no
+// enumeration leak. Failure-only budget: successful logins never consume it.
+const ACCT_FAILURE_LIMIT = 8;
+const ACCT_FAILURE_WINDOW_MS = 15 * 60_000;
 
 const LoginSchema = z
   .object({
@@ -43,6 +63,24 @@ export async function POST(req: NextRequest) {
     return jsonError(422, "VALIDATION_ERROR", GENERIC_LOGIN_ERROR, requestId);
   }
 
+  // Per-account throttle (peek only — the budget is consumed by the 401s below).
+  const rawIdentifier = (parsed.data.identifier ?? parsed.data.email ?? "")
+    .trim()
+    .toLowerCase();
+  const acctKey = `login-acct:${sha256Hex(rawIdentifier)}`;
+  const acct = failureLimitExhausted(acctKey, ACCT_FAILURE_LIMIT, ACCT_FAILURE_WINDOW_MS);
+  if (acct.blocked) {
+    return jsonError(
+      429,
+      "RATE_LIMITED",
+      `Too many failed sign-in attempts for this account. Try again in ${Math.max(
+        1,
+        Math.ceil(acct.retryAfterSec / 60)
+      )} minute(s).`,
+      requestId
+    );
+  }
+
   const result = await authenticateUser(
     { identifier: parsed.data.identifier, email: parsed.data.email, password: parsed.data.password },
     requestId,
@@ -51,6 +89,7 @@ export async function POST(req: NextRequest) {
   if (!result.ok) {
     if (result.code === "PHONE_OTP_REQUIRED") {
       // The identifier is phone-shaped → the client switches to the OTP flow.
+      // Not a credential failure — does not consume the per-account budget.
       return jsonError(
         400,
         "PHONE_OTP_REQUIRED",
@@ -58,12 +97,16 @@ export async function POST(req: NextRequest) {
         requestId
       );
     }
-    // Enumeration-resistant: identical error for unknown identifier and bad password.
+    // Enumeration-resistant: identical error for unknown identifier and bad
+    // password. Both consume the per-account failure budget (the key exists
+    // for unknown identifiers too — no existence leak).
+    recordFailure(acctKey, ACCT_FAILURE_WINDOW_MS);
     return jsonError(401, "INVALID_CREDENTIALS", GENERIC_LOGIN_ERROR, requestId);
   }
 
   const user = await getUserById(result.userId);
   if (!user) {
+    recordFailure(acctKey, ACCT_FAILURE_WINDOW_MS);
     return jsonError(401, "INVALID_CREDENTIALS", GENERIC_LOGIN_ERROR, requestId);
   }
 

@@ -1,0 +1,41 @@
+▲ Next.js 16.1.3 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://21.0.2.80:3000
+- Environments: .env
+
+✓ Starting...
+✓ Ready in 1396ms
+[boot-guard] DEV POSTURE — security secrets running on public dev constants (fine for MOCK sandbox, fatal in production):
+  - VAULT_MASTER_KEY: AES-256-GCM master key for the provider credential vault
+  - SIGNAL_PEPPER: pepper for identifier fingerprints (phone / NIN references)
+  - NINAUTH_CLIENT_SECRET: NINAuth partner client secret (mock ID-token signing in sandbox)
+  - LOOPBACK_SIGNING_SECRET: loopback provider-simulator ID-token signing secret
+○ Compiling / ...
+ GET / 200 in 2.3s (compile: 1772ms, proxy.ts: 9ms, render: 544ms)
+ GET / 200 in 79ms (compile: 6ms, proxy.ts: 4ms, render: 70ms)
+[boot-guard] DEV POSTURE — security secrets running on public dev constants (fine for MOCK sandbox, fatal in production):
+  - VAULT_MASTER_KEY: AES-256-GCM master key for the provider credential vault
+  - SIGNAL_PEPPER: pepper for identifier fingerprints (phone / NIN references)
+  - NINAUTH_CLIENT_SECRET: NINAuth partner client secret (mock ID-token signing in sandbox)
+  - LOOPBACK_SIGNING_SECRET: loopback provider-simulator ID-token signing secret
+ POST /api/v1/internal/webhook-tick 200 in 229ms (compile: 149ms, proxy.ts: 7ms, render: 73ms)
+ GET / 200 in 122ms (compile: 4ms, proxy.ts: 5ms, render: 114ms)
+ GET / 200 in 89ms (compile: 4ms, proxy.ts: 4ms, render: 81ms)
+ GET / 200 in 131ms (compile: 6ms, proxy.ts: 8ms, render: 117ms)
+⚠ Cross origin request detected from 127.0.0.1 to /_next/* resource. In a future major version of Next.js, you will need to explicitly configure "allowedDevOrigins" in next.config to allow this.
+Read more: https://nextjs.org/docs/app/api-reference/config/next-config-js/allowedDevOrigins
+ GET /api/v1/auth/me 401 in 232ms (compile: 197ms, proxy.ts: 21ms, render: 14ms)
+ GET /api/v1/engine/public 200 in 324ms (compile: 153ms, proxy.ts: 30ms, render: 141ms)
+ POST /api/v1/internal/webhook-tick 200 in 24ms (compile: 7ms, proxy.ts: 5ms, render: 12ms)
+ POST /api/v1/internal/webhook-tick 200 in 23ms (compile: 1963µs, proxy.ts: 12ms, render: 10ms)
+ POST /api/v1/auth/login 401 in 154ms (compile: 124ms, proxy.ts: 13ms, render: 17ms)
+ POST /api/v1/auth/login 200 in 121ms (compile: 3ms, proxy.ts: 4ms, render: 114ms)
+ GET /api/v1/identity/me 200 in 212ms (compile: 142ms, proxy.ts: 6ms, render: 64ms)
+ POST /api/v1/internal/webhook-tick 200 in 21ms (compile: 4ms, proxy.ts: 3ms, render: 13ms)
+ POST /api/v1/internal/webhook-tick 200 in 31ms (compile: 2ms, proxy.ts: 4ms, render: 25ms)
+ GET / 200 in 102ms (compile: 3ms, proxy.ts: 3ms, render: 96ms)
+ GET / 200 in 122ms (compile: 6ms, proxy.ts: 3ms, render: 112ms)
+ POST /api/v1/internal/webhook-tick 200 in 17ms (compile: 4ms, proxy.ts: 3ms, render: 10ms)
+ GET / 200 in 110ms (compile: 6ms, proxy.ts: 5ms, render: 100ms)
+ POST /api/v1/internal/webhook-tick 200 in 23ms (compile: 4ms, proxy.ts: 6ms, render: 13ms)
+le: 4ms, proxy.ts: 6ms, render: 13ms)

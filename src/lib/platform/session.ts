@@ -5,6 +5,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { generateSessionToken, sha256Hex, hashIp } from "@/lib/platform/crypto";
+import { clientIp } from "@/lib/platform/http";
+import { recordAudit } from "@/lib/services/audit-service";
 
 export const SESSION_COOKIE = "ts_session";
 export const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
@@ -44,10 +46,9 @@ export async function createSession(
       tokenHash: sha256Hex(token),
       expiresAt,
       userAgent: (req.headers.get("user-agent") ?? "unknown").slice(0, 200),
-      ipHash: hashIp(
-        req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-          req.headers.get("x-real-ip")
-      ),
+      // sec-batch-A: same trusted-proxy resolution as the rate limiter
+      // (rightmost XFF hop) — previously parsed raw x-forwarded-for here.
+      ipHash: hashIp(clientIp(req)),
     },
   });
   return { token, expiresAt };
@@ -91,6 +92,30 @@ export async function getSessionUser(
   if (!session) return null;
   if (session.revokedAt || session.expiresAt.getTime() < Date.now()) return null;
   if (session.user.status !== "ACTIVE") return null;
+
+  // sec-batch-A — honest session-device drift detection. HARD request-time
+  // UA/IP binding is deliberately NOT enforced (IP binding breaks mobile
+  // users; docs/audit/SECURITY_AUDIT.md used to overstate this — corrected).
+  // But a mid-session user-agent change on a live cookie is now AUDITED as
+  // SESSION_DEVICE_CHANGE and the stored fingerprint refreshed, so a stolen
+  // cookie used from a different device leaves a visible trail instead of
+  // zero friction. (Known limitation: clients that rotate UA per request
+  // would emit one event per distinct UA — rare, accepted.)
+  const currentUa = (req.headers.get("user-agent") ?? "unknown").slice(0, 200);
+  if (session.userAgent !== currentUa) {
+    void db.session
+      .update({ where: { id: session.id }, data: { userAgent: currentUa } })
+      .catch(() => {});
+    void recordAudit({
+      actorType: "USER",
+      actorId: session.user.id,
+      action: "SESSION_DEVICE_CHANGE",
+      subjectType: "session",
+      subjectId: session.id,
+      metadata: { severity: "warn" },
+    });
+  }
+
   return session.user;
 }
 

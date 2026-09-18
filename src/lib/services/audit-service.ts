@@ -118,6 +118,9 @@ export type AuditAction =
   | "AUTH_RESET_CONFIRMED"
   | "AUTH_EMAIL_VERIFY_REQUESTED"
   | "AUTH_EMAIL_VERIFIED"
+  // sec-batch-A — session-device drift on a live cookie (audited, not
+  // enforced: hard IP/UA binding breaks mobile users; see SECURITY_AUDIT.md).
+  | "SESSION_DEVICE_CHANGE"
   | "SCOPE_GUARD_BLOCKED";
 
 interface AuditInput {

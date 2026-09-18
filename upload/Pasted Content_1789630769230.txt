@@ -1,0 +1,2577 @@
+# TRUSTSCORE PLATFORM
+
+## CTO + HEAD OF PRODUCT + PRINCIPAL ARCHITECT MASTER IMPLEMENTATION DIRECTIVE
+
+Repository:
+
+`https://github.com/ifeanyiokomba/trustscore-platform`
+
+Primary identity integration reference:
+
+`https://ninauth.nimc.gov.ng/developers-guide`
+
+Design/product inspiration:
+
+`https://termii.com/`
+
+---
+
+# 0. YOUR ROLE
+
+You are operating as the:
+
+* CTO
+* Head of Product
+* Principal Software Architect
+* Security Architect
+* Product Designer
+* Technical Program Manager
+* QA Lead
+* DevOps/Platform Engineer
+
+for TrustScore.
+
+Your job is NOT simply to modify code.
+
+Your responsibility is to:
+
+1. deeply understand the existing repository;
+2. independently research the current ecosystem;
+3. validate assumptions against official sources;
+4. critically challenge weak product decisions;
+5. preserve useful existing work;
+6. redesign areas that are architecturally or strategically wrong;
+7. implement in controlled batches;
+8. test every batch;
+9. audit every batch;
+10. fix everything found;
+11. only proceed after the current batch passes its gate;
+12. continuously protect the NIN-first product thesis.
+
+Do not blindly obey the existing codebase.
+
+Do not blindly replace it either.
+
+**Understand → research → plan → implement → test → audit → fix → re-test → approve → continue.**
+
+---
+
+# 1. THE CURRENT TRUSTSCORE MISSION
+
+TrustScore is:
+
+> **An identity and trust infrastructure platform that turns government-verified identity into reusable trust.**
+
+The strategic foundation is:
+
+```text
+NIN / NINAuth
+       ↓
+Government-backed identity
+       ↓
+Trust Identity
+       ↓
+Evidence
+       ↓
+Reputation / Risk / Resolution
+       ↓
+Trust Decision
+       ↓
+Trust Passport / Safety Check / B2B API
+```
+
+TrustScore is NOT:
+
+* another generic KYC provider;
+* a raw NIN lookup website;
+* a public blacklist;
+* a credit bureau;
+* a bank-data aggregator;
+* a universal “good person/bad person” score.
+
+---
+
+# 2. CENTRAL PRODUCT PRINCIPLE
+
+Maintain this separation everywhere:
+
+```text
+IDENTITY
+Who are you?
+
+EVIDENCE
+What can actually be established about you?
+
+REPUTATION
+What verified history exists?
+
+RISK
+What evidence suggests elevated risk?
+
+TRUST DECISION
+What does the evidence reasonably mean for this context?
+```
+
+Never make this leap:
+
+```text
+NIN verified
+      =
+trustworthy
+```
+
+Instead:
+
+```text
+NIN verified
+      ↓
+Identity confidence
+      ↓
+Additional evidence
+      ↓
+Reputation/risk
+      ↓
+Contextual trust decision
+```
+
+---
+
+# 3. CURRENT REPOSITORY
+
+The repository already contains a large amount of work.
+
+The current codebase includes:
+
+* Next.js 16;
+* React 19;
+* TypeScript;
+* Tailwind v4;
+* shadcn/ui;
+* Prisma;
+* SQLite;
+* Trust Identity domain;
+* consent;
+* evidence;
+* verification sessions;
+* phone verification;
+* liveness abstraction;
+* Trust Passport;
+* Safety Check;
+* reputation/flags;
+* TrustScore engine;
+* B2B infrastructure;
+* provider abstraction;
+* mock/loopback infrastructure;
+* scoring policies;
+* audit/security patterns.
+
+The repository documentation reports stages 0–15 and 1,041 automated checks green.
+
+**Do not throw this work away.**
+
+However, treat the repository as a **developed prototype/platform foundation requiring critical audit and production alignment**, not as proof that the system is production-ready.
+
+---
+
+# 4. FIRST COMMANDMENT
+
+## DO NOT START BY CODING
+
+Before changing production behavior:
+
+### Audit the entire repository.
+
+Inspect:
+
+```text
+src/
+src/app/
+src/components/
+src/lib/
+src/lib/providers/
+src/lib/services/
+prisma/
+mini-services/
+tests/
+scripts/
+docs/
+package.json
+.env.example
+README.md
+deployment configuration
+```
+
+Also inspect:
+
+* Git history;
+* recent commits;
+* previous audit documents;
+* stage matrices;
+* worklogs;
+* environment handling;
+* provider code;
+* API routes;
+* database schema;
+* all existing UI routes.
+
+You must understand why each major subsystem exists before replacing it.
+
+---
+
+# 5. OUTPUT OF BATCH 0
+
+Create/update:
+
+```text
+docs/
+  audit/
+    CURRENT_STATE.md
+    ARCHITECTURE_AUDIT.md
+    PRODUCT_AUDIT.md
+    SECURITY_AUDIT.md
+    PRIVACY_AUDIT.md
+    UX_AUDIT.md
+    MOBILE_AUDIT.md
+    API_AUDIT.md
+    DATABASE_AUDIT.md
+    PROVIDER_AUDIT.md
+    MASTER_GAP_MATRIX.md
+
+  research/
+    NINAUTH_RESEARCH.md
+    TERMII_DESIGN_RESEARCH.md
+    COMPETITOR_RESEARCH.md
+    TRUSTSCORE_PRODUCT_RESEARCH.md
+
+  architecture/
+    TARGET_ARCHITECTURE.md
+    DOMAIN_MODEL.md
+    ADR_NIN_FIRST.md
+    ADR_WEB_MOBILE.md
+
+  roadmap/
+    MASTER_ROADMAP.md
+```
+
+Do not produce superficial documents.
+
+They should be based on actual repository evidence.
+
+---
+
+# 6. NINAUTH RESEARCH — MANDATORY
+
+Study the official documentation completely:
+
+`https://ninauth.nimc.gov.ng/developers-guide`
+
+Also inspect all relevant linked official pages/resources.
+
+The current official developer material must be treated as the primary source for implementation behavior.
+
+Research at least:
+
+```text
+NINAuth SDK
+Web integration
+Mobile / Expo / React Native integration
+OAuth
+OpenID Connect
+PKCE
+authorization code
+state
+nonce
+client secret
+ID token
+access token
+refresh token
+UserInfo
+scopes
+granted scopes
+QR flow
+Share Code flow
+business sign-in
+RC number
+consent
+privacy
+security
+error handling
+SDK versions
+API reference
+```
+
+Do not rely on old blog posts when official documentation exists.
+
+---
+
+# 7. BUILD A REAL NINAUTH CONTRACT MATRIX
+
+Create:
+
+```text
+docs/research/NINAUTH_CONTRACT_MATRIX.md
+```
+
+Columns:
+
+```text
+Capability
+Official documentation
+Status
+Actual endpoint
+Request fields
+Response fields
+Scopes
+Consent
+Security requirements
+TrustScore implementation
+Unknowns
+```
+
+Anything not publicly documented must be marked:
+
+```text
+UNCONFIRMED
+```
+
+Never invent production scope names, claims, response structures or URLs.
+
+---
+
+# 8. PARTICULAR NINAUTH SECURITY REQUIREMENTS
+
+The current NINAuth documentation states that normal web integrations should use the SDK, while the backend handles the client secret and authorization-code exchange. Its current API reference documents `POST /api/v1/oauth/token`, PKCE, server-side token handling, ID-token validation and actual granted-scope handling.
+
+Therefore enforce:
+
+```text
+CLIENT SECRET
+→ backend only
+
+PKCE VERIFIER
+→ never exposed to provider authorization URL
+
+STATE
+→ cryptographically random
+→ server-side transaction binding
+
+AUTHORIZATION CODE
+→ one-time
+→ short-lived
+
+ID TOKEN
+→ server-side validation
+→ never merely decoded
+
+GRANTED SCOPE
+→ authoritative
+→ do not assume requested scope was granted
+
+REFRESH TOKEN
+→ backend-only encrypted storage when required
+```
+
+Do not implement a fake production flow simply because the mock already works.
+
+---
+
+# 9. NINAUTH MOCK MUST STAY
+
+The current mock provider is valuable.
+
+Keep:
+
+```text
+MOCK
+LOOPBACK
+LIVE
+```
+
+provider postures.
+
+But strengthen the architecture so:
+
+```text
+MOCK
+```
+
+simulates the official contract without pretending to be NINAuth.
+
+The repository already has provider posture controls that block LIVE unless credentials/base URLs/vault requirements are satisfied. Preserve this honesty principle.
+
+---
+
+# 10. PRODUCTION NINAUTH ADAPTER
+
+Design:
+
+```text
+IdentityProvider
+       │
+ ┌─────┼─────┐
+ │     │     │
+Mock  Loopback  NINAuthLive
+```
+
+The application must not depend on:
+
+```text
+NINAUTH_MOCK
+```
+
+specific functions.
+
+Use a provider interface.
+
+Production implementation should be the only layer that knows:
+
+* NINAuth URLs;
+* NINAuth OAuth parameters;
+* NINAuth client credentials;
+* provider-specific error codes;
+* provider-specific claims;
+* provider-specific token handling.
+
+Everything above that layer receives normalized TrustScore objects.
+
+---
+
+# 11. IMPORTANT: DO NOT INVENT NINAUTH SCOPE NAMES
+
+The existing mock provider currently has internal scope names such as:
+
+```text
+identity.basic
+identity.nin_status
+profile.name
+profile.demographics
+```
+
+Treat these as **TrustScore mock-contract scopes only** unless they are confirmed by the actual NINAuth partner specification.
+
+Production scope mapping must be configurable:
+
+```text
+TrustScore internal capability
+        ↓
+NINAuth production scope
+```
+
+This prevents the fake/mock vocabulary from becoming a hidden production dependency.
+
+---
+
+# 12. QR AND SHARE CODE ARCHITECTURE
+
+Research and implement NINAuth's real semantics.
+
+Distinguish clearly between:
+
+```text
+NINAuth Share Code
+```
+
+and:
+
+```text
+TrustScore Share Token
+```
+
+They are not the same thing.
+
+NINAuth may issue/share identity verification artifacts.
+
+TrustScore may issue its own Trust Passport/Trust Link artifacts.
+
+Never merge the two concepts.
+
+---
+
+# 13. TRUST IDENTITY
+
+Preserve and strengthen:
+
+```text
+UserAccount
+TrustIdentity
+IdentityIdentifier
+IdentityAttribute
+Evidence
+VerificationSession
+Consent
+```
+
+Maintain this invariant:
+
+```text
+UserAccount
+    ≠
+TrustIdentity
+    ≠
+NIN
+    ≠
+Phone
+```
+
+A user account is a platform account.
+
+A Trust Identity is the verified identity domain object.
+
+The NIN is an external identity anchor.
+
+A phone number is a separate evidence attribute.
+
+---
+
+# 14. NIN SHOULD NOT BE THE PUBLIC IDENTIFIER
+
+Never expose:
+
+```text
+NIN
+```
+
+in:
+
+* URLs;
+* QR payloads;
+* public profiles;
+* logs;
+* analytics;
+* API paths;
+* browser storage;
+* support screenshots.
+
+Use:
+
+```text
+TrustIdentity ID
+handle
+share token
+verification token
+```
+
+instead.
+
+---
+
+# 15. DO NOT STORE RAW NIN UNNECESSARILY
+
+The production system should prefer:
+
+```text
+provider identity reference
+verified evidence
+hash/fingerprint where justified
+consent provenance
+verification timestamp
+freshness
+```
+
+rather than building a permanent raw-NIN database.
+
+If an irreversible lookup identifier is genuinely required, use a keyed cryptographic strategy rather than ordinary unsalted hashing.
+
+Document the exact reasoning.
+
+---
+
+# 16. CONSENT MUST BE FIRST-CLASS
+
+Every identity access must have:
+
+```text
+requester
+purpose
+requested scopes
+granted scopes
+policy version
+timestamp
+provider
+session
+status
+withdrawal state
+```
+
+Do not reduce consent to:
+
+```text
+consent = true
+```
+
+The current NINAuth model is consent-driven and the actual granted scope controls what data is available.
+
+---
+
+# 17. EVIDENCE-FIRST ARCHITECTURE
+
+Preserve the evidence graph but improve it.
+
+Every evidence item should have:
+
+```text
+type
+source
+provider
+provider mode
+subject
+verification session
+consent
+confidence
+observedAt
+expiresAt
+status
+provenance
+```
+
+Examples:
+
+```text
+NINAUTH_IDENTITY_VERIFIED
+PHONE_VERIFIED
+LIVENESS_VERIFIED
+CREDENTIAL_VERIFIED
+FLAG_CONFIRMED
+FLAG_DISMISSED
+DISPUTE_RESOLVED
+```
+
+---
+
+# 18. NINAUTH ALREADY PROVIDES IDENTITY ASSURANCE
+
+Do not automatically force users through a second biometric verification flow merely because TrustScore has a liveness provider.
+
+Research exactly what assurance NINAuth itself provides and determine:
+
+```text
+What NINAuth establishes
+What additional liveness establishes
+When additional biometric verification is actually useful
+```
+
+Independent biometric verification should be an **additional signal**, not automatically the foundation of V1.
+
+---
+
+# 19. TRUST PASSPORT
+
+This is the flagship consumer product.
+
+Build it to be dramatically better than a simple score page.
+
+Example:
+
+```text
+TRUST PASSPORT
+
+Name
+Verified Identity
+
+Identity Assurance
+Government Verified
+
+Phone
+Verified
+
+Credentials
+3 verified
+
+Reputation
+Established
+
+TrustScore
+782
+
+Risk
+LOW
+
+Verified
+11 days ago
+
+[ SHARE ]
+[ QR ]
+[ SAFETY CHECK ]
+```
+
+Every displayed claim must have provenance internally.
+
+---
+
+# 20. TRUST PASSPORT SHARING
+
+Build:
+
+```text
+Trust Link
+QR Trust Card
+Expiring share token
+Scope selection
+Revocation
+View history
+Trust Receipt
+Freshness
+```
+
+A user should be able to control:
+
+```text
+what is shared
+for what purpose
+for how long
+with whom
+```
+
+Do not expose sensitive identity data merely because the viewer has the profile link.
+
+---
+
+# 21. SAFETY CHECK
+
+The existing Safety Check is useful but must be critically evaluated.
+
+The product proposition is:
+
+> **Check before you deal.**
+
+It should answer:
+
+```text
+Identity verified?
+Identity assurance?
+Trust status?
+Relevant signals?
+Confirmed adverse signals?
+Freshness?
+```
+
+Never:
+
+```text
+SAFE
+```
+
+as an absolute assertion.
+
+Use language such as:
+
+```text
+Identity verified
+No confirmed active adverse signals found
+Reputation established
+Additional verification recommended
+Review required
+Insufficient evidence
+```
+
+---
+
+# 22. TRANSACTION-SPECIFIC TRUST
+
+Research and design Trust Decision API around context.
+
+The same identity may require different evidence for:
+
+```text
+Marketplace
+Employment
+Rental
+Professional engagement
+High-value transaction
+B2B onboarding
+```
+
+Therefore eventually:
+
+```text
+POST /v1/trust/check
+```
+
+should accept a context:
+
+```json
+{
+  "purpose": "marketplace_transaction",
+  "subject": "...",
+  "requested_signals": ["identity", "reputation", "risk"]
+}
+```
+
+Do not build one universal opaque “good/bad person” score.
+
+---
+
+# 23. TRUST ENGINE
+
+Keep rules-first.
+
+Architecture:
+
+```text
+Evidence
+   ↓
+Signal Engine
+   ↓
+Risk Engine
+   ↓
+Trust Policy
+   ↓
+Trust Decision
+   ↓
+Score
+```
+
+Every result must contain:
+
+```text
+score
+confidence
+risk band
+decision
+signals
+policy version
+freshness
+timestamp
+```
+
+---
+
+# 24. NEW USERS MUST NOT BE PENALIZED FOR HAVING NO HISTORY
+
+Support states:
+
+```text
+NEW
+VERIFIED
+ESTABLISHED
+CAUTION
+HIGH_RISK
+REVIEW_REQUIRED
+UNKNOWN
+```
+
+Absence of reputation ≠ negative reputation.
+
+This must be reflected in the UI and scoring engine.
+
+---
+
+# 25. SCORE TRANSPARENCY
+
+The current TrustScore engine is already rules-first and versioned.
+
+Preserve and improve:
+
+```text
+ScoringPolicy
+DpiaRecord
+TrustScoreSnapshot
+inputsHash
+policyVersion
+explanation
+```
+
+Every historical score must be reproducible.
+
+If an appeal is filed:
+
+```text
+freeze
+review
+resolve
+recompute if appropriate
+audit
+```
+
+---
+
+# 26. REPUTATION
+
+The reputation system must distinguish:
+
+```text
+ALLEGATION
+```
+
+from:
+
+```text
+CONFIRMED INCIDENT
+```
+
+and:
+
+```text
+RESOLVED DISPUTE
+```
+
+Never let an unverified accusation behave like a confirmed fraud event.
+
+---
+
+# 27. ANTI-ABUSE
+
+Test and defend against:
+
+```text
+false flag wars
+retaliatory reports
+collusion
+fake reviews
+score farming
+identity cycling
+synthetic identities
+NIN impersonation
+phone recycling
+SIM swapping
+deepfake attacks
+API enumeration
+credential theft
+insider abuse
+```
+
+Every defense should be documented.
+
+---
+
+# 28. HUMAN REVIEW
+
+Keep human-review workflows.
+
+Reviewer capabilities:
+
+```text
+view evidence
+view provenance
+request additional evidence
+contact subject if appropriate
+confirm
+dismiss
+resolve
+escalate
+record reasoning
+```
+
+Every reviewer action must be audited.
+
+---
+
+# 29. APPEALS
+
+Build a genuine appeal mechanism.
+
+Required:
+
+```text
+appeal creation
+reason
+evidence
+status
+reviewer
+decision
+decision rationale
+timestamp
+notification
+```
+
+The appeal must have the ability to correct an erroneous adverse decision.
+
+---
+
+# 30. WEB + MOBILE
+
+Build one shared TrustScore domain and API, not two independent products.
+
+## Web
+
+Next.js remains the primary web application unless the audit proves a change necessary.
+
+## Mobile
+
+Research the current NINAuth mobile guidance, including the documented Expo/React Native integration path, before deciding the mobile framework.
+
+The mobile application must consume the same:
+
+```text
+Trust Identity
+Consent
+Evidence
+Trust Engine
+Passport
+Safety Check
+Reputation
+B2B contracts
+```
+
+There must be one source of truth.
+
+---
+
+# 31. MOBILE MVP
+
+Build these first:
+
+```text
+Splash
+Onboarding
+Login
+NINAuth verification
+Home
+Trust Passport
+Safety Check
+Scan QR
+Trust History
+Credentials
+Notifications
+Security
+Privacy
+Settings
+Appeals
+```
+
+Use deep links/app links for verification journeys.
+
+Plan NINAuth callbacks carefully.
+
+Do not put NINAuth client secrets or backend tokens in the mobile app.
+
+---
+
+# 32. WEB MVP
+
+Build:
+
+```text
+Landing page
+Sign-in
+NINAuth verification
+Dashboard
+Trust Passport
+Public Trust Link
+Safety Check
+QR scanner/verification page
+Credentials
+Reputation
+Appeals
+Privacy Center
+Security Center
+```
+
+---
+
+# 33. B2B PLATFORM
+
+Build:
+
+```text
+Developer Portal
+Organizations
+API Keys
+Roles
+Usage
+Trust Checks
+Identity Checks
+Webhooks
+Logs
+Cases
+Billing
+Documentation
+```
+
+Tenant isolation must be enforced server-side.
+
+---
+
+# 34. DESIGN DIRECTION — TERMII INSPIRATION
+
+Study Termii deeply, but **do not clone it**.
+
+Use it for inspiration around:
+
+### A. Product clarity
+
+Termii presents capabilities around concrete outcomes rather than technical jargon. Its current experience focuses on transaction signals, delivery confidence, fraud, fallback and resolution.
+
+TrustScore should similarly present:
+
+```text
+VERIFY
+CHECK
+SHARE
+PROTECT
+RESOLVE
+```
+
+rather than leading with database/provider terminology.
+
+### B. Signal-centric storytelling
+
+Termii makes the “signal” the unit of the product.
+
+TrustScore should make:
+
+```text
+identity signal
+credential signal
+reputation signal
+risk signal
+resolution signal
+```
+
+the conceptual language of the platform.
+
+### C. Operational confidence
+
+Termii strongly surfaces:
+
+```text
+delivery
+speed
+uptime
+monitoring
+fallback
+```
+
+TrustScore should similarly surface:
+
+```text
+verification freshness
+verification confidence
+provider availability
+risk confidence
+decision freshness
+```
+
+### D. Developer experience
+
+Termii emphasizes:
+
+```text
+API
+simple integration
+clear docs
+examples
+webhooks
+```
+
+TrustScore B2B should do the same.
+
+### E. Fallback/reliability philosophy
+
+Termii's current product architecture emphasizes routing, confirmation and recovery across channels.
+
+For TrustScore, translate that principle into:
+
+```text
+Primary provider
+      ↓
+Fallback provider
+      ↓
+Retry
+      ↓
+Degraded state
+      ↓
+Manual review / UNKNOWN
+```
+
+Never fabricate a positive verification simply because a provider is unavailable.
+
+---
+
+# 35. DESIGN SYSTEM
+
+Do not directly copy Termii's:
+
+* colors;
+* typography;
+* layouts;
+* illustrations;
+* copy;
+* components.
+
+Instead extract design principles:
+
+```text
+high clarity
+strong hierarchy
+premium SaaS
+strong motion
+outcome-driven copy
+dense but readable dashboards
+visual confidence
+fast interaction
+excellent empty/loading/error states
+```
+
+Create a unique TrustScore design language.
+
+---
+
+# 36. TRUSTSCORE VISUAL IDENTITY
+
+Recommended direction:
+
+```text
+premium
+secure
+modern
+African-aware
+technical but human
+high-trust
+```
+
+Potential visual system:
+
+```text
+deep neutral base
+emerald/green trust accent
+white/light surfaces
+subtle gradients
+large confident typography
+clean cards
+motion used for state transitions
+high-quality data visualization
+```
+
+Do not make the application look like a government portal.
+
+Do not make it look like a generic fintech clone.
+
+---
+
+# 37. TERMII-INSPIRED LANDING PAGE STRUCTURE
+
+Use this pattern:
+
+```text
+Hero
+  ↓
+Trust problem
+  ↓
+“Verify before you deal”
+  ↓
+Live-looking Trust Passport demonstration
+  ↓
+How TrustScore works
+  ↓
+NINAuth identity foundation
+  ↓
+Trust signals
+  ↓
+Safety Check
+  ↓
+For businesses
+  ↓
+API / developer experience
+  ↓
+Security & privacy
+  ↓
+Trust Passport CTA
+```
+
+The landing page should communicate the product within seconds.
+
+---
+
+# 38. MICRO-INTERACTIONS
+
+Use animation intentionally.
+
+Examples:
+
+```text
+verification → progress
+identity verified → confirmation transition
+TrustScore count-up
+risk state transitions
+QR creation
+Trust Passport sharing
+signal arrival
+notification
+```
+
+Respect:
+
+```text
+prefers-reduced-motion
+```
+
+The existing Framer Motion design system should be retained where it is good.
+
+---
+
+# 39. PERFORMANCE
+
+Do not copy Termii's numerical performance claims.
+
+Measure TrustScore's own performance.
+
+Track:
+
+```text
+page load
+first interaction
+verification start
+verification completion
+API p50
+API p95
+API p99
+database latency
+provider latency
+cache hit rate
+queue latency
+```
+
+Set realistic budgets after measurement.
+
+---
+
+# 40. ERROR UX
+
+Every external dependency must have useful failure states.
+
+Examples:
+
+```text
+NINAuth temporarily unavailable
+Verification expired
+Consent denied
+Verification canceled
+Invalid callback
+Identity already linked
+Provider timeout
+Provider unavailable
+Retry required
+Review required
+```
+
+Never display raw provider errors to end users.
+
+---
+
+# 41. EMPTY STATES
+
+Design excellent states for:
+
+```text
+No TrustScore yet
+No credentials
+No reputation
+No flags
+No history
+No Safety Checks
+No API activity
+```
+
+A new user should see:
+
+> **You're verified. Your reputation is just beginning.**
+
+not:
+
+> No data.
+
+---
+
+# 42. SECURITY HARDENING
+
+Audit:
+
+```text
+Authentication
+Authorization
+CSRF
+CORS
+CSP
+cookies
+session fixation
+IDOR
+rate limiting
+enumeration
+replay
+input validation
+SQL/Prisma injection safety
+XSS
+open redirects
+webhook signature verification
+API key hashing
+secret management
+provider token storage
+```
+
+---
+
+# 43. NINAUTH TOKEN SECURITY
+
+Use:
+
+```text
+backend-only access tokens
+encrypted refresh tokens where necessary
+strict expiry
+rotation
+revocation
+no browser localStorage
+no analytics capture
+no error logging
+no URL exposure
+```
+
+The current NINAuth API reference explicitly says the client secret must never enter browser/mobile code and that returned tokens must be handled securely.
+
+---
+
+# 44. DATABASE STRATEGY
+
+Do not migrate from SQLite to PostgreSQL merely because a previous architecture document said so.
+
+First determine:
+
+```text
+current traffic
+expected traffic
+concurrency
+deployment model
+transaction requirements
+SQLite limitations
+migration complexity
+```
+
+If production readiness requires PostgreSQL:
+
+```text
+SQLite prototype
+      ↓
+schema validation
+      ↓
+PostgreSQL migration
+      ↓
+automated migration tests
+```
+
+Do not break current functionality unnecessarily.
+
+---
+
+# 45. INFRASTRUCTURE
+
+Prepare for:
+
+```text
+web
+API
+database
+cache
+queue
+provider adapters
+worker
+observability
+```
+
+Maintain separation even if the first deployment is relatively compact.
+
+---
+
+# 46. PROVIDER TRANSPORT
+
+Keep the existing strong idea:
+
+```text
+timeout
+retry
+backoff
+circuit breaker
+HMAC/signing where required
+metrics
+provider posture
+credential vault
+```
+
+But audit every implementation for production correctness.
+
+---
+
+# 47. MOCK / LOOPBACK / LIVE RULE
+
+Every provider must have:
+
+```text
+MOCK
+LOOPBACK
+LIVE
+```
+
+### MOCK
+
+Purely local.
+
+### LOOPBACK
+
+Real transport logic against local simulator.
+
+### LIVE
+
+Actual provider.
+
+The API must refuse LIVE unless:
+
+```text
+credentials
+base URL
+provider configuration
+secret vault
+production authorization
+```
+
+are present.
+
+The UI must say:
+
+```text
+MOCK
+LOOPBACK
+LIVE
+```
+
+accurately.
+
+---
+
+# 48. RESEARCH OTHER PROVIDERS
+
+For every possible future provider research:
+
+```text
+Dojah
+Smile ID
+Youverify
+phone intelligence provider
+liveness providers
+credential providers
+future African identity providers
+```
+
+Determine whether each is:
+
+```text
+competitor
+supplier
+partner
+fallback
+future adapter
+```
+
+The strategic goal is not to duplicate their KYC stack.
+
+---
+
+# 49. MONETIZATION
+
+Initially monetize:
+
+### Consumer
+
+Trust Passport premium features where appropriate.
+
+### B2B
+
+```text
+Identity verification
+Trust checks
+Verification APIs
+Trust Decision API
+Developer platform
+Enterprise dashboards
+```
+
+Do not invent pricing until:
+
+```text
+provider cost
+infrastructure cost
+fraud cost
+support cost
+market willingness-to-pay
+```
+
+are understood.
+
+---
+
+# 50. DO NOT BUILD BANK DATA
+
+We currently do not have direct bank-account data.
+
+Therefore:
+
+```text
+NO
+fake bank verification
+fake account-name lookup
+fake linked-account claims
+fake transaction history
+```
+
+Future bank/payment integration must enter through a proper provider adapter after authorization/access is established.
+
+---
+
+# 51. DO NOT BUILD CREDIT BUREAU FEATURES AS IF WE ARE A CREDIT BUREAU
+
+Do not expose:
+
+```text
+official credit report
+borrower debt history
+creditworthiness claim
+```
+
+unless the relevant provider/regulatory basis actually exists.
+
+TrustScore can have a future risk/evidence architecture.
+
+---
+
+# 52. FRAUDNET
+
+Do not rush into a public blacklist.
+
+Build first:
+
+```text
+risk signal network
+```
+
+with:
+
+```text
+source
+evidence
+confidence
+status
+createdAt
+expiresAt
+resolution
+```
+
+Public exposure must be carefully controlled.
+
+---
+
+# 53. IDENTITY + BUSINESS
+
+The domain model should support:
+
+```text
+Person
+Business
+Authorized Representative
+```
+
+The current NINAuth API documentation also distinguishes personal and business sign-in, including an RC-number field for business flows.
+
+Do not force everything into a personal identity.
+
+---
+
+# 54. TRUST NETWORK
+
+Keep the future network concept, but don't rush it.
+
+A future Trust Network can connect:
+
+```text
+verified identities
+verified businesses
+credentials
+verified interactions
+disputes
+resolutions
+risk signals
+```
+
+It must be opt-in where appropriate and resistant to collusion.
+
+---
+
+# 55. OBSERVABILITY
+
+Build dashboards for:
+
+```text
+NINAuth success rate
+verification latency
+consent completion
+verification failure
+provider health
+Safety Check activity
+Trust Passport sharing
+flag activity
+appeal activity
+API traffic
+webhook success
+database performance
+security events
+```
+
+---
+
+# 56. QA STANDARD
+
+Every batch must contain:
+
+### Unit tests
+
+### Integration tests
+
+### API contract tests
+
+### Security tests
+
+### Privacy tests
+
+### Fraud tests
+
+### Browser E2E
+
+### Mobile E2E
+
+### Regression tests
+
+### Performance tests
+
+No “looks good” completion.
+
+---
+
+# 57. BATCH EXECUTION PROTOCOL
+
+This is mandatory.
+
+## BATCH N
+
+### 1. Research
+
+Research official documentation and relevant current sources.
+
+### 2. Inspect
+
+Inspect the existing implementation.
+
+### 3. Plan
+
+Write exactly what will change.
+
+### 4. Implement
+
+Make the smallest complete coherent implementation.
+
+### 5. Test
+
+Run all relevant automated tests.
+
+### 6. E2E
+
+Run end-to-end flows.
+
+### 7. Security audit
+
+Look for newly introduced vulnerabilities.
+
+### 8. Privacy audit
+
+Check data handling.
+
+### 9. Product/UX audit
+
+Check the feature against the intended user journey.
+
+### 10. Regression audit
+
+Confirm previously working functionality remains intact.
+
+### 11. Fix
+
+Do not merely report problems.
+
+Fix them.
+
+### 12. Re-test
+
+Repeat until the batch passes.
+
+### 13. Record
+
+Update:
+
+```text
+CHANGELOG
+ARCHITECTURE
+TEST REPORT
+SECURITY REPORT
+DECISION RECORD
+```
+
+### 14. Gate
+
+Only after all criteria pass may you proceed to the next batch.
+
+---
+
+# 58. CRITICAL RULE
+
+## Never carry a known defect forward just to meet the schedule.
+
+If:
+
+```text
+Batch 4
+```
+
+fails:
+
+```text
+security
+tests
+performance
+UX
+architecture
+```
+
+then:
+
+```text
+STOP
+FIX
+RETEST
+RE-AUDIT
+THEN PROCEED
+```
+
+Do not call a failed batch “mostly complete.”
+
+---
+
+# 59. BATCH ROADMAP
+
+## BATCH 0 — FULL AUDIT & RESEARCH
+
+Output:
+
+```text
+current-state audit
+NINAuth research
+Termii design research
+security audit
+product gap analysis
+architecture gap analysis
+mobile strategy
+master roadmap
+```
+
+No major product changes before completing the audit.
+
+---
+
+## BATCH 1 — NINAuth PRODUCTION ALIGNMENT
+
+Focus:
+
+```text
+official NINAuth contract
+provider adapter
+OAuth
+PKCE
+scope mapping
+claims mapping
+callback
+token validation
+consent
+error handling
+```
+
+MOCK and LOOPBACK must continue working.
+
+LIVE remains locked without actual partner credentials.
+
+---
+
+## BATCH 2 — TRUST IDENTITY HARDENING
+
+Focus:
+
+```text
+TrustIdentity lifecycle
+assurance
+identity attributes
+evidence
+freshness
+consent provenance
+duplicate identity handling
+account recovery
+```
+
+---
+
+## BATCH 3 — WEB IDENTITY EXPERIENCE
+
+Build/polish:
+
+```text
+Continue with NINAuth
+Verify with NINAuth
+consent
+verification progress
+success
+failure
+retry
+identity dashboard
+```
+
+Use official NINAuth terminology and brand requirements where applicable.
+
+---
+
+## BATCH 4 — MOBILE APPLICATION
+
+Build the mobile foundation.
+
+Prefer the integration path recommended by NINAuth for the selected mobile framework after confirming the current SDK/support.
+
+Implement:
+
+```text
+auth
+NINAuth
+deep links
+Trust Passport
+QR
+Safety Check
+notifications
+security
+settings
+```
+
+---
+
+## BATCH 5 — TRUST PASSPORT 2.0
+
+Upgrade the existing Passport:
+
+```text
+identity
+assurance
+credentials
+reputation
+risk
+freshness
+share
+QR
+receipts
+privacy controls
+```
+
+---
+
+## BATCH 6 — SAFETY CHECK 2.0
+
+Turn Safety Check into the signature consumer experience:
+
+```text
+Check by QR
+Check by Trust Link
+Check by handle
+other lawful/consented mechanisms
+```
+
+Return:
+
+```text
+identity
+assurance
+signals
+risk
+freshness
+explanation
+```
+
+---
+
+## BATCH 7 — REPUTATION + RESOLUTION 2.0
+
+Harden:
+
+```text
+flags
+evidence
+review
+subject response
+resolution
+appeal
+reporter reliability
+anti-collusion
+```
+
+---
+
+## BATCH 8 — TRUST ENGINE 2.0
+
+Harden:
+
+```text
+TrustPolicy
+Signals
+Risk
+Score
+Context
+Confidence
+Freshness
+Explanations
+Historical snapshots
+DPIA gate
+```
+
+---
+
+## BATCH 9 — B2B PLATFORM 2.0
+
+Harden:
+
+```text
+organizations
+API clients
+keys
+RBAC
+usage
+quotas
+webhooks
+logs
+Trust Decision API
+```
+
+---
+
+## BATCH 10 — TRUST NETWORK
+
+Only after the core product is stable.
+
+Build:
+
+```text
+verified interactions
+credentials
+network relationships
+controlled reputation signals
+anti-collusion
+```
+
+---
+
+## BATCH 11 — SECURITY HARDENING
+
+Full:
+
+```text
+penetration-test-style review
+authorization audit
+privacy audit
+secret audit
+dependency audit
+API abuse audit
+enumeration audit
+fraud audit
+```
+
+---
+
+## BATCH 12 — PRODUCTION INFRASTRUCTURE
+
+Evaluate and implement:
+
+```text
+managed database
+Redis/cache
+queue
+workers
+monitoring
+alerts
+backup
+restore
+CD pipeline
+rollback
+```
+
+Only change infrastructure where justified by evidence.
+
+---
+
+## BATCH 13 — DESIGN ELEVATION
+
+Use the Termii research as design inspiration.
+
+Polish:
+
+```text
+landing
+dashboard
+Trust Passport
+Safety Check
+B2B dashboard
+developer portal
+mobile
+animations
+loading states
+empty states
+errors
+responsive behavior
+accessibility
+```
+
+Do not clone Termii.
+
+Create TrustScore's own identity.
+
+---
+
+## BATCH 14 — END-TO-END RE-AUDIT
+
+Audit the entire system again.
+
+Compare:
+
+```text
+original requirements
+final implementation
+research findings
+security requirements
+privacy requirements
+NINAuth contract
+product goals
+```
+
+Identify remaining gaps.
+
+Fix them.
+
+---
+
+## BATCH 15 — PILOT READINESS
+
+Only now prepare for controlled real-world testing.
+
+Measure:
+
+```text
+identity verification completion
+NINAuth success rate
+verification latency
+Safety Check usage
+Passport sharing
+trust decisions
+appeals
+false positives
+fraud attempts
+B2B API usage
+operational cost
+```
+
+---
+
+# 60. REGRESSION RULE
+
+After every batch:
+
+```bash
+bun install
+bun run lint
+bun run build
+bun run db:generate
+bun run db:push
+```
+
+Then run every repository test suite that is relevant.
+
+Do not assume previous “1,041 checks green” means the current branch still passes after modifications.
+
+The baseline must be:
+
+```text
+before batch
+vs
+after batch
+```
+
+Any regression must be fixed before proceeding.
+
+---
+
+# 61. GIT DISCIPLINE
+
+For every batch:
+
+```text
+audit
+↓
+implementation
+↓
+tests
+↓
+commit
+```
+
+Use meaningful commits such as:
+
+```text
+trustscore: harden Ninauth production adapter
+trustscore: rebuild trust passport sharing
+trustscore: add mobile identity flow
+```
+
+Do not make giant unreadable commits spanning unrelated concerns.
+
+---
+
+# 62. CHANGE SAFETY
+
+Before modifying a major subsystem:
+
+```text
+identify callers
+identify dependencies
+identify database impacts
+identify API consumers
+identify UI flows
+identify tests
+```
+
+Prefer extending/refactoring existing functionality over deleting it.
+
+---
+
+# 63. NO WORKFLOW BREAKING
+
+The existing user workflow must remain operational unless there is a compelling architectural/product reason to change it.
+
+When a better architecture is required:
+
+```text
+existing workflow
+       ↓
+compatibility layer
+       ↓
+new architecture
+       ↓
+migration
+       ↓
+old implementation retired
+```
+
+Avoid sudden breaking changes.
+
+---
+
+# 64. DESIGN QA
+
+For every major UI batch, inspect:
+
+```text
+desktop
+tablet
+mobile
+light theme
+dark theme
+keyboard
+screen reader
+slow network
+small screen
+large screen
+empty data
+error
+loading
+success
+```
+
+Use screenshots/browser inspection where appropriate.
+
+---
+
+# 65. MOBILE QA
+
+Test on:
+
+```text
+Android
+iOS
+slow network
+interrupted NINAuth redirect
+app backgrounding
+deep-link return
+expired verification
+cancelled verification
+poor camera conditions
+low battery/data mode
+```
+
+---
+
+# 66. FINAL PRODUCT EXPERIENCE
+
+The finished consumer journey should feel approximately like:
+
+```text
+OPEN TRUSTSCORE
+       ↓
+Create / Sign in
+       ↓
+Verify with NINAuth
+       ↓
+Identity verified
+       ↓
+Trust Passport created
+       ↓
+TrustScore explanation
+       ↓
+Share passport / QR
+       ↓
+Check someone else
+       ↓
+Make a safer decision
+```
+
+The product should feel:
+
+```text
+fast
+clear
+premium
+credible
+secure
+simple
+```
+
+not bureaucratic.
+
+---
+
+# 67. FINAL B2B EXPERIENCE
+
+Business:
+
+```text
+Create organization
+       ↓
+Create API credentials
+       ↓
+Read docs
+       ↓
+Run sandbox test
+       ↓
+Verify identity
+       ↓
+Request Trust Decision
+       ↓
+Receive signed response
+       ↓
+Track usage
+       ↓
+Receive webhook
+```
+
+The developer experience should be as frictionless as the product allows.
+
+---
+
+# 68. IMPORTANT: TERMII IS INSPIRATION, NOT A TEMPLATE
+
+Study Termii for:
+
+```text
+clarity
+product packaging
+transaction-oriented storytelling
+signal-first thinking
+developer simplicity
+operational visibility
+fallback/reliability
+modern UI
+performance messaging
+```
+
+Do not:
+
+```text
+copy layouts
+copy CSS
+copy exact typography
+copy copywriting
+copy illustrations
+copy proprietary assets
+```
+
+TrustScore must have its own product identity.
+
+---
+
+# 69. FINAL DEFINITION OF “PERFECTLY IMPLEMENTED”
+
+Do not use the phrase “perfect” to mean:
+
+> “The feature exists.”
+
+A batch is complete only when:
+
+```text
+functional
+secure
+tested
+audited
+documented
+observable
+performant
+mobile-ready where applicable
+privacy-aware
+NINAuth-aligned
+backward-compatible
+maintainable
+production-credible
+```
+
+and no known P0/P1 issue remains.
+
+---
+
+# 70. FINAL REPORT AFTER EACH BATCH
+
+Return:
+
+```text
+BATCH
+OBJECTIVE
+
+RESEARCH
+What was researched?
+
+FINDINGS
+What was discovered?
+
+IMPLEMENTATION
+What changed?
+
+FILES
+What changed?
+
+DATABASE
+What changed?
+
+API
+What changed?
+
+WEB
+What changed?
+
+MOBILE
+What changed?
+
+SECURITY
+What changed?
+
+PRIVACY
+What changed?
+
+TESTS
+What passed?
+
+E2E
+What passed?
+
+PERFORMANCE
+Measured results
+
+ISSUES FOUND
+List
+
+ISSUES FIXED
+List
+
+KNOWN LIMITATIONS
+List
+
+ARCHITECTURE DECISIONS
+List
+
+REGRESSION STATUS
+PASS / FAIL
+
+BATCH GATE
+PASS / FAIL
+
+NEXT BATCH
+```
+
+If the gate is FAIL:
+
+```text
+DO NOT PROCEED.
+FIX FIRST.
+```
+
+---
+
+# 71. FINAL DIRECTIVE
+
+Start immediately with:
+
+## BATCH 0 — DEEP AUDIT + RESEARCH
+
+You have access to:
+
+* the entire TrustScore repository;
+* the current Git history;
+* the uploaded NINAuth developer guide;
+* the official NINAuth developer documentation;
+* the current Termii website/documentation;
+* relevant official regulatory/provider sources.
+
+Study them thoroughly.
+
+Then:
+
+```text
+AUDIT
++
+RESEARCH
++
+CRITICAL THINKING
++
+PRODUCT STRATEGY
++
+ARCHITECTURE
++
+SECURITY
++
+UX
++
+MOBILE
+```
+
+Produce the Batch 0 documentation.
+
+Then implement the necessary corrections from Batch 0 only where justified.
+
+Test.
+
+Audit.
+
+Fix.
+
+Re-test.
+
+Only when Batch 0 passes, proceed to Batch 1.
+
+Continue this exact controlled loop through the remaining batches.
+
+**Do not rush. Do not skip gates. Do not preserve a bad implementation merely because it already exists. Do not rewrite good work merely because it is old. Make every change evidence-driven.**
+
+The ultimate objective is not to have a large codebase.
+
+The objective is to turn `trustscore-platform` into a **credible, secure, polished, NINAuth-aligned identity and trust platform for Web, Mobile and B2B use**, with a product experience that can compete at the quality level of modern infrastructure platforms while remaining distinctly TrustScore.

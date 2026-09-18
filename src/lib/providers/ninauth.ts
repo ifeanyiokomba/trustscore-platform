@@ -22,6 +22,7 @@ import {
   timingSafeEqual,
 } from "crypto";
 import { CAPABILITIES } from "@/lib/providers/scope-mapping.config";
+import { guardedSecret } from "@/lib/platform/boot-guard";
 
 // ---------------------------------------------------------------------------
 // Contract constants (to be replaced with partner-supplied values — audit §2.2)
@@ -34,8 +35,8 @@ export const NINAUTH_CLIENT_ID = "trustscore_sandbox";
 
 // Backend-only secret. In LIVE mode this becomes the partner-issued client
 // secret from the environment — still never exposed to any frontend.
-const NINAUTH_CLIENT_SECRET =
-  process.env.NINAUTH_CLIENT_SECRET ?? "ts_backend_only_mock_partner_secret";
+// sec-batch-A: guarded read — production refuses to boot on the dev default.
+const NINAUTH_CLIENT_SECRET = guardedSecret("NINAUTH_CLIENT_SECRET");
 
 const MOCK_ISSUER = "https://ninauth.nimc.gov.ng/mock";
 const ID_TOKEN_TTL_SEC = 300;
@@ -45,8 +46,7 @@ const ID_TOKEN_TTL_SEC = 300;
 // backend validates against THIS issuer + signing secret when the platform
 // posture is `loopback` — the validation DISCIPLINE stays identical.
 export const LOOPBACK_ISSUER = "https://provider-simulator.loopback/ninauth";
-export const LOOPBACK_SIGNING_SECRET =
-  process.env.LOOPBACK_SIGNING_SECRET ?? "ts_backend_only_loopback_signing_secret";
+export const LOOPBACK_SIGNING_SECRET = guardedSecret("LOOPBACK_SIGNING_SECRET");
 
 export const SESSION_TTL_MS = 10 * 60_000; // verification session TTL (authorize-flow-like)
 export const CODE_TTL_MS = 60_000; // one-time authorization code TTL

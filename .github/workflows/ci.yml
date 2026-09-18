@@ -1,0 +1,85 @@
+# TrustScore CI (sec-batch-A) — the "1,041 checks green" claims become an
+# enforced gate instead of a point-in-time manual run.
+#
+# quality job:
+#   - typecheck (tsc --noEmit — also enforced by next build since
+#     ignoreBuildErrors was flipped to false)
+#   - eslint
+#   - prisma generate + db push (fresh SQLite)
+#   - mini-services (provider-simulator :3032, webhook-worker :3031)
+#   - dev server on :3000, then the real HTTP integration matrices in the
+#     documented order with the documented rate-window pauses
+#     (stage2 → stage9 → [pause] → batch0 → auth_matrix).
+#
+# audit job:
+#   - generates a package-lock snapshot and fails on HIGH+ advisories
+#     (the 9 CVEs traced to unused deps were removed in sec-batch-A; this
+#     keeps them from coming back).
+
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: file:./ci.db
+      # Mock provider posture — no external calls; secrets intentionally left
+      # on dev defaults, which the boot guard permits outside production.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Typecheck
+        run: bunx tsc --noEmit
+      - name: Lint
+        run: bun run lint
+      - name: Prisma client + database
+        run: |
+          bun run db:generate
+          bun run db:push
+      - name: Python test dependencies
+        run: python -m pip install --quiet requests
+      - name: Start mini-services and dev server
+        run: |
+          (cd mini-services/provider-simulator && bun install && setsid nohup bun --hot index.ts > simulator.log 2>&1 &)
+          (cd mini-services/webhook-worker && bun install && setsid nohup bun --hot index.ts > worker.log 2>&1 &)
+          bun run dev > dev.log 2>&1 &
+          for i in $(seq 1 60); do
+            curl -sf http://127.0.0.1:3000 > /dev/null && break
+            sleep 2
+          done
+          curl -sf http://127.0.0.1:3000 > /dev/null || (cat dev.log && exit 1)
+          curl -sf http://127.0.0.1:3032/health > /dev/null || (cat mini-services/provider-simulator/simulator.log && exit 1)
+          sleep 5
+      - name: Seed fixture accounts (ada/chidi — matrices assume them)
+        run: bun run seed:fixtures
+      - name: Stage 2 matrix (auth/session/identity spine)
+        run: python3 tests/stage2_matrix.py
+      - name: Stage 9 matrix (B2B platform)
+        run: python3 tests/stage9_matrix.py
+      - name: Rate-window cooldown
+        run: sleep 75
+      - name: Batch 0 matrix (transport/webhooks)
+        run: python3 tests/batch0_matrix.py
+      - name: AUTH matrix (28-item multi-identifier suite)
+        run: python3 tests/auth_matrix.py
+
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Dependency audit (HIGH+)
+        run: |
+          npm install --package-lock-only --no-audit --ignore-scripts
+          npm audit --omit=dev --audit-level=high

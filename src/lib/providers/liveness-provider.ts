@@ -18,12 +18,13 @@
 //     identity reference (masked NINAuth subject) — never a raw NIN.
 
 import { createHash, randomBytes } from "crypto";
+import { guardedSecret } from "@/lib/platform/boot-guard";
 
 export const LIVENESS_PROVIDER_NAME = "LIVENESS_MOCK";
 export const LIVENESS_MODE: "MOCK" | "LIVE" = "MOCK"; // honestly labeled everywhere
 
-const LIVENESS_PEPPER =
-  process.env.SIGNAL_PEPPER ?? "ts_backend_only_signal_pepper";
+// sec-batch-A: guarded read — production refuses to boot on the dev default.
+const LIVENESS_PEPPER = guardedSecret("SIGNAL_PEPPER");
 
 export const LIVENESS_TTL_MS = 10 * 60_000; // capture-window TTL
 export const LIVENESS_FRESHNESS_DAYS = 90; // identifier freshness horizon

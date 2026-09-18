@@ -20,6 +20,7 @@
 
 import { createHash, createHmac, randomBytes, timingSafeEqual } from "crypto";
 import { generatePkce, generateState } from "@/lib/providers/ninauth";
+import { guardedSecret } from "@/lib/platform/boot-guard";
 
 export const GOOGLE_PROVIDER_NAME = "GOOGLE_MOCK";
 export const GOOGLE_MODE: "MOCK" | "LIVE" =
@@ -35,8 +36,8 @@ export const GOOGLE_CODE_TTL_MS = 60_000; // one-time authorization code TTL
 export const GOOGLE_SCOPES = ["openid", "email"];
 
 const GOOGLE_ISSUER = "https://accounts.google.com";
-const MOCK_SIGNING_SECRET =
-  process.env.SIGNAL_PEPPER ?? "ts_backend_only_signal_pepper";
+// sec-batch-A: guarded read — production refuses to boot on the dev default.
+const MOCK_SIGNING_SECRET = guardedSecret("SIGNAL_PEPPER");
 
 // ---------------------------------------------------------------------------
 // PKCE / state / one-time codes — same primitives as the NINAuth rail.

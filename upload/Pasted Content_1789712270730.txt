@@ -1,0 +1,2242 @@
+# TRUSTSCORE PLATFORM — MASTER CTO / PRODUCT / ENGINEERING DIRECTIVE
+
+Repository:
+
+`https://github.com/ifeanyiokomba/trustscore-platform`
+
+Product:
+
+**TrustScore — the NIN-first trust layer for African digital commerce**
+
+You are acting as the combined:
+
+* Principal Software Architect
+* Senior Full-Stack Engineer
+* Product Architect
+* Security Engineer
+* Privacy/Data Protection Architect
+* Identity & Authentication Architect
+* DevOps/SRE Engineer
+* QA/Test Engineer
+* UI/UX/Product Designer
+* Brand/Design Systems Engineer
+* Technical Researcher
+* Technical Product Manager
+
+Your responsibility is to **deeply audit, research, critically analyze, strategically redesign where necessary, implement, test, re-audit and production-harden TrustScore**.
+
+Do NOT rush directly into coding.
+
+The existing repository contains substantial work already. Your job is NOT to blindly rewrite everything. Preserve good architecture and working workflows, but challenge weak assumptions and strategically improve anything that is incomplete, insecure, over-engineered, poorly designed, half-implemented or inconsistent with the product vision.
+
+The final result should feel like a serious, production-grade identity/trust infrastructure company, not a prototype assembled from disconnected features.
+
+---
+
+# 1. NON-NEGOTIABLE OPERATING PRINCIPLE
+
+Work in **strict implementation batches**.
+
+For EVERY batch:
+
+```text
+RESEARCH
+↓
+AUDIT CURRENT STATE
+↓
+CRITICALLY ANALYZE
+↓
+DESIGN SOLUTION
+↓
+WRITE IMPLEMENTATION PLAN
+↓
+IMPLEMENT
+↓
+RUN UNIT / INTEGRATION / CONTRACT / E2E TESTS
+↓
+SECURITY + PRIVACY AUDIT
+↓
+UI/UX AUDIT
+↓
+REGRESSION AUDIT
+↓
+FIX EVERYTHING FOUND
+↓
+RE-RUN TESTS
+↓
+FINAL BATCH AUDIT
+↓
+COMMIT
+↓
+ONLY THEN MOVE TO NEXT BATCH
+```
+
+### HARD GATE
+
+Never proceed to the next batch if:
+
+* tests fail
+* security checks fail
+* migrations are broken
+* authentication is inconsistent
+* APIs are inconsistent
+* UI regressions exist
+* existing workflows are broken
+* accessibility significantly regresses
+* privacy boundaries are violated
+* notification delivery is unreliable
+* provider failover is untested
+* documentation is materially out of sync
+* a batch contains known half-implemented functionality
+
+Fix the issue before proceeding.
+
+---
+
+# 2. FIRST ACTION — FULL CURRENT-STATE AUDIT
+
+Before modifying code, inspect the ENTIRE repository.
+
+Audit:
+
+* application architecture
+* database schema
+* Prisma models
+* API routes
+* services
+* providers
+* authentication
+* sessions
+* identity system
+* NINAuth mock integration
+* notification/email/SMS infrastructure
+* UI components
+* design system
+* routes
+* dashboards
+* onboarding
+* middleware
+* authorization
+* RBAC
+* rate limiting
+* security controls
+* environment variables
+* secrets
+* logging
+* error handling
+* queue/worker architecture
+* webhooks
+* background jobs
+* tests
+* E2E flows
+* deployment configuration
+* documentation
+* migrations
+* observability
+* responsive/mobile behavior
+
+Do not trust README claims blindly.
+
+Verify what ACTUALLY works.
+
+Identify:
+
+```text
+DONE
+PARTIALLY DONE
+MOCKED
+BROKEN
+UNSAFE
+MISSING
+DUPLICATED
+OVER-ENGINEERED
+UNDER-ENGINEERED
+```
+
+Create a current-state audit report before major implementation.
+
+---
+
+# 3. RESEARCH REQUIREMENT
+
+Perform deep current research before implementing provider-dependent features.
+
+At minimum research:
+
+### NINAuth
+
+Study the official NINAuth developer documentation:
+
+`https://ninauth.nimc.gov.ng/developers-guide`
+
+Also research the current official developer/API documentation at:
+
+`https://sso.ninauth.nimc.gov.ng/demo-sign-in/developer-guide`
+
+Critically verify:
+
+* OAuth/OIDC architecture
+* authorization code flow
+* PKCE
+* state
+* nonce
+* token exchange
+* ID token validation
+* issuer
+* audience
+* expiry
+* redirect URI
+* client/app identifiers
+* business authentication
+* QR flow
+* Share Code
+* consent
+* scopes
+* approved claims
+* identity verification semantics
+* provider-side identity references
+* refresh token handling
+* production integration requirements
+* enterprise requirements
+* partner requirements
+* real vs sandbox behavior
+
+DO NOT invent production NINAuth scopes, claims, endpoints or partner semantics.
+
+The repository's mock scopes MUST NOT automatically be treated as official NINAuth production scopes.
+
+Maintain a strict distinction between:
+
+```text
+NINAuth identity verification
+TrustScore authentication
+TrustScore Trust Identity
+TrustScore share tokens
+NINAuth Share Code
+```
+
+They are NOT interchangeable.
+
+---
+
+# 4. CORE PRODUCT PRINCIPLE
+
+TrustScore must remain fundamentally:
+
+### Identity
+
+**Who are you?**
+
+↓
+
+### Evidence
+
+**What can actually be established about you?**
+
+↓
+
+### Trust
+
+**What does that evidence mean in this context?**
+
+Therefore:
+
+```text
+Google authentication ≠ NIN verification
+
+Phone verification ≠ NIN verification
+
+NIN verification ≠ trustworthiness
+
+TrustScore ≠ generic KYC vendor
+
+TrustScore ≠ public blacklist
+
+TrustScore ≠ bank-data aggregation platform
+```
+
+The product should become a **consent-based identity and trust infrastructure layer**.
+
+---
+
+# 5. CORE PRODUCT SURFACES
+
+Build the platform around:
+
+## A. Trust Passport
+
+The user's reusable trust profile.
+
+Potential components:
+
+* verified identity status
+* assurance level
+* verified credentials
+* verified phone
+* evidence history
+* reputation signals
+* resolution history
+* TrustScore
+* score explanation
+* evidence freshness
+* trust receipts
+* shareable verification
+* controlled disclosure
+
+---
+
+## B. Check Before You Deal
+
+A contextual Safety Check.
+
+The experience should answer:
+
+> “What can I safely establish about this person/business for this particular interaction?”
+
+Do NOT expose unnecessary personal information.
+
+Do not design a public “blacklist”.
+
+---
+
+## C. Trust Link / QR
+
+Users should be able to securely share a controlled TrustScore verification experience.
+
+Possible mechanisms:
+
+* share links
+* QR
+* verification sessions
+* scoped disclosure
+* expiry
+* purpose
+* consent
+* revocation
+* verification receipts
+
+Make it impossible to confuse this with an NINAuth Share Code.
+
+---
+
+## D. Reputation & Resolution
+
+Build reputation around actual interactions and evidence.
+
+Include:
+
+* transaction/interactions evidence where available
+* dispute/resolution outcomes
+* verified credentials
+* trustworthy behavior signals
+* appeal workflows
+* correction workflows
+* evidence freshness
+
+Do not manufacture reputation.
+
+---
+
+## E. Trust Decision API
+
+B2B companies should eventually be able to ask:
+
+```text
+Can I trust this identity for THIS purpose?
+```
+
+rather than merely:
+
+```text
+Is this person verified?
+```
+
+Make the API contextual.
+
+---
+
+# 6. AUTHENTICATION ARCHITECTURE
+
+TrustScore MUST support all of the following:
+
+### Login
+
+Users can log in using:
+
+* username
+* email address
+* phone number
+* Google OAuth
+
+The login interface should provide one unified identifier field:
+
+**“Username, email or phone number”**
+
+plus:
+
+**“Continue with Google”**
+
+---
+
+# 7. UNIFIED USER ACCOUNT MODEL
+
+Do NOT create separate user accounts for:
+
+* username
+* email
+* phone
+* Google
+
+They should all map to one underlying `UserAccount`.
+
+Conceptually:
+
+```text
+UserAccount
+ ├── Username
+ ├── Email
+ ├── Phone
+ ├── Google account
+ └── NINAuth identity
+```
+
+Maintain this conceptual hierarchy:
+
+```text
+Authentication
+        ↓
+TrustScore UserAccount
+        ↓
+NINAuth Verification
+        ↓
+Trust Identity
+        ↓
+Evidence
+        ↓
+Reputation / Trust Signals
+        ↓
+Contextual Trust Decision
+```
+
+---
+
+# 8. REGISTRATION
+
+Support:
+
+```text
+Username + Password
+OR
+Email + Password
+OR
+Phone + OTP
+OR
+Continue with Google
+```
+
+All routes should converge into a unified onboarding state machine.
+
+Do not create four separate onboarding architectures.
+
+---
+
+# 9. GOOGLE AUTHENTICATION
+
+Implement Google OAuth/OIDC properly.
+
+### Signup
+
+A new user can select:
+
+**Continue with Google**
+
+After authentication:
+
+* create/link UserAccount
+* establish application session
+* guide user through TrustScore onboarding
+* guide user toward NINAuth verification where required
+
+### Login
+
+Existing Google users can use Google login.
+
+### Account linking
+
+Handle:
+
+* existing email + Google
+* existing phone + Google
+* existing username + Google
+* Google identity already linked to another TrustScore account
+* duplicate-account situations
+
+Never silently merge accounts where ownership cannot be proven.
+
+Google authentication must NEVER automatically mean:
+
+* NIN verified
+* government verified
+* trustworthy
+* high TrustScore
+
+---
+
+# 10. USERNAME SYSTEM
+
+Users should have unique usernames.
+
+Requirements:
+
+* normalized
+* case-insensitive uniqueness
+* reserved-name protection
+* profanity/abuse protection where appropriate
+* secure username-change workflow
+* audit trail
+* safe public handle
+
+Public URLs may use usernames/handles where appropriate, but never raw NIN or sensitive identifiers.
+
+---
+
+# 11. EMAIL AUTHENTICATION
+
+Email login must support:
+
+* verified email
+* password login where applicable
+* verification email
+* password reset
+* account recovery
+* notification preferences
+
+Normalize emails consistently.
+
+Avoid account enumeration.
+
+---
+
+# 12. PHONE AUTHENTICATION
+
+Phone authentication should support:
+
+* international normalization
+* OTP
+* expiry
+* retry limits
+* brute-force protection
+* rate limiting
+* suspicious login detection
+* recycled-number considerations
+* SIM-swap risk hooks
+
+Do NOT treat phone possession as equivalent to NIN identity.
+
+Never expose phone numbers in:
+
+* URLs
+* analytics
+* logs
+* public profiles
+* share links
+
+unless explicitly and safely required.
+
+---
+
+# 13. NINAUTH IDENTITY MODEL
+
+Keep:
+
+```text
+UserAccount
+TrustIdentity
+NINAuth identity
+IdentityIdentifier
+Evidence
+Consent
+VerificationSession
+```
+
+as distinct concepts.
+
+Raw NIN must NOT become:
+
+* username
+* public identifier
+* URL identifier
+* QR payload
+* analytics identifier
+* log identifier
+
+Use provider references and privacy-preserving identifiers wherever possible.
+
+---
+
+# 14. PRIVACY & DATA MINIMIZATION
+
+Architect the system around:
+
+* consent
+* purpose limitation
+* data minimization
+* retention
+* deletion
+* correction
+* access
+* auditability
+* revocation
+* secure storage
+
+Do not claim formal NDPA compliance without appropriate legal assessment.
+
+The architecture should nevertheless be privacy-first by design.
+
+For deterministic sensitive identifier lookup, use a properly keyed cryptographic mechanism such as HMAC rather than casually storing unsalted hashes.
+
+---
+
+# 15. TRUST ENGINE
+
+Trust scoring must be:
+
+* explainable
+* contextual
+* versioned
+* auditable
+* evidence-based
+* freshness-aware
+* configurable
+* resistant to gaming
+
+Initially prefer rules-based scoring.
+
+Do NOT rush into machine learning.
+
+Do not mix incompatible score models.
+
+The repository's current score model should be audited and made internally consistent.
+
+---
+
+# 16. SCORE STATES
+
+Support meaningful states such as:
+
+* insufficient evidence
+* new
+* verified
+* established
+* caution
+* high risk
+* review required
+
+Avoid pretending the platform knows something it does not know.
+
+An UNKNOWN state can be more trustworthy than a fabricated confidence score.
+
+---
+
+# 17. ANTI-ABUSE ARCHITECTURE
+
+Explicitly defend against:
+
+* fake accounts
+* synthetic identity
+* stolen identity
+* account takeover
+* score farming
+* collusion
+* reputation manipulation
+* malicious reports
+* false accusations
+* phone recycling
+* SIM swap
+* credential theft
+* QR abuse
+* share-token replay
+* enumeration
+* insider abuse
+* automated probing
+* denial of service
+* notification abuse
+
+Build appeal and human-review pathways.
+
+---
+
+# 18. LOGO & BRAND SYSTEM — DEEP RESEARCH + STRATEGIC DESIGN
+
+This is a major requirement.
+
+Do NOT simply keep the current logo because it already exists.
+
+Do NOT randomly generate an icon.
+
+Before implementing the final brand:
+
+### Research
+
+Study:
+
+* TrustScore's actual product positioning
+* trust/identity/security product branding
+* fintech/infrastructure SaaS branding
+* identity platforms
+* developer infrastructure companies
+* modern African technology brands
+* relevant competitors
+* visual trends
+* accessibility
+* small-screen recognition
+* favicon/app-icon behavior
+* B2B credibility
+* consumer trust signals
+
+Research should inform the design rather than dictate it.
+
+---
+
+# 19. STRATEGIC LOGO DESIGN PROCESS
+
+Develop several conceptual directions first.
+
+Evaluate each concept against:
+
+* trust
+* identity
+* verification
+* confidence
+* protection
+* connection
+* clarity
+* technology
+* scalability
+* African relevance without becoming stereotypical
+* international usability
+* B2B credibility
+* consumer friendliness
+* memorability
+* small-size recognition
+* monochrome reproduction
+* motion potential
+* accessibility
+* trademark distinctiveness
+
+Do not directly copy:
+
+* Termii
+* Stripe
+* Google
+* Mastercard
+* Apple
+* other identity/security brands
+
+Use them only as research references.
+
+The logo should be original.
+
+Do not permanently tie the logo to “NIN” because the long-term product can expand beyond NIN.
+
+The brand must be capable of becoming an African/global trust infrastructure product.
+
+---
+
+# 20. PROFESSIONAL LOGO SYSTEM
+
+Create a complete identity system:
+
+### Primary wordmark
+
+TrustScore
+
+### Symbol / mark
+
+An independent recognizable mark.
+
+### Horizontal lockup
+
+For:
+
+* navbar
+* dashboards
+* marketing pages
+
+### Compact lockup
+
+For:
+
+* mobile
+* tight headers
+
+### Icon
+
+For:
+
+* favicon
+* browser tab
+* app icon
+* QR-related UI
+* avatars where appropriate
+
+### Monochrome versions
+
+* light
+* dark
+* one-color
+* reverse
+
+### Motion version
+
+A restrained animated logo treatment for selected UI states.
+
+Do not animate it everywhere.
+
+---
+
+# 21. LOGO USAGE SYSTEM
+
+Create formal rules for:
+
+* clear space
+* minimum size
+* placement
+* background handling
+* light/dark surfaces
+* icon-to-wordmark ratio
+* responsive behavior
+* favicon
+* app icon
+* social preview
+* email header
+* transactional email footer
+* PDF/receipt
+* verification receipt
+* public Trust Link
+* authentication pages
+* loading states
+* system error pages
+
+The logo must be professionally affixed everywhere it belongs.
+
+Do not:
+
+* stretch it
+* distort it
+* randomly resize it
+* place it against unreadable backgrounds
+* duplicate it unnecessarily
+* use inconsistent versions across pages
+
+Create a single canonical logo asset system, preferably SVG-first.
+
+---
+
+# 22. DESIGN SYSTEM
+
+Create a centralized TrustScore design system.
+
+Define:
+
+* typography
+* display typography
+* body typography
+* spacing
+* grid
+* radius
+* shadows
+* borders
+* iconography
+* buttons
+* inputs
+* cards
+* tables
+* dialogs
+* badges
+* status indicators
+* charts
+* QR components
+* trust indicators
+* motion
+* skeletons
+* loading states
+* empty states
+* error states
+
+Avoid scattered one-off CSS.
+
+---
+
+# 23. TERMII-INSPIRED UI/UX DIRECTION
+
+Use Termii as **product-design inspiration**, NOT a visual clone.
+
+Study Termii's current experience around:
+
+* outcome-first product presentation
+* signal-centric language
+* developer simplicity
+* communication reliability
+* routing/fallback
+* operational visibility
+* elegant technical SaaS UI
+* clear hierarchy
+* focused CTAs
+* purposeful motion
+* modern typography
+* confidence-building states
+
+Do NOT copy:
+
+* exact layouts
+* exact colors
+* logos
+* copy
+* illustrations
+* proprietary assets
+* distinctive page structures
+
+TrustScore must develop its own visual identity.
+
+---
+
+# 24. UX PRINCIPLES
+
+The platform should feel:
+
+**Trustworthy**
+
+**Clear**
+
+**Modern**
+
+**Intelligent**
+
+**Secure**
+
+**Human**
+
+**Fast**
+
+**Infrastructure-grade**
+
+Avoid:
+
+* generic dashboard templates
+* excessive gradients
+* visual noise
+* unnecessary glassmorphism
+* oversized decorative elements
+* excessive animations
+* fake statistics
+* meaningless badges
+* confusing trust terminology
+
+Motion should communicate:
+
+* progress
+* verification
+* confidence
+* transition
+* feedback
+* state change
+
+Respect reduced-motion preferences.
+
+---
+
+# 25. EMAIL INFRASTRUCTURE — MULTI-PROVIDER
+
+This is a core infrastructure requirement.
+
+TrustScore must have a unified notification/email abstraction.
+
+The application must NOT call Resend or Google Apps Script directly from random feature code.
+
+Instead build:
+
+```text
+Notification Service
+        ↓
+Email Router
+        ↓
+Provider Selection
+ ┌───────────────┐
+ │ Resend        │
+ │ Google Script │
+ └───────────────┘
+        ↓
+Delivery
+        ↓
+Status / Audit / Retry
+```
+
+---
+
+# 26. EMAIL PROVIDER 1 — RESEND
+
+Integrate:
+
+**Resend**
+
+Use it as a major transactional email provider.
+
+Current Resend documentation lists the free plan at:
+
+* 3,000 emails/month
+* 100 emails/day
+
+and supports webhooks for email events.
+
+Do NOT hard-code these numbers as eternal truth.
+
+Store configurable provider limits in the application/admin configuration.
+
+---
+
+# 27. EMAIL PROVIDER 2 — GOOGLE APPS SCRIPT
+
+Integrate:
+
+**Google Apps Script**
+
+The intended sender account is:
+
+`support@okomba.com`
+
+This is NOT assumed to be a Google Workspace mailbox.
+
+Treat the Google account as a constrained provider.
+
+Google's current Apps Script documentation lists consumer-account email-recipient quota at approximately:
+
+**100 recipients/day**
+
+while Workspace limits are higher; quotas can change and reset based on the quota rules rather than necessarily resetting at midnight.
+
+Therefore:
+
+DO NOT hard-code:
+
+```text
+100 forever
+```
+
+Instead:
+
+```text
+provider configured limit
+provider observed usage
+safety threshold
+critical reserve
+remaining capacity
+```
+
+The system should discover, monitor and adapt.
+
+---
+
+# 28. EMAIL FAILOVER STRATEGY
+
+Design true provider failover.
+
+Example:
+
+```text
+Email Event
+      ↓
+Notification Router
+      ↓
+Check provider health + quota
+      ↓
+Resend available?
+  ├── YES → Resend
+  └── NO
+       ↓
+Google Apps Script available?
+  ├── YES → Apps Script
+  └── NO
+       ↓
+Queue / Retry / Admin Alert
+```
+
+Do not blindly send through both providers simultaneously.
+
+Otherwise users may receive duplicate emails.
+
+Implement:
+
+* idempotency key
+* notification ID
+* delivery attempt ID
+* provider message ID
+* status
+* attempt count
+* timestamp
+* failure reason
+* provider selected
+* fallback reason
+
+---
+
+# 29. QUOTA-AWARE ROUTING
+
+This is extremely important.
+
+The system must know when each provider is:
+
+```text
+HEALTHY
+DEGRADED
+NEAR_QUOTA
+QUOTA_EXHAUSTED
+RATE_LIMITED
+AUTH_FAILURE
+CONFIGURATION_ERROR
+UNAVAILABLE
+```
+
+Use safety thresholds.
+
+Example configurable policy:
+
+```text
+0–79%     NORMAL
+80–89%    CONSERVE
+90–99%    CRITICAL RESERVE MODE
+100%      STOP USING PROVIDER
+```
+
+These thresholds are examples and must be configurable.
+
+---
+
+# 30. NEVER WASTE CRITICAL QUOTA
+
+Reserve capacity for critical messages.
+
+Priority classes:
+
+### P0 — Critical
+
+* login OTP
+* password reset
+* account security alert
+* identity verification events
+* account takeover alerts
+* critical compliance/security notifications
+
+### P1 — Important
+
+* Trust Passport changes
+* safety-check results
+* verification completion
+* important account notifications
+
+### P2 — Normal
+
+* product updates
+* ordinary account events
+
+### P3 — Optional
+
+* marketing/product announcements
+* non-essential notifications
+
+When approaching provider limits:
+
+```text
+P0 > P1 > P2 > P3
+```
+
+Never allow low-value notifications to consume the last available capacity for authentication/security messages.
+
+---
+
+# 31. EMAIL OUTBOX ARCHITECTURE
+
+Use an outbox/job model.
+
+For example:
+
+```text
+NotificationEvent
+EmailJob
+EmailDeliveryAttempt
+EmailProviderUsage
+EmailTemplate
+NotificationPreference
+```
+
+A user action should not depend on a provider responding synchronously whenever that can be avoided.
+
+Use reliable queue/worker processing compatible with the current architecture.
+
+Do not introduce unnecessary infrastructure merely for fashion.
+
+---
+
+# 32. EMAIL TEMPLATING SYSTEM
+
+Create professional reusable transactional email templates.
+
+At minimum:
+
+* welcome
+* email verification
+* password reset
+* login alert
+* Google login/account linking
+* phone verification
+* NINAuth verification started
+* NINAuth verification completed
+* NINAuth verification failed
+* Trust Passport updated
+* Trust Link created
+* Trust Link viewed where appropriate
+* Safety Check result
+* reputation update
+* dispute/resolution update
+* account security alert
+* privacy/data request update
+* support ticket notifications
+* admin/security alerts
+
+Templates should share the TrustScore design system and logo.
+
+Include:
+
+* brand header
+* clean typography
+* responsive layout
+* CTA
+* status indicator
+* footer
+* privacy/contact information
+* unsubscribe/preferences where applicable
+
+Do not make every email a marketing newsletter.
+
+---
+
+# 33. EMAIL WEBHOOKS
+
+Integrate delivery events where providers support them.
+
+Track:
+
+* queued
+* sent
+* delivered
+* bounced
+* rejected
+* failed
+* complained
+* clicked/opened where supported and appropriate
+
+Resend provides webhook-based email events.
+
+Design a common event abstraction so provider-specific event names do not leak throughout the application.
+
+---
+
+# 34. GOOGLE APPS SCRIPT DESIGN
+
+Create a small, secure Google Apps Script HTTP endpoint.
+
+The platform should communicate with it via authenticated HTTPS POST.
+
+Example:
+
+```text
+TrustScore
+   ↓
+Email Router
+   ↓
+Google Script Adapter
+   ↓
+HTTPS POST
+   ↓
+Apps Script
+   ↓
+MailApp/Gmail service
+   ↓
+support@okomba.com
+```
+
+Secure the endpoint.
+
+Do NOT expose it as a completely unauthenticated mail relay.
+
+Implement:
+
+* shared secret/HMAC validation
+* timestamp validation
+* replay protection
+* request ID
+* idempotency
+* sender validation
+* payload validation
+* logging
+* rate limiting
+
+Apps Script `doPost(e)` supports web-app HTTP POST requests and can be used as the controlled bridge.
+
+---
+
+# 35. GOOGLE SCRIPT FAILURE CONDITIONS
+
+Handle:
+
+* Apps Script quota exceeded
+* Gmail quota exceeded
+* script disabled
+* authorization expired
+* endpoint unavailable
+* malformed payload
+* timeout
+* duplicate delivery
+* temporary Google error
+* sender issue
+
+When Apps Script is unavailable, automatically fail over according to policy.
+
+---
+
+# 36. SMS INFRASTRUCTURE
+
+Create a unified SMS provider abstraction just as with email.
+
+Architecture:
+
+```text
+Notification Service
+       ↓
+SMS Router
+       ↓
+Provider selection
+ ┌─────────────────┐
+ │ Termii          │
+ │ Twilio          │
+ │ Future provider │
+ └─────────────────┘
+```
+
+Do not hard-wire SMS logic directly into login/OTP features.
+
+---
+
+# 37. SMS PROVIDER STRATEGY
+
+### Primary SMS provider
+
+Use:
+
+**Termii**
+
+Termii currently provides messaging, token/verification functionality, reports/events and webhooks through its API.
+
+### Secondary SMS provider
+
+Implement:
+
+**Twilio**
+
+Twilio provides Programmable Messaging and delivery-status webhooks/callbacks.
+
+Keep the provider interface extensible for additional providers such as Africa's Talking where market/country coverage or pricing makes it appropriate.
+
+Do not assume every provider supports every country, sender type or message class.
+
+Routing must account for:
+
+* country
+* destination
+* carrier
+* sender availability
+* provider health
+* cost
+* message type
+* provider restrictions
+* verification/OTP capability
+* delivery quality
+
+---
+
+# 38. SMS ROUTING
+
+Example:
+
+```text
+SMS Event
+     ↓
+Country + message type
+     ↓
+Provider health
+     ↓
+Termii
+     ↓
+If unavailable/degraded
+     ↓
+Twilio
+     ↓
+If unavailable
+     ↓
+Future configured provider
+     ↓
+Queue / alert
+```
+
+Do not retry blindly if a provider may have accepted the message.
+
+Track provider message IDs.
+
+Use idempotency wherever possible.
+
+---
+
+# 39. OTP ARCHITECTURE
+
+Unify OTP behavior across:
+
+* phone verification
+* login
+* password recovery where applicable
+* sensitive actions
+
+Implement:
+
+* secure random OTP
+* expiration
+* attempt limit
+* resend cooldown
+* IP/user/device rate limiting
+* phone rate limiting
+* abuse detection
+* generic responses
+* audit trail
+* provider delivery status
+
+Do not store OTPs in plaintext.
+
+---
+
+# 40. NOTIFICATION CENTER
+
+Users should eventually have an in-app notification center.
+
+Support:
+
+* unread/read
+* priority
+* notification type
+* timestamp
+* deep link
+* email delivered
+* SMS delivered
+* push-ready architecture for later
+
+Allow users to configure preferences where appropriate.
+
+Never allow a user to disable mandatory security communications.
+
+---
+
+# 41. NOTIFICATION OBSERVABILITY
+
+Create operational visibility.
+
+Admin/operator views should show:
+
+```text
+Emails sent
+Emails delivered
+Emails failed
+Emails bounced
+SMS sent
+SMS delivered
+SMS failed
+Provider health
+Provider quota
+Provider usage
+Fallback events
+Average delivery latency
+Failure reasons
+Critical notification backlog
+```
+
+Design this with the same clean, technical, signal-oriented philosophy inspired by Termii.
+
+---
+
+# 42. PROVIDER QUOTA DASHBOARD
+
+Create an internal provider health/quota view showing:
+
+```text
+Provider
+Channel
+Daily limit
+Monthly limit
+Used
+Remaining
+Percentage used
+Estimated remaining capacity
+Status
+Last error
+Last successful delivery
+Fallback count
+```
+
+Do not expose provider secrets.
+
+Allow authorized administrators to configure:
+
+* enabled/disabled
+* priority
+* quotas
+* safety thresholds
+* countries
+* message classes
+* cost weighting
+* maintenance mode
+
+---
+
+# 43. PROVIDER ROUTING ENGINE
+
+Build one reusable provider-routing abstraction.
+
+Conceptually:
+
+```text
+ProviderRouter
+ ├── capability()
+ ├── health()
+ ├── quota()
+ ├── cost()
+ ├── send()
+ ├── verify()
+ ├── normalizeResponse()
+ └── normalizeWebhook()
+```
+
+This architecture should eventually support:
+
+```text
+EMAIL
+SMS
+WHATSAPP
+VOICE
+PUSH
+```
+
+without forcing all channels into an identical implementation.
+
+---
+
+# 44. NOTIFICATION FAILOVER MUST NOT CAUSE DUPLICATES
+
+This deserves explicit testing.
+
+Scenario:
+
+```text
+Resend accepts request
+↓
+network response is lost
+↓
+application thinks it failed
+↓
+fallback provider is called
+```
+
+Potential result:
+
+**two emails sent.**
+
+Prevent this using:
+
+* idempotency
+* delivery state
+* provider message IDs
+* reconciliation
+* cautious retry behavior
+* webhook updates
+
+Do not solve reliability by simply “try the next provider”.
+
+---
+
+# 45. CURRENT PLATFORM ARCHITECTURE
+
+Do not automatically migrate everything because another technology appears fashionable.
+
+Current stack should be audited and preserved where appropriate.
+
+Use the existing:
+
+* Next.js
+* TypeScript
+* Prisma
+* current database approach
+* existing provider abstraction
+* existing worker/services
+
+unless the audit proves a migration is genuinely justified.
+
+Do not rewrite the platform into:
+
+* FastAPI
+* NestJS
+* Postgres
+* Redis
+* Kafka
+* Kubernetes
+
+merely because they sound enterprise-grade.
+
+Every infrastructure addition must have a concrete requirement.
+
+---
+
+# 46. MOBILE
+
+The product vision should account for web and mobile.
+
+Do not force a mobile rewrite into an early batch if it would compromise the current platform.
+
+First stabilize:
+
+* identity
+* authentication
+* Trust Passport
+* Safety Check
+* notification infrastructure
+* API contracts
+
+Then build a mobile client against the stable API.
+
+The mobile application should share product semantics and design tokens with web.
+
+---
+
+# 47. TRUST NETWORK
+
+Longer-term architecture may support:
+
+* verified interactions
+* business identities
+* credential relationships
+* trusted references
+* verified institutions
+* fraud networks
+* reputation graphs
+
+Do not expose raw relationship graphs publicly.
+
+Design carefully against collusion and privacy abuse.
+
+---
+
+# 48. WHAT NOT TO BUILD IN V1
+
+Do NOT prematurely build:
+
+* bank-account data aggregation
+* fake credit reports
+* unsupported official credit bureau data
+* public blacklists
+* uncontrolled public allegations
+* escrow
+* fake AI fraud scoring
+* fake NIN production integration
+* fabricated government partnerships
+
+The architecture can reserve space for future providers.
+
+---
+
+# 49. BATCH IMPLEMENTATION ROADMAP
+
+## BATCH 0 — COMPLETE AUDIT + RESEARCH
+
+Deliver:
+
+* full repository audit
+* architecture map
+* database audit
+* security audit
+* privacy audit
+* authentication audit
+* notification audit
+* design audit
+* NINAuth research
+* Termii UX research
+* competitor/product research
+* missing-feature matrix
+* technical debt report
+* implementation roadmap
+
+Do not make large changes yet.
+
+---
+
+## BATCH 1 — IDENTITY + NINAUTH PRODUCTION ALIGNMENT
+
+Strengthen:
+
+* PKCE
+* state
+* nonce
+* authorization code lifecycle
+* token exchange
+* ID token validation
+* consent
+* scopes
+* provider adapter
+* production/live posture
+
+Keep mock/loopback/live architecture where useful.
+
+Never misrepresent mock behavior as production verification.
+
+---
+
+## BATCH 2 — AUTHENTICATION 2.0
+
+Implement and harden:
+
+* username signup/login
+* email signup/login
+* phone signup/login
+* Google signup/login
+* account linking
+* password management
+* OTP
+* recovery
+* sessions
+* revocation
+* rate limiting
+* anti-enumeration
+
+Test all combinations.
+
+---
+
+## BATCH 3 — USER IDENTITY & PROFILE
+
+Improve:
+
+* TrustIdentity
+* identity identifiers
+* identity attributes
+* consent
+* evidence
+* verification sessions
+* account profile
+* security settings
+* notification preferences
+
+---
+
+## BATCH 4 — LOGO + BRAND + DESIGN SYSTEM
+
+Deeply research and create the final:
+
+* logo
+* wordmark
+* symbol
+* icon
+* favicon
+* app icon
+* light/dark variants
+* monochrome variants
+* motion version
+* usage rules
+* design tokens
+
+Affix the final brand professionally throughout the product.
+
+---
+
+## BATCH 5 — TRUST PASSPORT 2.0
+
+Build the flagship Trust Passport experience.
+
+It should feel premium, trustworthy and immediately understandable.
+
+---
+
+## BATCH 6 — SAFETY CHECK 2.0
+
+Build contextual trust verification.
+
+Use careful language.
+
+Avoid making unsupported accusations.
+
+---
+
+## BATCH 7 — REPUTATION + RESOLUTION
+
+Implement:
+
+* reputation
+* interactions
+* reports
+* disputes
+* resolution
+* appeals
+* evidence
+* freshness
+
+---
+
+## BATCH 8 — TRUST ENGINE 2.0
+
+Implement:
+
+* score policy
+* explainability
+* evidence weighting
+* freshness
+* contextual scoring
+* versioning
+* auditability
+* review states
+
+---
+
+## BATCH 9 — NOTIFICATION INFRASTRUCTURE 2.0
+
+Implement:
+
+* notification service
+* email router
+* Resend adapter
+* Google Apps Script adapter
+* SMS router
+* Termii adapter
+* Twilio adapter
+* queues/outbox
+* delivery status
+* webhooks
+* provider health
+* quota tracking
+* failover
+* admin dashboard
+* email templates
+* SMS templates
+* notification preferences
+
+This should become shared infrastructure for the whole product.
+
+---
+
+## BATCH 10 — B2B TRUST DECISION API
+
+Build:
+
+* developer portal
+* API keys
+* scoped access
+* RBAC
+* rate limits
+* usage tracking
+* webhooks
+* documentation
+* decision explainability
+
+---
+
+## BATCH 11 — TRUST NETWORK
+
+Implement carefully:
+
+* relationships
+* verified organizations
+* trusted credentials
+* evidence relationships
+* anti-collusion mechanisms
+
+---
+
+## BATCH 12 — SECURITY HARDENING
+
+Conduct deep:
+
+* threat modelling
+* penetration-style review
+* authentication review
+* authorization review
+* API abuse testing
+* secret review
+* session review
+* webhook verification review
+* provider credential review
+* privacy review
+* data retention review
+
+---
+
+## BATCH 13 — PRODUCTION INFRASTRUCTURE
+
+Harden:
+
+* deployment
+* environment separation
+* migrations
+* backups
+* observability
+* error monitoring
+* health checks
+* worker reliability
+* provider health monitoring
+* incident alerts
+* rate limiting
+* disaster recovery
+
+---
+
+## BATCH 14 — DESIGN ELEVATION
+
+Perform a full product-wide design pass.
+
+Audit:
+
+* landing page
+* auth
+* onboarding
+* dashboard
+* Trust Passport
+* Safety Check
+* reputation
+* settings
+* support
+* admin
+* developer portal
+* public Trust Links
+* email templates
+* SMS messaging
+* error pages
+* loading states
+* empty states
+* mobile responsiveness
+
+Use Termii-inspired principles:
+
+```text
+clarity
+signal
+confidence
+speed
+operational visibility
+simple developer experiences
+purposeful motion
+```
+
+But maintain a unique TrustScore visual identity.
+
+---
+
+## BATCH 15 — COMPLETE END-TO-END RE-AUDIT
+
+Pretend the product is being reviewed by:
+
+* a senior CTO
+* security auditor
+* privacy reviewer
+* product manager
+* enterprise customer
+* consumer
+* developer
+* designer
+* QA lead
+* SRE engineer
+
+Find everything that remains weak.
+
+Fix it.
+
+---
+
+## BATCH 16 — PILOT READINESS
+
+Prepare the platform for controlled real-world testing.
+
+Verify:
+
+* onboarding
+* Google login
+* username login
+* email login
+* phone login
+* NINAuth workflow
+* Trust Passport
+* Safety Check
+* Trust Links
+* notifications
+* email failover
+* SMS failover
+* provider quotas
+* security
+* privacy
+* support
+* observability
+* analytics
+* rollback
+
+---
+
+# 50. TESTING REQUIREMENTS
+
+Maintain strong automated coverage.
+
+At minimum test:
+
+### Authentication
+
+* username signup
+* username login
+* email signup
+* email login
+* phone signup
+* phone login
+* Google signup
+* Google login
+* Google linking
+* duplicate accounts
+* recovery
+* OTP
+* session expiration
+* session revocation
+* logout
+
+### Identity
+
+* NINAuth mock
+* NINAuth loopback
+* NINAuth live posture
+* consent
+* scopes
+* state
+* PKCE
+* nonce
+* token validation
+* expiration
+* replay prevention
+
+### Notifications
+
+* Resend success
+* Resend failure
+* Resend near quota
+* Resend quota exhausted
+* Google Script success
+* Google Script failure
+* Google quota exhausted
+* Termii SMS success
+* Termii failure
+* Twilio success
+* Twilio failure
+* provider failover
+* ambiguous delivery response
+* duplicate prevention
+* webhook updates
+* retries
+* dead-letter handling
+
+### UI
+
+* desktop
+* tablet
+* mobile
+* reduced motion
+* dark/light surfaces
+* keyboard navigation
+* accessibility
+* loading
+* error
+* empty
+* success states
+
+---
+
+# 51. SECURITY GATES
+
+Before declaring the system ready:
+
+Check for:
+
+* authentication bypass
+* authorization bypass
+* account enumeration
+* IDOR
+* CSRF
+* XSS
+* SSRF
+* SQL injection
+* command injection
+* insecure deserialization
+* secret leakage
+* webhook spoofing
+* replay attacks
+* OTP brute force
+* rate-limit bypass
+* session fixation
+* session theft
+* provider credential exposure
+* notification abuse
+* QR/share-token replay
+* privacy leakage
+* excessive logging
+* sensitive-data exposure
+
+---
+
+# 52. DOCUMENTATION
+
+Every major batch must update:
+
+* architecture docs
+* API docs
+* environment documentation
+* provider configuration
+* migration instructions
+* security notes
+* operational runbooks
+* notification routing rules
+* branding/design documentation
+* test documentation
+* deployment instructions
+
+Documentation must reflect actual implementation.
+
+---
+
+# 53. GIT DISCIPLINE
+
+After every successful batch:
+
+```text
+git status
+git diff
+run tests
+audit
+commit
+push
+```
+
+Use meaningful commit messages.
+
+Do not commit secrets.
+
+Do not push broken intermediate states.
+
+---
+
+# 54. IMPLEMENTATION QUALITY STANDARD
+
+Do not optimize for:
+
+**“It works.”**
+
+Optimize for:
+
+**“It is correct, secure, explainable, maintainable, resilient, tested, observable and professionally designed.”**
+
+Every implementation decision must answer:
+
+1. Why is this required?
+2. What problem does it solve?
+3. What existing workflow could it affect?
+4. What are the failure modes?
+5. What happens when the provider is unavailable?
+6. What happens at quota exhaustion?
+7. What happens under attack?
+8. What happens when evidence is insufficient?
+9. How is the behavior tested?
+10. How will this scale later?
+
+---
+
+# 55. FINAL PRODUCT STANDARD
+
+The finished TrustScore platform should feel like:
+
+```text
+Identity infrastructure
+        +
+Trust infrastructure
+        +
+Developer infrastructure
+        +
+Consumer safety product
+        +
+Modern premium SaaS
+```
+
+It must not feel like:
+
+```text
+generic KYC checker
+generic dashboard
+generic fintech clone
+government database viewer
+social reputation gimmick
+```
+
+The user should immediately understand:
+
+> **TrustScore helps people and businesses establish identity-backed trust before they interact.**
+
+The product should communicate trust through the quality of its:
+
+* identity architecture
+* evidence model
+* consent model
+* security
+* explanations
+* UX
+* notifications
+* branding
+* reliability
+* developer experience
+
+---
+
+# 56. ABSOLUTE RULE
+
+Do not stop after making the requested changes.
+
+After implementation, ask yourself:
+
+**“What else would prevent this product from becoming a genuinely strong, trustworthy, production-grade trust infrastructure platform?”**
+
+Research it.
+
+Audit it.
+
+Design it.
+
+Implement what is justified.
+
+Test it.
+
+Fix it.
+
+Re-audit it.
+
+Then continue to the next batch.
+
+Never confuse:
+
+**completed code**
+
+with
+
+**completed product**.
+
+The objective is the latter.

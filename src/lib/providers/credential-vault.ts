@@ -17,10 +17,15 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "crypto";
 import { db } from "@/lib/db";
 import type { ProviderKey } from "@/lib/providers/transport";
+import { guardedSecret, secretIsDefault } from "@/lib/platform/boot-guard";
 
-const MASTER_KEY_INPUT = process.env.VAULT_MASTER_KEY ?? "ts_dev_only_vault_master_key";
+// sec-batch-A: guarded read — production REFUSES to boot on the dev default
+// (boot-guard.ts); the vaultUsesDefaultKey flag below now feeds the admin
+// security-posture endpoint instead of being an honesty signal wired to
+// nothing.
+const MASTER_KEY_INPUT = guardedSecret("VAULT_MASTER_KEY");
 
-export const vaultUsesDefaultKey = !process.env.VAULT_MASTER_KEY;
+export const vaultUsesDefaultKey = secretIsDefault("VAULT_MASTER_KEY");
 
 function masterKey(): Buffer {
   // Any input → 32-byte AES key via SHA-256 (env value may be hex or a phrase).
