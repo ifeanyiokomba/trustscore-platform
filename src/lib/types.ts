@@ -56,6 +56,13 @@ export interface ConsentField {
   label: string;
   description: string;
   core?: boolean;
+  /**
+   * Batch 3 — documented official NINAuth pii-fields paths this capability
+   * maps to (see scope-mapping.config.ts). Rendered on the consent screen so
+   * our capability-level bundling stays transparent against the official
+   * field-level catalog. Absent/empty for status-only capabilities.
+   */
+  fieldPaths?: string[];
 }
 
 export interface ConsentScreenInfo {
@@ -188,6 +195,12 @@ export interface VerificationTimelineEvent {
   id: string;
   eventType: string;
   createdAt: string;
+  /**
+   * Batch 3 — raw JSON detail column of the event row (e.g. `{"reason":"ttl"}`
+   * on SESSION_EXPIRED). Sent by /identity/me today; the timeline now parses
+   * it to show WHY a session failed instead of a bare label.
+   */
+  detail?: string | null;
 }
 
 // ---------------------------------------------------------------------------

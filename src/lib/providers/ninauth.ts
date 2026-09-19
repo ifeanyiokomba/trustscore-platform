@@ -61,7 +61,14 @@ export const IDENTITY_FRESHNESS_DAYS = 90; // re-verification horizon
 // user opts in per field.
 export const SCOPE_CATALOG: Record<
   string,
-  { label: string; description: string; core?: boolean; attributeKeys?: string[] }
+  {
+    label: string;
+    description: string;
+    core?: boolean;
+    attributeKeys?: string[];
+    /** Batch 3 — documented official pii-fields paths under this capability. */
+    piiFieldPaths?: string[];
+  }
 > = Object.fromEntries(
   CAPABILITIES.map((c) => [
     c.mockScope,
@@ -70,6 +77,7 @@ export const SCOPE_CATALOG: Record<
       description: c.description,
       ...(c.core ? { core: c.core } : {}),
       ...(c.attributeKeys.length ? { attributeKeys: [...c.attributeKeys] } : {}),
+      ...(c.piiFieldPaths.length ? { piiFieldPaths: [...c.piiFieldPaths] } : {}),
     },
   ])
 );
@@ -405,6 +413,13 @@ export interface ConsentField {
   label: string;
   description: string;
   core?: boolean;
+  /**
+   * Batch 3 — the documented official `dataRequested[]` pii-fields paths this
+   * capability maps to (scope-mapping.config.ts). Disclosed on the consent
+   * screen so the granularity we bundle is transparent against NINAuth's
+   * field-level catalog. Empty for status-only capabilities.
+   */
+  fieldPaths?: string[];
 }
 
 export interface ConsentScreen {
@@ -424,6 +439,9 @@ export function consentScreenFor(scopes: string[], purpose: string = PURPOSE): C
       label: SCOPE_CATALOG[s].label,
       description: SCOPE_CATALOG[s].description,
       core: SCOPE_CATALOG[s].core ?? false,
+      ...(SCOPE_CATALOG[s].piiFieldPaths?.length
+        ? { fieldPaths: [...SCOPE_CATALOG[s].piiFieldPaths!] }
+        : {}),
     }));
   return {
     requester: REQUESTER,

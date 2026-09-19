@@ -13,6 +13,7 @@ import {
   Check,
   Clock,
   FileCheck2,
+  RefreshCw,
 } from "lucide-react";
 import {
   Dialog,
@@ -76,6 +77,16 @@ export interface ConsentModalProps {
   consent: ConsentScreenInfo | null;
   busy: boolean;
   error: string | null;
+  /**
+   * Batch 3 — how recoverable the current error is. "restart": the session is
+   * terminal (expired / not pending / code replay / state mismatch) — the only
+   * way forward is a fresh session. "retry": the session is still usable
+   * (e.g. provider hiccup) — Approve/Deny simply stay enabled.
+   */
+  errorAction?: "retry" | "restart" | null;
+  /** Batch 3 — parent re-runs POST /identity/sessions and passes the fresh session. */
+  onRestart?: () => void;
+  restarting?: boolean;
   onDecision: (decision: "GRANT" | "DENY", grantedScopes?: string[]) => void;
   onDismiss: () => void;
 }
@@ -86,6 +97,9 @@ export function ConsentModal({
   consent,
   busy,
   error,
+  errorAction = null,
+  onRestart,
+  restarting = false,
   onDecision,
   onDismiss,
 }: ConsentModalProps) {
@@ -109,6 +123,10 @@ export function ConsentModal({
   }, [open, session]);
 
   const expired = msLeft <= 0;
+  // Batch 3 — a terminal error kills the session server-side (expired /
+  // already-granted / replayed code): pressing Approve again can only produce
+  // another error, so the decision buttons yield to the restart CTA.
+  const dead = !!error && errorAction === "restart";
 
   const coreFields = (consent?.fields ?? []).filter((f) => f.core);
   const optionalFields = (consent?.fields ?? []).filter((f) => !f.core);
@@ -177,6 +195,39 @@ export function ConsentModal({
               </span>
             </div>
 
+            {/* Batch 3 — expiry is a fork in the road, not a dead end: the only
+                way forward is a fresh session, so offer it right here instead
+                of making the user close the modal and find the button again. */}
+            {expired && (
+              <div
+                className="flex items-start gap-2.5 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2.5 text-xs text-amber-700 dark:text-amber-300"
+                role="alert"
+                data-testid="consent-expired-banner"
+              >
+                <RefreshCw className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium">This verification session expired.</p>
+                  <p>Sessions last 10 minutes for security. Start a new one to continue.</p>
+                </div>
+                {onRestart && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 shrink-0 border-amber-500/40 bg-transparent text-amber-700 hover:bg-amber-500/15 hover:text-amber-800 dark:text-amber-300 dark:hover:text-amber-200"
+                    onClick={onRestart}
+                    disabled={busy || restarting}
+                    data-testid="consent-restart-button"
+                  >
+                    {restarting ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                    ) : null}
+                    Start a new session
+                  </Button>
+                )}
+              </div>
+            )}
+
             {/* QR / share code panel */}
             <div className="grid grid-cols-[auto,1fr] items-center gap-4 rounded-xl border border-border bg-muted/30 p-4">
               <MockQr seed={session.id} />
@@ -218,6 +269,14 @@ export function ConsentModal({
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium">{f.label}</p>
                     <p className="text-xs text-muted-foreground">{f.description}</p>
+                    {f.fieldPaths && f.fieldPaths.length > 0 && (
+                      <p
+                        className="mt-1 truncate font-mono text-[10px] text-muted-foreground/70"
+                        title={f.fieldPaths.join(", ")}
+                      >
+                        NINAuth fields: {f.fieldPaths.join(", ")}
+                      </p>
+                    )}
                   </div>
                   <Badge
                     variant="outline"
@@ -255,6 +314,14 @@ export function ConsentModal({
                         <div className="min-w-0 flex-1">
                           <p className="text-sm font-medium">{f.label}</p>
                           <p className="text-xs text-muted-foreground">{f.description}</p>
+                          {f.fieldPaths && f.fieldPaths.length > 0 && (
+                            <p
+                              className="mt-1 truncate font-mono text-[10px] text-muted-foreground/70"
+                              title={f.fieldPaths.join(", ")}
+                            >
+                              NINAuth fields: {f.fieldPaths.join(", ")}
+                            </p>
+                          )}
                         </div>
                       </label>
                     );
@@ -281,19 +348,47 @@ export function ConsentModal({
             </div>
 
             {error && (
-              <p
-                className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive"
-                role="alert"
-              >
-                {error}
-              </p>
+              <div className="space-y-2">
+                <p
+                  className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive"
+                  role="alert"
+                >
+                  {error}
+                </p>
+                {errorAction === "restart" && onRestart && (
+                  <div
+                    className="flex items-start gap-2.5 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2.5 text-xs text-amber-700 dark:text-amber-300"
+                    role="alert"
+                    data-testid="consent-error-restart-banner"
+                  >
+                    <RefreshCw className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium">This attempt can&apos;t continue.</p>
+                      <p>The session is no longer usable — start a fresh one to try again.</p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 shrink-0 border-amber-500/40 bg-transparent text-amber-700 hover:bg-amber-500/15 hover:text-amber-800 dark:text-amber-300 dark:hover:text-amber-200"
+                      onClick={onRestart}
+                      disabled={busy || restarting}
+                    >
+                      {restarting ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                      ) : null}
+                      Start a new session
+                    </Button>
+                  </div>
+                )}
+              </div>
             )}
 
             {/* Actions */}
             <div className="flex flex-col gap-2 sm:flex-row-reverse">
               <Button
                 onClick={() => onDecision("GRANT", grantedScopes)}
-                disabled={busy || expired}
+                disabled={busy || expired || dead}
                 className="flex-1"
               >
                 {busy ? (
@@ -311,7 +406,7 @@ export function ConsentModal({
               <Button
                 variant="outline"
                 onClick={() => onDecision("DENY")}
-                disabled={busy || expired}
+                disabled={busy || expired || dead}
                 className="flex-1"
               >
                 <XCircle className="mr-2 h-4 w-4" />

@@ -1339,6 +1339,8 @@ export function AuthView() {
         session={ninSession}
         consent={ninConsent}
         initialEmail={googleInitialEmail}
+        onRestart={() => void startNinAuth()}
+        restarting={ninStarting}
         onDismiss={() => {
           setNinOpen(false);
           setNinSession(null);

@@ -58,6 +58,38 @@ const EVENT_META: Record<string, { label: string; icon: React.ElementType; tone:
   SESSION_EXPIRED: { label: "Session expired", icon: Hourglass, tone: "warn" },
 };
 
+// Batch 3 — friendly text for the failure reasons the timeline events carry
+// in their `detail` JSON (identity-service recordEvent calls). Unknown reasons
+// fall back to the raw code — honesty over silence.
+const EVENT_REASON_LABELS: Record<string, string> = {
+  ttl: "timed out",
+  state_mismatch: "security state check failed",
+  code_mismatch: "authorization code mismatch",
+  identity_taken: "identity already claimed by another account",
+  user_denied: "denied by you",
+};
+
+function eventReason(detail?: string | null): string | null {
+  if (!detail) return null;
+  try {
+    const parsed = JSON.parse(detail) as { reason?: unknown };
+    if (typeof parsed?.reason !== "string") return null;
+    return EVENT_REASON_LABELS[parsed.reason] ?? parsed.reason;
+  } catch {
+    return null;
+  }
+}
+
+// Batch 3 — only failure-shaped events carry a reason worth surfacing (the
+// positive events' detail is transport diagnostics like "one_time_60s" —
+// noise for the user, kept off the timeline).
+const REASON_EVENTS = new Set([
+  "SESSION_FAILED",
+  "SESSION_EXPIRED",
+  "CONSENT_DENIED",
+  "CONSENT_PROVIDER_UNAVAILABLE",
+]);
+
 function freshnessLabel(verifiedAt: string | null): string {
   if (!verifiedAt) return "";
   const diffMs = Date.now() - new Date(verifiedAt).getTime();
@@ -93,6 +125,7 @@ function Timeline({ events }: { events: VerificationTimelineEvent[] }) {
         const meta = EVENT_META[e.eventType] ?? { label: e.eventType, icon: CircleDot, tone: "info" as const };
         const Icon = meta.icon;
         const isLatest = i === events.length - 1;
+        const reason = REASON_EVENTS.has(e.eventType) ? eventReason(e.detail) : null;
         return (
           <li key={e.id} className="relative flex items-start gap-3 rounded-lg px-2 py-1.5 transition-colors hover:bg-accent/40">
             <span
@@ -107,7 +140,12 @@ function Timeline({ events }: { events: VerificationTimelineEvent[] }) {
               <Icon className="h-3 w-3" aria-hidden="true" />
             </span>
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-medium leading-snug">{meta.label}</p>
+              <p className="text-xs font-medium leading-snug">
+                {meta.label}
+                {reason && (
+                  <span className="font-normal text-muted-foreground"> · {reason}</span>
+                )}
+              </p>
               <time className="text-[10px] text-muted-foreground" dateTime={e.createdAt}>
                 {new Date(e.createdAt).toLocaleTimeString("en-NG", {
                   hour: "2-digit",
@@ -203,6 +241,10 @@ export function IdentityCard({
   const [session, setSession] = React.useState<VerificationSessionInfo | null>(null);
   const [consent, setConsent] = React.useState<ConsentScreenInfo | null>(null);
   const [flowError, setFlowError] = React.useState<string | null>(null);
+  // Batch 3 — "restart" means the session is terminal (expired / replayed /
+  // state mismatch): the consent modal swaps its decision buttons for a
+  // fresh-session affordance. "retry" keeps Approve/Deny live (provider hiccup).
+  const [flowErrorAction, setFlowErrorAction] = React.useState<"retry" | "restart" | null>(null);
   const [withdrawingId, setWithdrawingId] = React.useState<string | null>(null);
   const [confirmWithdraw, setConfirmWithdraw] = React.useState<ConsentRecord | null>(null);
   // Batch 2 (G7) — duplicate-identity conflict: the claimed government
@@ -216,6 +258,7 @@ export function IdentityCard({
   async function startVerification() {
     setStarting(true);
     setFlowError(null);
+    setFlowErrorAction(null);
     setIdentityTaken(false);
     try {
       const res = await fetch("/api/v1/identity/sessions", {
@@ -233,6 +276,7 @@ export function IdentityCard({
       const body = await res.json();
       if (!res.ok) {
         setFlowError(body?.error?.message ?? "Could not start verification.");
+        setFlowErrorAction("retry");
         return;
       }
       setSession(body.session);
@@ -249,6 +293,7 @@ export function IdentityCard({
     if (!session) return;
     setBusy(true);
     setFlowError(null);
+    setFlowErrorAction(null);
     try {
       const consentRes = await fetch(
         `/api/v1/identity/sessions/${session.id}/consent`,
@@ -261,6 +306,13 @@ export function IdentityCard({
       const consentBody = await consentRes.json();
       if (!consentRes.ok) {
         setFlowError(consentBody?.error?.message ?? "Consent step failed.");
+        // Batch 3 — classify: these codes mean the session is dead server-side.
+        const c = consentBody?.error?.code as string | undefined;
+        setFlowErrorAction(
+          c === "EXPIRED" || c === "SESSION_NOT_FOUND" || c === "NOT_PENDING"
+            ? "restart"
+            : "retry"
+        );
         return;
       }
       if (decision === "DENY") {
@@ -306,6 +358,11 @@ export function IdentityCard({
           return;
         }
         setFlowError(cbBody?.error?.message ?? "Verification failed.");
+        // Batch 3 — every non-IDENTITY_TAKEN callback failure leaves the session
+        // terminal (BAD_STATE / CODE_REUSED / EXCHANGE_FAILED / TOKEN_INVALID
+        // all fail the session row; SESSION_NOT_FOUND / NOT_GRANTED mean it was
+        // never usable). The way forward is a fresh session.
+        setFlowErrorAction("restart");
         onChanged();
         return;
       }
@@ -325,6 +382,7 @@ export function IdentityCard({
       onChanged();
     } catch {
       setFlowError("Network error — please try again.");
+      setFlowErrorAction("retry");
     } finally {
       setBusy(false);
     }
@@ -570,12 +628,26 @@ export function IdentityCard({
                 />
               )}
               {flowError && !identityTaken && (
-                <p
-                  className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive"
+                <div
+                  className="flex items-start justify-between gap-3 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive"
                   role="alert"
                 >
-                  {flowError}
-                </p>
+                  <p className="min-w-0 flex-1 leading-relaxed">{flowError}</p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 shrink-0 border-destructive/40 bg-transparent px-2.5 text-destructive hover:bg-destructive/10"
+                    onClick={() => void startVerification()}
+                    disabled={starting}
+                  >
+                    {starting ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                    ) : (
+                      <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
+                    )}
+                    Try again
+                  </Button>
+                </div>
               )}
             </motion.div>
           ) : (
@@ -625,12 +697,26 @@ export function IdentityCard({
                 />
               )}
               {flowError && !identityTaken && (
-                <p
-                  className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive"
+                <div
+                  className="flex items-start justify-between gap-3 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive"
                   role="alert"
                 >
-                  {flowError}
-                </p>
+                  <p className="min-w-0 flex-1 leading-relaxed">{flowError}</p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 shrink-0 border-destructive/40 bg-transparent px-2.5 text-destructive hover:bg-destructive/10"
+                    onClick={() => void startVerification()}
+                    disabled={starting}
+                  >
+                    {starting ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                    ) : (
+                      <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
+                    )}
+                    Try again
+                  </Button>
+                </div>
               )}
               <ul className="grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
                 <li className="flex items-center gap-2">
@@ -663,11 +749,15 @@ export function IdentityCard({
             consent={consent}
             busy={busy}
             error={flowError}
+            errorAction={flowErrorAction}
+            onRestart={() => void startVerification()}
+            restarting={starting}
             onDecision={handleDecision}
             onDismiss={() => {
               if (busy) return;
               setModalOpen(false);
               setFlowError(null);
+              setFlowErrorAction(null);
               onChanged();
             }}
           />

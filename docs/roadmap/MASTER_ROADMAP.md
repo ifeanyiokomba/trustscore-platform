@@ -23,9 +23,10 @@ Audits (11 docs), research (5 docs incl. contract matrix), architecture (4 docs)
 - ✅ DSR erasure-cascade invariant test (PR2) — DMMF-driven zero-rows scan over EVERY UserAccount relation + cascade-coverage assertion + surgical-cascade negative control (ada)
 - ✅ Bonus: live API-catalog drift fixed (19 undocumented routes — the AUTH batch never registered in the /api index; batch1's drift guard now closes at 107 entries)
 
-## Batch 3 — Web Identity Experience polish — ⬜
-- Continue-with-NINAuth journey refinements (error states, retry, session expiry UX)
-- Consent screen granularity review vs official field-level model
+## Batch 3 — Web Identity Experience polish — ✅ **DONE (gate: PASS)**
+- ✅ Continue-with-NINAuth journey refinements (error states, retry, session expiry UX) — expiry + terminal-error are recovery forks now, not dead ends: amber banners with in-modal "Start a new session"/"Start again" (verification + login journeys, mirroring the Google-modal pattern), error classification (terminal → restart CTA + decisions disabled; retryable → decisions stay live), card-level "Try again" affordance, timeline failure reasons surfaced (event `detail.reason` → friendly labels, failure events only)
+- ✅ Consent screen granularity review vs official field-level model — decision documented (`docs/research/CONSENT_GRANULARITY_REVIEW.md`): keep capability-level bundles (small, individually opt-in, LIVE-gated), disclose the underlying official `piiFieldPaths` on-screen ("NINAuth fields: biographicData.firstName, …") via `ConsentField.fieldPaths` — payload + both consent screens
+- ✅ Gate evidence: full regression 349/349 (stage2 36, stage9 102, batch0 29, auth 95, batch1 28, batch2 59), tsc 0, eslint clean, browser E2E of every new path (field-path render, TTL-lapse banner + restart, NOT_PENDING terminal error + restart, NINAuth login expiry + restart + passwordless sign-in, timeline reason), 390px no overflow, zero page errors; screenshots docs/screenshots/batch3-*.png
 
 ## Batch 4 — Mobile Application — ⛔ gated (ADR-002)
 Open when official mobile guidance exists OR pilot-stable web + pinned callbacks. Scope per directive §31.

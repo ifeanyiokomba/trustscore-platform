@@ -26,6 +26,7 @@ import {
   Lock,
   Mail,
   Fingerprint,
+  RefreshCw,
 } from "lucide-react";
 import {
   Dialog,
@@ -70,14 +71,33 @@ export interface NinAuthModalProps {
   consent: ConsentScreenInfo | null;
   /** Pre-fill from the email field the user may already have typed. */
   initialEmail: string;
+  /** Batch 3 — parent re-runs /auth/ninauth/start and passes the fresh session. */
+  onRestart?: () => void;
+  restarting?: boolean;
   onDismiss: () => void;
 }
+
+// Batch 3 — error codes that mean the sign-in session is terminal server-side.
+// Pressing Approve again can only produce the same error, so the decision
+// buttons yield to the restart affordance instead.
+const TERMINAL_ERROR_CODES = new Set([
+  "SESSION_NOT_FOUND",
+  "NOT_PENDING",
+  "EXPIRED",
+  "BAD_STATE",
+  "CODE_REUSED",
+  "NOT_GRANTED",
+  "EXCHANGE_FAILED",
+  "TOKEN_INVALID",
+]);
 
 export function NinAuthModal({
   open,
   session,
   consent,
   initialEmail,
+  onRestart,
+  restarting = false,
   onDismiss,
 }: NinAuthModalProps) {
   const { setUser } = useTrustStore();
@@ -87,6 +107,8 @@ export function NinAuthModal({
   const [optionalOn, setOptionalOn] = React.useState<Record<string, boolean>>({});
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  // Batch 3 — set when the last failure left the session unusable.
+  const [dead, setDead] = React.useState(false);
 
   React.useEffect(() => {
     if (!open) return;
@@ -94,6 +116,7 @@ export function NinAuthModal({
     setEmailError(null);
     setOptionalOn({}); // privacy-first: optional scopes start OFF
     setError(null);
+    setDead(false);
   }, [open, session?.id, initialEmail]);
 
   React.useEffect(() => {
@@ -141,6 +164,7 @@ export function NinAuthModal({
         const approved = await approveRes.json();
         if (!approveRes.ok) {
           setError(approved?.error?.message ?? "NINAuth did not approve the sign-in.");
+          setDead(TERMINAL_ERROR_CODES.has(approved?.error?.code));
           return;
         }
         // 2. The callback contract: code + state → assertion validation →
@@ -153,12 +177,14 @@ export function NinAuthModal({
         const finished = await cbRes.json();
         if (!cbRes.ok) {
           setError(finished?.error?.message ?? "The NINAuth sign-in failed. Start again.");
+          setDead(TERMINAL_ERROR_CODES.has(finished?.error?.code));
           return;
         }
         setUser(finished.user);
         onDismiss();
       } catch {
         setError("Network error — try again.");
+        setDead(false);
       } finally {
         setBusy(false);
       }
@@ -227,6 +253,38 @@ export function NinAuthModal({
               </span>
             </div>
 
+            {/* Batch 3 — expiry recovery: offer the fresh session right here
+                instead of a dead-end disabled modal. */}
+            {expired && (
+              <div
+                className="flex items-start gap-2.5 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2.5 text-xs text-amber-700 dark:text-amber-300"
+                role="alert"
+                data-testid="ninauth-expired-banner"
+              >
+                <RefreshCw className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium">This sign-in window expired.</p>
+                  <p>Windows last 10 minutes for security. Start again for a fresh consent screen.</p>
+                </div>
+                {onRestart && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 shrink-0 border-amber-500/40 bg-transparent text-amber-700 hover:bg-amber-500/15 hover:text-amber-800 dark:text-amber-300 dark:hover:text-amber-200"
+                    onClick={onRestart}
+                    disabled={busy || restarting}
+                    data-testid="ninauth-restart-button"
+                  >
+                    {restarting ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                    ) : null}
+                    Start again
+                  </Button>
+                )}
+              </div>
+            )}
+
             {/* Binding identity — the mock stand-in for the biometrically-
                 bound NINAuth identity. LIVE: this field disappears. */}
             <div className="space-y-2">
@@ -272,6 +330,14 @@ export function NinAuthModal({
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium">{f.label}</p>
                     <p className="text-xs text-muted-foreground">{f.description}</p>
+                    {f.fieldPaths && f.fieldPaths.length > 0 && (
+                      <p
+                        className="mt-1 truncate font-mono text-[10px] text-muted-foreground/70"
+                        title={f.fieldPaths.join(", ")}
+                      >
+                        NINAuth fields: {f.fieldPaths.join(", ")}
+                      </p>
+                    )}
                   </div>
                   <Badge
                     variant="outline"
@@ -309,6 +375,14 @@ export function NinAuthModal({
                         <div className="min-w-0 flex-1">
                           <p className="text-sm font-medium">{f.label}</p>
                           <p className="text-xs text-muted-foreground">{f.description}</p>
+                          {f.fieldPaths && f.fieldPaths.length > 0 && (
+                            <p
+                              className="mt-1 truncate font-mono text-[10px] text-muted-foreground/70"
+                              title={f.fieldPaths.join(", ")}
+                            >
+                              NINAuth fields: {f.fieldPaths.join(", ")}
+                            </p>
+                          )}
                         </div>
                       </label>
                     );
@@ -335,19 +409,47 @@ export function NinAuthModal({
             </div>
 
             {error && (
-              <p
-                className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive"
-                role="alert"
-              >
-                {error}
-              </p>
+              <div className="space-y-2">
+                <p
+                  className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive"
+                  role="alert"
+                >
+                  {error}
+                </p>
+                {dead && onRestart && (
+                  <div
+                    className="flex items-start gap-2.5 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2.5 text-xs text-amber-700 dark:text-amber-300"
+                    role="alert"
+                    data-testid="ninauth-error-restart-banner"
+                  >
+                    <RefreshCw className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium">This sign-in can&apos;t continue.</p>
+                      <p>The session is no longer usable — start a fresh one to try again.</p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 shrink-0 border-amber-500/40 bg-transparent text-amber-700 hover:bg-amber-500/15 hover:text-amber-800 dark:text-amber-300 dark:hover:text-amber-200"
+                      onClick={onRestart}
+                      disabled={busy || restarting}
+                    >
+                      {restarting ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                      ) : null}
+                      Start again
+                    </Button>
+                  </div>
+                )}
+              </div>
             )}
 
             {/* Actions — NINAuth brand treatment: white approve, quiet deny */}
             <div className="flex flex-col gap-2 sm:flex-row-reverse">
               <Button
                 onClick={() => void decide("GRANT")}
-                disabled={busy || expired}
+                disabled={busy || expired || dead}
                 className="flex-1 gap-2 border border-emerald-600/40 bg-white text-emerald-700 shadow-sm hover:bg-emerald-50 hover:text-emerald-800 dark:bg-white dark:text-emerald-700 dark:hover:bg-emerald-50"
               >
                 {busy ? (
@@ -365,7 +467,7 @@ export function NinAuthModal({
               <Button
                 variant="outline"
                 onClick={() => void decide("DENY")}
-                disabled={busy || expired}
+                disabled={busy || expired || dead}
                 className="flex-1"
               >
                 <XCircle className="mr-2 h-4 w-4" />

@@ -962,7 +962,7 @@ export async function getIdentityForUser(
       createdAt: true,
       events: {
         orderBy: { createdAt: "asc" },
-        select: { id: true, eventType: true, createdAt: true },
+        select: { id: true, eventType: true, createdAt: true, detail: true },
       },
     },
   });
