@@ -37,14 +37,18 @@ jobs:
           bun-version: latest
       - name: Install dependencies
         run: bun install --frozen-lockfile
-      - name: Typecheck
-        run: bunx tsc --noEmit
-      - name: Lint
-        run: bun run lint
       - name: Prisma client + database
         run: |
           bun run db:generate
           bun run db:push
+      # Prisma client must be generated BEFORE typecheck: bun blocks untrusted
+      # dependency postinstall scripts, so `bun install` alone leaves
+      # @prisma/client ungenerated and tsc fails with TS2305 (PrismaClient /
+      # Prisma not exported) — observed on the first real CI run (35433939987).
+      - name: Typecheck
+        run: bunx tsc --noEmit
+      - name: Lint
+        run: bun run lint
       - name: Python test dependencies
         run: python -m pip install --quiet requests
       - name: Start mini-services and dev server
