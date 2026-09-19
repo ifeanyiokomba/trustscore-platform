@@ -1,3 +1,0 @@
-{
-  "/api/v1/auth/google/[id]/grant/route": "app/api/v1/auth/google/[id]/grant/route.js"
-}

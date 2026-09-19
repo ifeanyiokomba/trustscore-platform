@@ -1,2 +1,34 @@
-skills/
+# Dependencies
 node_modules/
+
+# Sandbox tooling
+skills/
+agent-ctx/
+tool-results/
+upload/
+
+# Next.js build output + Turbopack dev cache
+# (accidentally tracked 2026-09-18..19 across 3 commits; untracked 2026-09-19 — index-only, disk untouched)
+.next/
+out/
+
+# Environment — never commit env files.
+# (the historically tracked .env held only a benign local DATABASE_URL path, but the
+#  tracked path itself was a landmine for any future real secret — SIGNAL_PEPPER etc.)
+.env
+.env.*
+!.env.example
+
+# SQLite database + journals (schema is in prisma/schema.prisma; fixtures via `bun run seed:fixtures`)
+db/*.db
+db/*.db-journal
+db/*.db-shm
+db/*.db-wal
+
+# Logs
+dev.log
+server.log
+*.log
+
+# Build artifacts
+tsconfig.tsbuildinfo
