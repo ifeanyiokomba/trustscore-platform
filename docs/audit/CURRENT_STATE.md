@@ -22,7 +22,7 @@ The three-layer separation (Identity / Evidence / Trust) is implemented, not jus
 | Database | Prisma + SQLite — **39 models** (identity, consent, evidence, reputation, B2B, transport, network) |
 | Services | Next dev (:3000) + `mini-services/webhook-worker` (:3031, signed webhook retries) + `mini-services/provider-simulator` (:3032, loopback NINAuth/SMS/liveness) |
 | Tests | 36 test files; stage matrices (Python) + browser E2E (Playwright-driven shell) + `qa_regression.sh` — **1,041+ automated checks green** at last full run |
-| Version catalog | v1.15.0 "Stage 16 — Surface Elevation" |
+| Version catalog | v1.16.0 "Stage 17 — Trust Passport 2.0" |
 | Provider posture | MOCK (default) / LOOPBACK (simulator on :3032) / LIVE (honestly refused without credentials + `PROVIDER_LIVE_ENABLED`) |
 
 ## 3. Delivered capability inventory (evidence: code + tests + worklog stages 0–16)
@@ -67,7 +67,7 @@ The three-layer separation (Identity / Evidence / Trust) is implemented, not jus
 
 ## 5. Baseline verification (this audit round)
 
-- `/api/health` → `v1.15.0`, db up, stage 16
+- `/api/health` → `v1.16.0`, db up, stage 17
 - provider-simulator (:3032) healthy, webhook-worker (:3031) healthy (35 ticks, 1 historical error, recovered)
 - `dev.log` clean; git tree clean at `1c6cd96`
 - Full regression suite re-run scheduled post-corrections (see Batch 0 report in worklog)

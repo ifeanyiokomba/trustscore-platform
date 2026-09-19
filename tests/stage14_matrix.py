@@ -9,6 +9,7 @@ authorization on every new endpoint, the internal tick's observability leg,
 audit trail coverage, and deterministic cleanup (posture/fault/threshold
 restored, test-window rows removed)."""
 import json
+import os
 import time
 import urllib.request
 import urllib.error
@@ -17,7 +18,8 @@ import sqlite3
 from datetime import datetime, timezone
 
 BASE = "http://127.0.0.1:3000"
-DB = "/home/z/my-project/db/custom.db"
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DB = os.path.join(ROOT, "db", "custom.db")
 PASS = 0
 FAIL = 0
 # Prisma stores SQLite DateTime as 'YYYY-MM-DDTHH:MM:SS.mmmZ' — match exactly

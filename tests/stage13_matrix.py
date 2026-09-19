@@ -12,6 +12,7 @@ the credential vault (write-only secrets, masked hints, rotation, revoke),
 admin authorization on every new endpoint, audit trail, and deterministic
 cleanup (posture restored to mock, faults cleared, circuits reset)."""
 import json
+import os
 import re
 import time
 import urllib.request
@@ -20,7 +21,8 @@ import http.cookiejar
 import sqlite3
 
 BASE = "http://127.0.0.1:3000"
-DB = "/home/z/my-project/db/custom.db"
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DB = os.path.join(ROOT, "db", "custom.db")
 PASS = 0
 FAIL = 0
 

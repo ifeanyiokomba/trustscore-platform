@@ -3,8 +3,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 
-const STAGE = "16 — Surface Elevation (the display voice in every deep dashboard surface, plain/technical policy transparency, and cursor-paginated score insights over a 50-snapshot retention horizon)";
-const VERSION = "1.15.0";
+const STAGE = "17 — Trust Passport 2.0 (receipts richness with channel + link provenance, owner-facing share-link analytics, freshness nudges, and the email-verified credential — on top of the Stage-16 display voice and cursor-paginated score insights)";
+const VERSION = "1.16.0";
 const startedAt = Date.now();
 
 export async function GET(_req: NextRequest) {

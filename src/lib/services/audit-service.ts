@@ -31,6 +31,9 @@ export type AuditAction =
   | "SHARE_TOKEN_VIEWED"
   | "SHARE_TOKEN_REVOKED"
   | "SHARE_TOKEN_BLOCKED" // view rejected: expired / revoked / view limit
+  // Batch 5 — the owner opened a share link's analytics panel (counts only;
+  // the audit metadata carries just the token id).
+  | "SHARE_ANALYTICS_VIEWED"
   | "SESSION_REVOKED"
   | "DSR_EXPORT_REQUESTED"
   | "DSR_EXPORT_COMPLETED"
@@ -224,6 +227,9 @@ const SAFE_METADATA_KEYS = new Set([
   "holderIdentity",
   // Batch 2 (G8) — masked RC display hint ("RC 1•••45" — non-reconstructable)
   "rcHint",
+  // Batch 5 — share-link analytics: the ShareToken cuid only (not a user id,
+  // not PII) so analytics views are traceable to the exact link.
+  "tokenId",
 ]);
 
 export async function recordAudit(input: AuditInput): Promise<void> {

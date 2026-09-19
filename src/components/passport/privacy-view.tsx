@@ -64,7 +64,7 @@ export function PrivacyTab({ onOpenScoreInsights }: { onOpenScoreInsights?: () =
 
       {/* Trust receipts */}
       <div className="min-w-0 lg:col-span-1">
-        <ReceiptsCard receipts={passport.receipts} />
+        <ReceiptsCard receipts={passport.receipts} stats={passport.receiptsStats} />
       </div>
 
       {/* Security center */}

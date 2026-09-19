@@ -10,6 +10,7 @@ L2+ consented check, 90-day window, PHONE method excluded), masked reporter
 in subject view (unmasked in DSR export), audit PII discipline, security-
 timeline subject linkage, DSR export inclusion, rate limits."""
 import json
+import os
 import re
 import time
 import urllib.request
@@ -17,7 +18,8 @@ import http.cookiejar
 import sqlite3
 
 BASE = "http://127.0.0.1:3000"
-DB = "/home/z/my-project/db/custom.db"
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DB = os.path.join(ROOT, "db", "custom.db")
 PASS = 0
 FAIL = 0
 

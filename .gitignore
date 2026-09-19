@@ -36,3 +36,6 @@ tsconfig.tsbuildinfo
 # python test caches
 __pycache__/
 *.pyc
+
+# npm lockfile snapshot (CI audit job regenerates it)
+package-lock.json

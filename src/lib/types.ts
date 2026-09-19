@@ -476,12 +476,64 @@ export interface ShareTokenCreated {
   expiresAt: string;
 }
 
+// Batch 5 — GET /api/v1/passport/share/:id/analytics (owner-only). Derived
+// from the link's TrustReceipts: counts + receipt labels only — no raw
+// tokens, no IP hashes, no viewer PII.
+export interface ShareAnalytics {
+  tokenId: string;
+  scopes: string[];
+  status: string;
+  maxViews: number;
+  views: number;
+  viewsLeft: number;
+  lastViewedAt: string | null;
+  createdAt: string;
+  expiresAt: string;
+  revokedAt: string | null;
+  firstViewedAt: string | null;
+  uniqueViewers: number; // count of DISTINCT receipt ipHashes — hashes NEVER leave
+  opensByChannel: Record<string, number>;
+  recentOpens: { viewedAt: string; channel: string; viewerLabel: string }[];
+  firstOpenLatencyMinutes: number | null;
+}
+
+// Batch-5 alias: the share-analytics card was delivered importing this name —
+// identical shape, single source of truth above.
+export type ShareTokenAnalytics = ShareAnalytics;
+
+// Batch 5 — the Trust Link a receipt's open came through, resolved
+// owner-scoped at read time. status derives EXPIRED once past expiresAt or
+// the view limit, exactly like the owner's share-token list.
+export interface ReceiptLinkToken {
+  status: string;
+  scopes: string[];
+  views: number;
+  maxViews: number;
+}
+
 export interface TrustReceiptInfo {
   id: string;
   viewerLabel: string;
   channel: string;
   viewedAt: string;
   shown: Record<string, unknown>;
+  // Batch 5 — token linkage (additive): which link was opened and whether it
+  // is still live. linkStatus null = no link recorded / token no longer
+  // resolves; scopes are the disclosure set of that link.
+  shareTokenId: string | null;
+  linkStatus: string | null;
+  linkScopes: string[];
+  // Batch 5 task 3-a — the same linkage as a nested object (status + scopes
+  // + view counters). null when the receipt predates token linkage or the
+  // owner-scoped token row no longer resolves.
+  token?: ReceiptLinkToken | null;
+}
+
+// Batch 5 — receipts header stats: total retained (pruning keeps ≤ 50) and
+// per-channel open counts. Counts only — never viewer PII.
+export interface ReceiptsStats {
+  total: number;
+  byChannel: Record<string, number>;
 }
 
 export interface SessionInfo {
@@ -536,6 +588,7 @@ export interface PassportMe {
   credentials: CredentialInfo[];
   shareTokens: ShareTokenInfo[];
   receipts: TrustReceiptInfo[];
+  receiptsStats: ReceiptsStats;
   sessions: SessionInfo[];
   activeSessionCount: number;
   notifications: NotificationInfo[];

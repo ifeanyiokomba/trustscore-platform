@@ -296,8 +296,16 @@ export function computeScoreFromInputs(
   const assuranceValue = Math.round((ASSURANCE[clamp(level, 0, 4)] ?? 0) * freshnessFactor);
 
   // --- Verified Credentials (policy: credentialPoints/credentialMax) ------
+  // Batch 5: only the three CORE types feed the score (the stage5 contract:
+  // 6 x fresh CORE credential, cap 20). EMAIL_VERIFIED is a supporting
+  // credential — displayed on the passport with an honest "not scored"
+  // label but deliberately excluded from the Verified Credentials
+  // component so historical score expectations stay byte-stable.
   const freshCredentials = inputs.credentials.filter(
-    (c) => c.status === "ACTIVE" && (c.expiresAt?.getTime() ?? Infinity) > now
+    (c) =>
+      SCORED_CREDENTIAL_TYPES.has(c.type) &&
+      c.status === "ACTIVE" &&
+      (c.expiresAt?.getTime() ?? Infinity) > now
   );
   const credentialValue = clamp(freshCredentials.length * rules.credentialPoints, 0, rules.credentialMax);
 
@@ -359,8 +367,8 @@ export function computeScoreFromInputs(
     );
     explanation.push(
       freshCredentials.length > 0
-        ? `Verified Credentials ${credentialValue}/${rules.credentialMax}: ${freshCredentials.length} active credential${freshCredentials.length === 1 ? "" : "s"} backed by live evidence (${freshCredentials.map((c) => c.type.replace("_VERIFIED", "").replace(/_/g, " ").toLowerCase()).join(", ")}).`
-        : `Verified Credentials 0/${rules.credentialMax}: no active credentials — verify signals to earn them.`
+        ? `Verified Credentials ${credentialValue}/${rules.credentialMax}: ${freshCredentials.length} active core credential${freshCredentials.length === 1 ? "" : "s"} backed by live evidence (${freshCredentials.map((c) => c.type.replace("_VERIFIED", "").replace(/_/g, " ").toLowerCase()).join(", ")}).`
+        : `Verified Credentials 0/${rules.credentialMax}: no active core credentials — verify signals to earn them.`
     );
     explanation.push(
       inputs.verifiedInteractions > 0
@@ -672,7 +680,24 @@ const CREDENTIAL_LABELS: Record<string, string> = {
   GOV_ID_VERIFIED: "Government identity verified",
   PHONE_VERIFIED: "Phone number verified",
   LIVENESS_VERIFIED: "Biometric liveness passed",
+  // Batch 5 — EMAIL_VERIFIED: a verified account email is a real,
+  // evidence-backed fact about the member, so it earns a PLACE on the
+  // passport — but as a SUPPORTING credential, not a scored one: the
+  // Verified Credentials component counts only the three core types
+  // (see SCORED_CREDENTIAL_TYPES) so the stage5 score contract stays
+  // byte-stable. The masked hint (maskEmail) is the only claim — the raw
+  // address never reaches the Credential row.
+  EMAIL_VERIFIED: "Email address verified",
 };
+
+// Batch 5: the types that feed the Verified Credentials score component
+// (6 points each, cap 20 — stage5 contract). EMAIL_VERIFIED is displayed
+// but deliberately NOT scored.
+const SCORED_CREDENTIAL_TYPES = new Set([
+  "GOV_ID_VERIFIED",
+  "PHONE_VERIFIED",
+  "LIVENESS_VERIFIED",
+]);
 
 export function credentialLabel(type: string): string {
   return CREDENTIAL_LABELS[type] ?? type;
@@ -700,6 +725,15 @@ export async function syncCredentials(userId: string): Promise<number> {
   );
   const phoneEvidence = identity.evidence.find((e) => e.type === "PHONE_OTP" && fresh(e.expiresAt));
   const livenessEvidence = identity.evidence.find((e) => e.type === "LIVENESS" && fresh(e.expiresAt));
+  // Batch 5 — EMAIL_VERIFIED derives from the AUTH-batch identifier registry
+  // (a VERIFIED EMAIL AuthIdentifier), NOT from trust-identity evidence. The
+  // masked hint (maskEmail) is the only thing stored in claims — the raw
+  // address never reaches the Credential row.
+  const emailIdentifier = await db.authIdentifier.findFirst({
+    where: { userId, type: "EMAIL", verified: true },
+    orderBy: { isPrimary: "desc" },
+    select: { value: true, verifiedAt: true },
+  });
 
   const sources: {
     type: string;
@@ -738,6 +772,15 @@ export async function syncCredentials(userId: string): Promise<number> {
       claims: {
         verdict: "passed",
         templateStored: false, // honesty: verdict-only, never biometric templates
+      },
+    },
+    {
+      type: "EMAIL_VERIFIED",
+      live: !!emailIdentifier,
+      evidenceId: null, // account-level registry fact, not identity evidence
+      expiresAt: null, // no freshness horizon: lapses only if unlinked/unverified
+      claims: {
+        emailHint: emailIdentifier ? maskEmail(emailIdentifier.value) : null,
       },
     },
   ];

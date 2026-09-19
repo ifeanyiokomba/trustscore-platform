@@ -2,7 +2,7 @@
 """TrustScore Stage 16 — Surface Elevation + NINAuth Auth + Paginated Insights.
 
 Contract test matrix. Covers:
-  1. Version catalog (v1.15.0 / Stage 16).
+  1. Version catalog (v1.16.0 / Stage 17).
   2. NINAuth passwordless authentication ("Continue with NINAuth"):
      start (PKCE S256, consent screen), approve (one-time code), callback
      (REGISTERED / LOGIN / LINKED outcomes), replay protection, deny path,
@@ -60,12 +60,12 @@ def jbody(raw):
 print("== 1) version catalog ==")
 s, raw, _ = call("GET", "/api/health")
 b = jbody(raw)
-check("health reports Stage 16 / v1.15.0",
-      s == 200 and b.get("version") == "1.15.0" and "16" in b.get("stage", ""),
+check("health reports Stage 17 / v1.16.0",
+      s == 200 and b.get("version") == "1.16.0" and "17" in b.get("stage", ""),
       str(b.get("stage")))
 s, raw, _ = call("GET", "/api")
 b = jbody(raw)
-check("api index: v1.15.0 + Stage 16", b.get("version") == "1.15.0" and "16" in b.get("stage", ""))
+check("api index: v1.16.0 + Stage 17", b.get("version") == "1.16.0" and "17" in b.get("stage", ""))
 check("api index documents the NINAuth auth endpoints",
       "/api/v1/auth/ninauth/start" in raw and "/api/v1/auth/ninauth/:id/callback" in raw)
 check("api index documents the paginated score-history contract",

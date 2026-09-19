@@ -83,8 +83,8 @@ check "plain view restores the component cards" "$PLAIN_BACK"
 
 evcheck "roadmap shows the Surface elevation entry" \
   "document.body.textContent.includes('Surface elevation')"
-evcheck "nav badge says Stage 16 · Surface Elevation" \
-  "document.body.textContent.includes('Stage 16 · Surface Elevation')"
+evcheck "nav badge says Stage 17 · Trust Passport 2.0" \
+  "document.body.textContent.includes('Stage 17 · Trust Passport 2.0')"
 
 # ===========================================================================
 echo "--- 2) SIGN IN WITH NINAUTH (the flagship flow) ---"
@@ -128,8 +128,8 @@ for i in $(seq 1 10); do
 done
 check "passwordless sign-in lands in the dashboard" "$DASH_OK"
 
-evcheck "dashboard carries the Stage 16 badge" \
-  "document.body.textContent.includes('Stage 16 · Surface Elevation')"
+evcheck "dashboard carries the Stage 17 badge" \
+  "document.body.textContent.includes('Stage 17 · Trust Passport 2.0')"
 evcheck "eight dashboard tabs present" \
   "document.querySelectorAll('[role=tab]').length === 8"
 

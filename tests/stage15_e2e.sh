@@ -59,10 +59,10 @@ check "animated hero stats settle (100M+ / 100%)" "$STATS_OK"
 $AB eval "window.scrollTo(0, 0)" >/dev/null 2>&1
 evcheck "roadmap shows the Design elevation entry" \
   "document.body.textContent.includes('Design elevation')"
-evcheck "hero preview note honest (Stage 16)" \
-  "document.body.textContent.includes('(Stage 16)')"
-evcheck "nav badge: Stage 16 · Surface Elevation" \
-  "document.body.textContent.includes('Stage 16 · Surface Elevation')"
+evcheck "hero preview note honest (Stage 17)" \
+  "document.body.textContent.includes('(Stage 17)')"
+evcheck "nav badge: Stage 17 · Trust Passport 2.0" \
+  "document.body.textContent.includes('Stage 17 · Trust Passport 2.0')"
 evcheck "footer present" "!!document.querySelector('footer')"
 
 # Scroll choreography — reveal transforms/rails appear after scrolling.
@@ -115,8 +115,8 @@ evcheck "dashboard heading welcomes the user" \
   "(document.querySelector('h1')?.textContent || '').includes('Welcome back')"
 evcheck "dashboard H1 uses the display serif" \
   "getComputedStyle(document.querySelector('h1')).fontFamily.includes('Fraunces')"
-evcheck "dashboard Stage 16 badge present" \
-  "document.body.textContent.includes('Stage 16 · Surface Elevation')"
+evcheck "dashboard Stage 17 badge present" \
+  "document.body.textContent.includes('Stage 17 · Trust Passport 2.0')"
 evcheck "eight dashboard tabs present" \
   "document.querySelectorAll('[role=tab]').length === 8"
 

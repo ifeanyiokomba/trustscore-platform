@@ -14,6 +14,7 @@ import {
   FileCheck2,
   CircleDot,
   Clock,
+  CalendarClock,
 } from "lucide-react";
 import {
   Card,
@@ -45,6 +46,14 @@ function timeLabel(iso: string): string {
     ` · ${d.toLocaleTimeString("en-NG", { hour: "2-digit", minute: "2-digit" })}`;
 }
 
+function timeAgoShort(iso: string): string {
+  const mins = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
+  if (mins < 60) return `${mins} min`;
+  const h = Math.floor(mins / 60);
+  if (h < 24) return `${h} h`;
+  return `${Math.floor(h / 24)} d`;
+}
+
 export function VerificationHistory({ identity }: { identity: IdentityMe | null }) {
   type Entry = {
     id: string;
@@ -55,6 +64,8 @@ export function VerificationHistory({ identity }: { identity: IdentityMe | null 
     sub: string;
     status: string;
     tone: string;
+    // Batch 5 — evidence freshness horizon (null when the record has none).
+    expiresAt: string | null;
   };
 
   const entries: Entry[] = React.useMemo(() => {
@@ -71,6 +82,7 @@ export function VerificationHistory({ identity }: { identity: IdentityMe | null 
         sub: `${e.provider} (${e.providerMode}) · confidence ${e.confidence}%`,
         status: e.status,
         tone: e.status === "ACTIVE" ? "text-primary" : "text-muted-foreground",
+        expiresAt: e.expiresAt,
       });
     }
     const s = identity.lastSession;
@@ -88,6 +100,7 @@ export function VerificationHistory({ identity }: { identity: IdentityMe | null 
         sub: `${s.flow === "QR" ? "QR flow" : "Share-code flow"} · ${s.events.length} audited steps`,
         status: s.status,
         tone: meta.tone,
+        expiresAt: null,
       });
     }
     return list.sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
@@ -150,6 +163,22 @@ export function VerificationHistory({ identity }: { identity: IdentityMe | null 
                           <span className={cn("inline-flex items-center gap-1 font-medium", e.tone)}>
                             <Clock className="h-3 w-3" aria-hidden="true" />
                             {e.status === "ACTIVE" ? "active" : e.status.toLowerCase()}
+                          </span>
+                        )}
+                        {e.kind === "evidence" && e.expiresAt && (
+                          <span
+                            data-testid="evidence-expiry-chip"
+                            className={cn(
+                              "inline-flex items-center gap-1 tabular-nums",
+                              Date.parse(e.expiresAt) > Date.now()
+                                ? "text-muted-foreground"
+                                : "font-medium text-amber-600 dark:text-amber-400"
+                            )}
+                          >
+                            <CalendarClock className="h-3 w-3" aria-hidden="true" />
+                            {Date.parse(e.expiresAt) > Date.now()
+                              ? `valid until ${new Date(e.expiresAt).toLocaleDateString("en-NG", { day: "numeric", month: "short" })}`
+                              : `expired ${timeAgoShort(e.expiresAt)} ago`}
                           </span>
                         )}
                       </p>

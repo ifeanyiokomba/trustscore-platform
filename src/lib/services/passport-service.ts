@@ -23,17 +23,29 @@ import {
 } from "@/lib/services/trustscore-service";
 import { getSessionUser } from "@/lib/platform/session";
 import { isAutomatedDecisionsEnabled } from "@/lib/services/engine-service";
+import type { ShareAnalytics } from "@/lib/types";
 
 export const SHARE_SCOPES = ["PROFILE", "SIGNALS", "ATTRIBUTES", "SCORE"] as const;
 export type ShareScope = (typeof SHARE_SCOPES)[number];
 
 export const DSR_EXPORT_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 const RECEIPTS_RETAIN = 50;
+const RECEIPTS_READ_WINDOW = 20;
+// Batch 5 — freshness nudges: an ACTIVE credential whose horizon is inside
+// NUDGE_SOON_DAYS (or already past) produces a VERIFICATION notification on
+// the /passport/me read path, deduped per (user, type, title) for a week.
+const NUDGE_SOON_MS = 14 * 24 * 60 * 60 * 1000;
+const NUDGE_DEDUPE_MS = 7 * 24 * 60 * 60 * 1000;
 const PUBLIC_CARD_LANGUAGE = {
   adverse: "No confirmed adverse signals found",
   disclaimer:
     "A TrustScore summarizes recorded verification evidence. It is not a guarantee that a person is safe to deal with.",
 };
+
+// Batch 5 — receipt channels with display metadata (icon keys resolved by the
+// frontend): anonymous link opens, named member Safety Checks, B2B API checks.
+export const RECEIPT_CHANNELS = ["TRUST_LINK", "SAFETY_CHECK", "API_CHECK"] as const;
+export type ReceiptChannel = (typeof RECEIPT_CHANNELS)[number];
 
 function newRawShareToken(): string {
   return `ts_${randomBytes(24).toString("base64url")}`;
@@ -41,6 +53,89 @@ function newRawShareToken(): string {
 
 function shareHash(raw: string): string {
   return sha256Hex(`share:${raw}`);
+}
+
+// ---------------------------------------------------------------------------
+// Batch 5 — freshness nudges (owner read path only, never public reads)
+// ---------------------------------------------------------------------------
+
+// Credential read-model rows (subset of CredentialInfo used here).
+interface NudgeCredential {
+  type: string;
+  label: string;
+  status: string;
+  expiresAt: string | null;
+}
+
+/**
+ * Emit freshness nudge notifications for ACTIVE credentials whose horizon is
+ * inside 14 days (or past) and for a VERIFIED government identity inside its
+ * own horizon. Dedupe: a (type, title) notification for this user created in
+ * the last 7 days (read or unread) suppresses a re-issue. Returns the number
+ * of notifications created. Bodies carry LABELS only — never raw values.
+ */
+async function maybeFreshnessNudges(
+  userId: string,
+  credentials: NudgeCredential[],
+  identity: { status: string; expiresAt: Date | null } | null
+): Promise<number> {
+  const now = Date.now();
+  const soonCutoff = now + NUDGE_SOON_MS;
+  const dedupeSince = new Date(now - NUDGE_DEDUPE_MS);
+  let created = 0;
+
+  const nudgeOnce = async (title: string, body: string): Promise<void> => {
+    const existing = await db.notification.findFirst({
+      where: {
+        userId,
+        type: "VERIFICATION",
+        title,
+        createdAt: { gt: dedupeSince },
+      },
+      select: { id: true },
+    });
+    if (existing) return;
+    await notifyUser(userId, "VERIFICATION", title, body);
+    created += 1;
+  };
+
+  for (const c of credentials) {
+    // Nudge only rows that still carry their source (read-model ACTIVE, or
+    // ACTIVE-in-DB past-horizon rows surfaced as EXPIRED). Manually/source
+    // REVOKED rows are intentional states — an expiry nudge would be noise.
+    if ((c.status !== "ACTIVE" && c.status !== "EXPIRED") || !c.expiresAt) continue;
+    const exp = Date.parse(c.expiresAt);
+    if (Number.isNaN(exp)) continue;
+    if (exp <= now) {
+      await nudgeOnce(
+        "Credential expired",
+        `${c.label} — renew to keep your Trust Score current.`
+      );
+    } else if (exp <= soonCutoff) {
+      await nudgeOnce(
+        "Credential expiring soon",
+        `${c.label} — renew to keep your Trust Score current.`
+      );
+    }
+  }
+
+  // The government identity 90-day horizon: same nudge family, own title.
+  if (identity && identity.status === "VERIFIED" && identity.expiresAt) {
+    const exp = identity.expiresAt.getTime();
+    if (exp <= now) {
+      await nudgeOnce(
+        "Government identity expired",
+        "Government identity verified — renew to keep your Trust Score current."
+      );
+    } else if (exp <= soonCutoff) {
+      await nudgeOnce(
+        "Government identity expiring soon",
+        "Government identity verified — renew to keep your Trust Score current."
+      );
+    }
+  }
+
+  return created;
 }
 
 // ---------------------------------------------------------------------------
@@ -64,7 +159,7 @@ export async function getPassportForUser(userId: string, currentToken?: string) 
       db.trustReceipt.findMany({
         where: { userId },
         orderBy: { viewedAt: "desc" },
-        take: 20,
+        take: RECEIPTS_READ_WINDOW,
       }),
       db.session.findMany({
         where: { userId, revokedAt: null, expiresAt: { gt: new Date() } },
@@ -86,6 +181,61 @@ export async function getPassportForUser(userId: string, currentToken?: string) 
     ]);
 
   const now = Date.now();
+
+  // Batch 5 — receipts richness: join each receipt's share token so the owner
+  // can see WHICH link was opened and whether that link is still live. The
+  // join is owner-scoped (userId must match) so a stray shareTokenId can
+  // never surface another user's link metadata. Only non-PII linkage
+  // metadata leaves the DB (status + scopes + view counters); raw tokens and
+  // IP hashes never do.
+  const receiptTokenIds = [
+    ...new Set(receipts.map((r) => r.shareTokenId).filter((x): x is string => !!x)),
+  ];
+  const receiptTokens = receiptTokenIds.length
+    ? await db.shareToken.findMany({
+        where: { id: { in: receiptTokenIds }, userId },
+        select: { id: true, scopes: true, status: true, expiresAt: true, views: true, maxViews: true },
+      })
+    : [];
+  const tokenById = new Map(receiptTokens.map((t) => [t.id, t]));
+  const shapeLink = (
+    tokenId: string | null
+  ): {
+    status: string | null;
+    scopes: string[];
+    token: { status: string; scopes: string[]; views: number; maxViews: number } | null;
+  } => {
+    if (!tokenId) return { status: null, scopes: [], token: null };
+    const t = tokenById.get(tokenId);
+    // token: null when the receipt predates linkage or the row no longer
+    // resolves (owner-scoped join came back empty).
+    if (!t) return { status: null, scopes: [], token: null };
+    const expired =
+      t.status === "ACTIVE" && (t.expiresAt.getTime() <= now || t.views >= t.maxViews);
+    const status = t.status === "ACTIVE" && expired ? "EXPIRED" : t.status;
+    const scopes = JSON.parse(t.scopes) as string[];
+    return {
+      status,
+      scopes,
+      token: { status, scopes, views: t.views, maxViews: t.maxViews },
+    };
+  };
+
+  // Batch 5 — receipts header stats: total retained + per-channel counts
+  // (pruning keeps at most RECEIPTS_RETAIN per user).
+  const [totalReceipts, channelGroups] = await Promise.all([
+    db.trustReceipt.count({ where: { userId } }),
+    db.trustReceipt.groupBy({ by: ["channel"], where: { userId }, _count: { _all: true } }),
+  ]);
+  const byChannel: Record<string, number> = {};
+  for (const g of channelGroups) {
+    byChannel[g.channel] = g._count._all;
+  }
+  const receiptsStats = {
+    total: totalReceipts,
+    byChannel,
+  };
+
   const shapedTokens = shareTokens.map((t) => {
     const expired =
       t.status === "ACTIVE" && (t.expiresAt.getTime() <= now || t.views >= t.maxViews);
@@ -131,6 +281,22 @@ export async function getPassportForUser(userId: string, currentToken?: string) 
     select: { id: true, action: true, createdAt: true },
   });
 
+  // Batch 5 — freshness nudges (read path): an ACTIVE credential whose
+  // expiresAt is inside the 14-day horizon (or already past) and a VERIFIED
+  // government identity inside its own horizon each produce a VERIFICATION
+  // notification, deduped per (type, title) for 7 days. Labels only — no
+  // raw values in bodies.
+  const nudged = await maybeFreshnessNudges(userId, credentials, identity);
+  let shapedNotifications = notifications;
+  if (nudged > 0) {
+    // Keep this response self-consistent when a nudge just landed.
+    shapedNotifications = await db.notification.findMany({
+      where: { userId },
+      orderBy: { createdAt: "desc" },
+      take: 20,
+    });
+  }
+
   return {
     profile: user
       ? {
@@ -159,14 +325,26 @@ export async function getPassportForUser(userId: string, currentToken?: string) 
       } catch {
         shown = {};
       }
+      // Batch 5 — token linkage (additive): which link was opened, its live
+      // status and the scopes it discloses. null status = no link recorded
+      // (pre-Stage-5-shape rows) or the token row no longer resolves.
+      // `token` (task 3-a) is the same linkage as a nested object with the
+      // link's view counters; linkStatus/linkScopes stay for the receipts card.
+      const link = shapeLink(r.shareTokenId);
       return {
         id: r.id,
         viewerLabel: r.viewerLabel,
         channel: r.channel,
         viewedAt: r.viewedAt.toISOString(),
         shown,
+        shareTokenId: r.shareTokenId,
+        linkStatus: link.status,
+        linkScopes: link.scopes,
+        token: link.token,
       };
     }),
+    // Batch 5 — receipts header stats (additive): total retained + per channel.
+    receiptsStats,
     sessions: sessions.map((s) => ({
       id: s.id,
       userAgent: s.userAgent,
@@ -176,7 +354,7 @@ export async function getPassportForUser(userId: string, currentToken?: string) 
       current: currentToken ? s.tokenHash === sha256Hex(currentToken) : false,
     })),
     activeSessionCount,
-    notifications: notifications.map((n) => ({
+    notifications: shapedNotifications.map((n) => ({
       id: n.id,
       type: n.type,
       title: n.title,
@@ -184,7 +362,7 @@ export async function getPassportForUser(userId: string, currentToken?: string) 
       readAt: n.readAt?.toISOString() ?? null,
       createdAt: n.createdAt.toISOString(),
     })),
-    unreadNotifications: notifications.filter((n) => n.readAt === null).length,
+    unreadNotifications: shapedNotifications.filter((n) => n.readAt === null).length,
     securityEvents: securityEvents.map((e) => ({
       id: e.id,
       action: e.action,
@@ -262,6 +440,87 @@ export async function revokeShareToken(userId: string, tokenId: string): Promise
     metadata: { views: row.views },
   });
   return "REVOKED";
+}
+
+// ---------------------------------------------------------------------------
+// Batch 5 — share-link analytics (owner-only)
+// ---------------------------------------------------------------------------
+
+/**
+ * Owner-scoped analytics for one share token: derived entirely from the
+ * TrustReceipts written by viewPublicCard. Anti-enumeration: a token that
+ * belongs to another user (or does not exist) returns null → 404, identical
+ * to the revoke route. No raw tokens, no IP hashes, no viewer PII — counts
+ * and receipt labels only. The ShareAnalytics response type lives in
+ * src/lib/types.ts (single source of truth for the client mirror).
+ */
+export async function getShareAnalytics(
+  userId: string,
+  tokenId: string
+): Promise<ShareAnalytics | null> {
+  const token = await db.shareToken.findFirst({
+    where: { id: tokenId, userId },
+  });
+  if (!token) return null;
+
+  // Audit fires only for a resolved owner link (task 3-a): the ShareToken
+  // cuid is the sole metadata — never raw tokens or viewer identifiers.
+  await recordAudit({
+    actorType: "USER",
+    actorId: userId,
+    action: "SHARE_ANALYTICS_VIEWED",
+    subjectType: "ShareToken",
+    subjectId: tokenId,
+    metadata: { tokenId },
+  });
+
+  // Receipts are gathered owner-scoped (userId belt-and-braces against
+  // cross-linked rows) in viewedAt asc order: receipts[0] is the FIRST open,
+  // the array tail carries the most recent ones.
+  const receipts = await db.trustReceipt.findMany({
+    where: { shareTokenId: token.id, userId },
+    orderBy: { viewedAt: "asc" },
+  });
+
+  const now = Date.now();
+  const expired =
+    token.status === "ACTIVE" && (token.expiresAt.getTime() <= now || token.views >= token.maxViews);
+  const status = token.status === "ACTIVE" && expired ? "EXPIRED" : token.status;
+
+  const firstViewedAt = receipts.length > 0 ? receipts[0].viewedAt : null;
+
+  const opensByChannel: Record<string, number> = {};
+  for (const r of receipts) {
+    opensByChannel[r.channel] = (opensByChannel[r.channel] ?? 0) + 1;
+  }
+  const uniqueIps = new Set(
+    receipts.map((r) => r.ipHash).filter((h): h is string => !!h)
+  );
+
+  return {
+    tokenId: token.id,
+    scopes: JSON.parse(token.scopes) as string[],
+    status,
+    maxViews: token.maxViews,
+    views: token.views,
+    viewsLeft: Math.max(0, token.maxViews - token.views),
+    lastViewedAt: token.lastViewedAt?.toISOString() ?? null,
+    createdAt: token.createdAt.toISOString(),
+    expiresAt: token.expiresAt.toISOString(),
+    revokedAt: token.revokedAt?.toISOString() ?? null,
+    firstViewedAt: firstViewedAt?.toISOString() ?? null,
+    uniqueViewers: uniqueIps.size,
+    opensByChannel,
+    recentOpens: receipts.slice(-20).map((r) => ({
+      viewedAt: r.viewedAt.toISOString(),
+      channel: r.channel,
+      viewerLabel: r.viewerLabel,
+    })),
+    firstOpenLatencyMinutes:
+      firstViewedAt !== null
+        ? Math.max(0, Math.round((firstViewedAt.getTime() - token.createdAt.getTime()) / 60_000))
+        : null,
+  };
 }
 
 // ---------------------------------------------------------------------------

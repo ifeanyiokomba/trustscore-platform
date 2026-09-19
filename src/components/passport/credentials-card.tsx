@@ -11,6 +11,7 @@ import {
   Landmark,
   Phone,
   ScanFace,
+  Mail,
   Ban,
   Loader2,
   ShieldCheck,
@@ -44,6 +45,7 @@ const TYPE_ICON: Record<string, React.ElementType> = {
   GOV_ID_VERIFIED: Landmark,
   PHONE_VERIFIED: Phone,
   LIVENESS_VERIFIED: ScanFace,
+  EMAIL_VERIFIED: Mail, // Batch 5 — account-contact credential
 };
 
 function timeAgo(iso: string): string {
@@ -70,6 +72,8 @@ function claimsSummary(c: CredentialInfo): string {
       return `OTP-verified phone ${c.claims.phoneHint ? `(${String(c.claims.phoneHint)})` : ""} · SIM-swap checked`;
     case "LIVENESS_VERIFIED":
       return "Liveness passed · face matched the government record · no templates stored";
+    case "EMAIL_VERIFIED":
+      return `Email confirmed by verification code${c.claims.emailHint ? ` (${String(c.claims.emailHint)})` : ""} · account contact channel`;
     default:
       return "Platform-issued credential";
   }
@@ -146,6 +150,11 @@ export function CredentialsCard({
                 const Icon = TYPE_ICON[c.type] ?? Award;
                 const days = daysUntil(c.expiresAt);
                 const active = c.status === "ACTIVE";
+                // Batch 5 — 3-state freshness: the read model surfaces
+                // past-horizon rows as EXPIRED (source-lapsed, not manual);
+                // those get the destructive badge, distinct from "revoked".
+                const expired =
+                  c.status === "EXPIRED" || (active && days !== null && days <= 0);
                 return (
                   <motion.li
                     key={c.id}
@@ -172,14 +181,31 @@ export function CredentialsCard({
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="text-sm font-semibold">{c.label}</span>
-                          {active ? (
-                            days !== null && days <= 0 ? (
+                        {c.type === "EMAIL_VERIFIED" && (
+                          <Badge
+                            variant="outline"
+                            data-testid="credential-supporting"
+                            className="border-muted-foreground/30 bg-muted/50 text-[10px] text-muted-foreground"
+                          >
+                            supporting · not scored
+                          </Badge>
+                        )}
+                          {expired ? (
+                            <Badge variant="outline" className="border-destructive/40 bg-destructive/10 text-[10px] text-destructive">
+                              expired
+                            </Badge>
+                          ) : active ? (
+                            days === null ? (
+                              <Badge variant="outline" className="border-primary/30 bg-primary/10 text-[10px] text-primary">
+                                active · no expiry
+                              </Badge>
+                            ) : days <= 14 ? (
                               <Badge variant="outline" className="border-amber-500/40 bg-amber-500/10 text-[10px] text-amber-600 dark:text-amber-400">
-                                expired
+                                expiring soon · {days}d
                               </Badge>
                             ) : (
                               <Badge variant="outline" className="border-primary/30 bg-primary/10 text-[10px] text-primary">
-                                active{days !== null ? ` · ${days}d` : ""}
+                                active · {days}d
                               </Badge>
                             )
                           ) : (

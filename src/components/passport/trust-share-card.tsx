@@ -22,6 +22,8 @@ import {
   ShieldAlert,
   CheckCircle2,
   Info,
+  BarChart3,
+  Webhook,
 } from "lucide-react";
 import {
   Card,
@@ -59,7 +61,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import type { PassportMe, ShareTokenCreated, ShareTokenInfo } from "@/lib/types";
+import type { PassportMe, ShareTokenAnalytics, ShareTokenCreated, ShareTokenInfo } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const SCOPE_META: Record<string, string> = {
@@ -424,6 +426,215 @@ function ShareDialog({
   );
 }
 
+// ---------------------------------------------------------------------------
+// Batch 5 — Link analytics dialog (owner-only view of one link's receipts)
+// ---------------------------------------------------------------------------
+
+const ANALYTICS_CHANNELS: { key: string; label: string }[] = [
+  { key: "TRUST_LINK", label: "Link opens" },
+  { key: "SAFETY_CHECK", label: "Member checks" },
+  { key: "API_CHECK", label: "API checks" },
+];
+
+function latencyLabel(minutes: number | null): string {
+  if (minutes === null) return "—";
+  if (minutes < 1) return "< 1 min";
+  if (minutes < 60) return `${minutes} min`;
+  const h = Math.floor(minutes / 60);
+  if (h < 48) return `${h} h`;
+  return `${Math.floor(h / 24)} d`;
+}
+
+function AnalyticsDialog({
+  token,
+  open,
+  onOpenChange,
+}: {
+  token: ShareTokenInfo;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const [data, setData] = React.useState<ShareTokenAnalytics | null>(null);
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    fetch(`/api/v1/passport/share/${token.id}/analytics`)
+      .then(async (res) => {
+        const body = await res.json().catch(() => null);
+        if (cancelled) return;
+        if (res.ok && body?.analytics) {
+          setData(body.analytics as ShareTokenAnalytics);
+        } else {
+          setError(body?.error?.message ?? "Could not load analytics.");
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setError("Network error — please try again.");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, token.id]);
+
+  const dead = (data?.status ?? token.status) !== "ACTIVE";
+  const channelTotal = Math.max(
+    1,
+    ...ANALYTICS_CHANNELS.map((c) => data?.opensByChannel?.[c.key] ?? 0)
+  );
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <BarChart3 className="h-5 w-5 text-primary" aria-hidden="true" />
+            Link analytics
+          </DialogTitle>
+          <DialogDescription>
+            How this trust link performed — derived from its trust receipts. Counts and
+            receipt labels only; viewers are never identified.
+          </DialogDescription>
+        </DialogHeader>
+        {loading ? (
+          <div className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+            Loading analytics…
+          </div>
+        ) : error ? (
+          <div
+            role="alert"
+            className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+          >
+            {error}
+          </div>
+        ) : data ? (
+          <div className="space-y-4">
+            {/* Status + scopes */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              <Badge
+                variant="outline"
+                className={cn(
+                  "text-[10px] font-semibold uppercase tracking-wide",
+                  dead
+                    ? "border-border bg-muted text-muted-foreground"
+                    : "border-primary/30 bg-primary/10 text-primary"
+                )}
+              >
+                {data.status === "REVOKED" ? "revoked" : data.status === "EXPIRED" || dead ? "expired" : "live"}
+              </Badge>
+              {data.scopes.map((s) => (
+                <Badge key={s} variant="outline" className="text-[9px] uppercase tracking-wide text-muted-foreground">
+                  {s}
+                </Badge>
+              ))}
+            </div>
+
+            {/* Stat tiles */}
+            <div className="grid grid-cols-2 gap-2.5">
+              <div className="rounded-lg border border-border bg-muted/25 px-3 py-2.5">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Opens</p>
+                <p className="mt-0.5 text-lg font-bold tabular-nums" data-testid="share-analytics-opens">
+                  {data.views}
+                  <span className="text-xs font-medium text-muted-foreground"> / {data.maxViews}</span>
+                </p>
+              </div>
+              <div className="rounded-lg border border-border bg-muted/25 px-3 py-2.5">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Views left</p>
+                <p className="mt-0.5 text-lg font-bold tabular-nums" data-testid="share-analytics-views-left">
+                  {data.viewsLeft}
+                </p>
+              </div>
+              <div className="rounded-lg border border-border bg-muted/25 px-3 py-2.5">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Unique viewers</p>
+                <p className="mt-0.5 text-lg font-bold tabular-nums" data-testid="share-analytics-unique-viewers">
+                  {data.uniqueViewers}
+                </p>
+                <p className="text-[10px] text-muted-foreground">distinct devices / IPs</p>
+              </div>
+              <div className="rounded-lg border border-border bg-muted/25 px-3 py-2.5">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">First open</p>
+                <p className="mt-0.5 text-lg font-bold tabular-nums" data-testid="share-analytics-latency">
+                  {latencyLabel(data.firstOpenLatencyMinutes)}
+                </p>
+                <p className="text-[10px] text-muted-foreground">
+                  {data.firstViewedAt ? `after link creation` : "never opened"}
+                </p>
+              </div>
+            </div>
+
+            {/* Channel breakdown mini-bars */}
+            <div className="space-y-2" aria-label="Opens by channel">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                Opens by channel
+              </p>
+              {ANALYTICS_CHANNELS.map((c) => {
+                const n = data.opensByChannel?.[c.key] ?? 0;
+                return (
+                  <div key={c.key} className="flex items-center gap-2">
+                    <span className="w-24 shrink-0 text-[11px] text-muted-foreground">{c.label}</span>
+                    <div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-muted">
+                      <div
+                        className="h-full rounded-full bg-primary/70"
+                        style={{ width: `${Math.round((n / channelTotal) * 100)}%` }}
+                        data-testid={`share-analytics-channel-${c.key}`}
+                      />
+                    </div>
+                    <span className="w-6 shrink-0 text-right text-[11px] font-semibold tabular-nums">{n}</span>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Recent opens timeline */}
+            <div>
+              <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                Recent opens
+              </p>
+              {data.recentOpens.length === 0 ? (
+                <p className="rounded-lg border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">
+                  No opens recorded yet.
+                </p>
+              ) : (
+                <ul className="max-h-48 space-y-1 overflow-y-auto pr-1 ts-scrollbar" data-testid="share-analytics-recent">
+                  {data.recentOpens.map((o, i) => {
+                    const OpenIcon =
+                      o.channel === "SAFETY_CHECK" ? ShieldCheck : o.channel === "API_CHECK" ? Webhook : LinkIcon;
+                    return (
+                      <li
+                        key={`${o.viewedAt}-${i}`}
+                        className="flex items-center gap-2.5 rounded-lg border border-border/60 bg-muted/25 px-3 py-2 text-[11px]"
+                      >
+                        <OpenIcon className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" />
+                        <span className="min-w-0 flex-1 truncate font-medium">{o.viewerLabel}</span>
+                        <time className="shrink-0 text-muted-foreground" dateTime={o.viewedAt}>
+                          {timeAgoShort(o.viewedAt)}
+                        </time>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+
+            <p className="text-[10px] leading-relaxed text-muted-foreground">
+              Analytics are computed from your trust receipts (salted-IP dedupe for the
+              unique-viewer count — the hashes themselves are never shown or exported).
+            </p>
+          </div>
+        ) : null}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function TokenRow({
   token,
   onRevoke,
@@ -432,6 +643,7 @@ function TokenRow({
   onRevoke: (t: ShareTokenInfo) => void;
 }) {
   const countdown = useCountdown(token.expiresAt);
+  const [analyticsOpen, setAnalyticsOpen] = React.useState(false);
   const dead = token.status !== "ACTIVE";
   return (
     <motion.li
@@ -495,18 +707,32 @@ function TokenRow({
             />
           )}
         </div>
-        {!dead && (
+        <div className="flex shrink-0 items-center gap-1">
           <Button
             variant="ghost"
             size="sm"
-            className="shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
-            onClick={() => onRevoke(token)}
+            className="h-8 w-8 p-0 text-muted-foreground hover:bg-primary/10 hover:text-primary"
+            aria-label={`Link analytics: ${token.scopes.join(", ")} link`}
+            title="Link analytics"
+            data-testid="share-analytics-trigger"
+            onClick={() => setAnalyticsOpen(true)}
           >
-            <Ban className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
-            Revoke
+            <BarChart3 className="h-4 w-4" aria-hidden="true" />
           </Button>
-        )}
+          {!dead && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
+              onClick={() => onRevoke(token)}
+            >
+              <Ban className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+              Revoke
+            </Button>
+          )}
+        </div>
       </div>
+      <AnalyticsDialog token={token} open={analyticsOpen} onOpenChange={setAnalyticsOpen} />
     </motion.li>
   );
 }

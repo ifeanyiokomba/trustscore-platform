@@ -5,8 +5,8 @@ import { NextResponse } from "next/server";
 export async function GET() {
   return NextResponse.json({
     name: "TrustScore Platform API",
-    stage: "16 — Surface Elevation (the display voice in every deep dashboard surface, plain/technical policy transparency, and cursor-paginated score insights over a 50-snapshot retention horizon)",
-    version: "1.15.0",
+    stage: "17 — Trust Passport 2.0 (receipts richness with channel + link provenance, owner-facing share-link analytics, freshness nudges, and the email-verified credential — on top of the Stage-16 display voice and cursor-paginated score insights)",
+    version: "1.16.0",
     notice:
       "NINAuth integration is implemented contract-first behind a runtime-switchable provider POSTURE: MOCK (default, in-process, honestly labeled), SANDBOX LOOPBACK (the real transport path — HMAC-signed calls, timeouts, retries, per-provider circuit breakers, latency metrics — proven against the local provider simulator on :3032), and LIVE (honestly gated on partner credentials + base URLs; the API refuses the flip until they exist). Phone (SMS OTP) and biometric (liveness) follow the same posture. The credential vault stores provider secrets AES-256-GCM encrypted and write-only. The B2B Trust Decision API and webhook deliveries are real integrations against that same platform; plan billing is an honest mock-up (no payment processor is connected).",
     endpoints: [
@@ -53,6 +53,7 @@ export async function GET() {
       { method: "POST", path: "/api/v1/passport/share", auth: "session", description: "Stage 5: create Trust Link (raw token shown ONCE; hashed at rest; view-counted, expiring, revocable)" },
       { method: "GET", path: "/api/v1/passport/share", auth: "session", description: "Stage 5: list share tokens (metadata only)" },
       { method: "DELETE", path: "/api/v1/passport/share/:id", auth: "session", description: "Stage 5: revoke a Trust Link" },
+      { method: "GET", path: "/api/v1/passport/share/:id/analytics", auth: "session", description: "Batch 5: owner-only link analytics — opens, views left, unique viewers (distinct receipt IP-hash count — hashes never leave), opens by channel, recent-opens timeline, first-open latency; anti-enumeration 404 like revoke" },
       { method: "GET", path: "/api/v1/passport/public/:token", auth: "public", description: "Stage 5: PUBLIC trust-card view — anti-enumeration, view-counted, receipted (410 when dead, 429 when abused)" },
       { method: "POST", path: "/api/v1/passport/credentials/:id/revoke", auth: "session", description: "Stage 5: manually revoke a passport credential (sticks until re-verification)" },
       { method: "POST", path: "/api/v1/passport/dsr", auth: "session", description: "Stage 5: NDPA §36 DSR — EXPORT (data download, 7-day retention) or DELETE (password-confirmed cascade)" },
@@ -125,6 +126,7 @@ export async function GET() {
       "12": "Transparency & alerting — SHIPPED (public policy explainer, drop receipts, timer worker)",
       "13": "Live-ready providers — SHIPPED (transport layer + circuit breakers + vault + loopback simulator)",
       "14": "Transport observability — SHIPPED (persisted snapshot history, circuit transition log, sustained-open alerting)",
+      "17": "Trust Passport 2.0 — SHIPPED (receipts richness, share-link analytics, freshness nudges, EMAIL_VERIFIED credential)",
     },
   });
 }
