@@ -58,7 +58,7 @@ con.execute("DELETE FROM ApiKey WHERE clientId NOT IN (SELECT id FROM ApiClient)
 con.execute("DELETE FROM ApiUsageEvent WHERE keyId NOT IN (SELECT id FROM ApiKey)")
 con.commit()
 con.close()
-subprocess.run(["bash", "tests/restart-dev.sh"], check=True, cwd="/home/z/my-project")
+subprocess.run(["bash", "tests/restart-dev.sh"], check=True, cwd=ROOT)
 time.sleep(2)
 
 def client():

@@ -24,6 +24,7 @@ together. Run: python3 tests/auth_matrix.py   (dev server on :3000)
 
 import http.cookiejar
 import json
+import os
 import re
 import secrets
 import subprocess
@@ -34,7 +35,8 @@ import urllib.parse
 import urllib.request
 
 BASE = "http://127.0.0.1:3000"
-ROOT = "/home/z/my-project"
+# Root-relative (CI-portable): the repo root is one level above tests/
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TMP_SCRIPT = "tests/auth_matrix_db_ops.ts"
 
 PASS = 0

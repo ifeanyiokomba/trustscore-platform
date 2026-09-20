@@ -45,6 +45,7 @@ Run: python3 tests/batch2_matrix.py [--with-regressions | --regressions-only]
 
 import http.cookiejar
 import json
+import os
 import re
 import secrets
 import subprocess
@@ -54,7 +55,8 @@ import urllib.error
 import urllib.request
 
 BASE = "http://127.0.0.1:3000"
-ROOT = "/home/z/my-project"
+# Root-relative (CI-portable): the repo root is one level above tests/
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TMP_SCRIPT = "tests/batch2_db_ops.ts"
 
 PASS = 0
