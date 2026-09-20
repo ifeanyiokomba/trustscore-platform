@@ -42,6 +42,7 @@ import {
   validateGoogleIdToken,
   googleConsentScreen,
   GoogleTokenValidationError,
+  assertGoogleLiveNotAttempted,
 } from "@/lib/providers/google";
 
 // ---------------------------------------------------------------------------
@@ -49,6 +50,9 @@ import {
 // ---------------------------------------------------------------------------
 
 export async function startGoogleLogin(requestId: string) {
+  // Same defense-in-depth as completeGoogleLogin — see assertGoogleLiveNotAttempted.
+  assertGoogleLiveNotAttempted();
+
   const { verifier, challenge } = generatePkce();
   const state = generateState();
   const session = await db.googleLoginSession.create({
@@ -213,6 +217,12 @@ export async function completeGoogleLogin(
   input: { sessionId: string; code: string; state: string },
   requestId: string
 ): Promise<GoogleCallbackResult> {
+  // Defense in depth: proxy.ts already refuses to boot in production if
+  // GOOGLE_MODE is LIVE (see assertGoogleLiveNotAttempted in google.ts for
+  // why). Re-checked here too, so this function never mints a mock-signed
+  // token and calls it a real login if it's ever reached some other way.
+  assertGoogleLiveNotAttempted();
+
   const session = await db.googleLoginSession.findUnique({
     where: { id: input.sessionId },
   });

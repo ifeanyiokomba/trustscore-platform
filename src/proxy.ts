@@ -23,9 +23,11 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { assertSecretsAtBoot } from "@/lib/platform/boot-guard";
+import { assertGoogleLiveNotAttempted } from "@/lib/providers/google";
 
-// Fail-closed boot check — before the first byte of any request.
+// Fail-closed boot checks — before the first byte of any request.
 assertSecretsAtBoot();
+assertGoogleLiveNotAttempted();
 
 function freshNonce(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(16));

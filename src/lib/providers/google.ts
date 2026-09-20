@@ -28,6 +28,33 @@ export const GOOGLE_MODE: "MOCK" | "LIVE" =
     ? "LIVE"
     : "MOCK"; // honestly labeled everywhere
 
+// sec-batch-B (external review): GOOGLE_MODE flipping to "LIVE" does NOT mean
+// LIVE actually works. googleAuthorizationUrl()'s LIVE branch builds a
+// correct real-accounts.google.com redirect, but completeGoogleLogin() in
+// google-auth-service.ts unconditionally mints a MOCK-signed token
+// (mockGoogleIdToken) regardless of mode — there is no real token-endpoint
+// exchange and no RS256/JWKS verification of a genuine Google ID token yet.
+// That half-finished state is exactly the trap: it LOOKS live-ready because
+// the redirect half is real. Refuse to boot rather than let someone
+// discover this by setting the two env vars and hitting an undefined
+// failure in front of a real user. Remove this guard once the real
+// exchange + JWKS verification lands.
+export function assertGoogleLiveNotAttempted(): void {
+  if (GOOGLE_MODE !== "LIVE") return;
+  const strict =
+    process.env.NODE_ENV === "production" ||
+    process.env.TS_BOOT_GUARD_STRICT === "1";
+  if (!strict) return; // local dev may experiment while building the real exchange
+  throw new Error(
+    "[google] Refusing to start: GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET are " +
+      "set, which flips GOOGLE_MODE to LIVE — but real Google token exchange " +
+      "and ID-token verification are not implemented yet (completeGoogleLogin " +
+      "always mints a mock-signed token; see the comment above this function). " +
+      "Unset both env vars, or finish the real implementation, before this can " +
+      "run in production."
+  );
+}
+
 export const GOOGLE_LOGIN_TTL_MS = 10 * 60_000; // consent window
 export const GOOGLE_CODE_TTL_MS = 60_000; // one-time authorization code TTL
 
