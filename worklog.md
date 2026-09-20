@@ -961,3 +961,24 @@ Stage Summary:
 - Project state: dev :3000 healthy; DB re-seeded to canonical fixture posture (ada verified L1, chidi registered); git tree clean at 83be3e3; mini-services :3031/:3032 untouched this round (not restarted).
 - 15-min webDevReview cron recreated: job_id 399595 (fixed_rate 900s, tz Africa/Lagos, payload webDevReview).
 - NEXT recommendations: (a) run the standing regression suite on the re-seeded DB (stage2/stage9/batch0/auth/batch1/batch2 + batch5_matrix — the DB reset makes this the first full-suite run post-83be3e3; batch5_matrix also closes the "owed" items from entry 3-a); (b) worklog the still-un-worklogged crashed-attempt batch-5 slices (nudges, receiptsStats, channels, frontend cards) or fold them into the next batch entry; (c) deferred queue unchanged: username-change auditable flow, Google LIVE real exchange (then delete this guard), G13/G14, CI end-to-end GitHub push.
+
+---
+Task ID: push-1 (push to GitHub: twin reconciliation + first green CI)
+Agent: Z.ai Code (main session)
+Task: User request — push all unpushed updates to GitHub.
+
+Work Log:
+- PRE-PUSH RECON: git fetch revealed origin/main had advanced to 0a7ea62 ("CI red → green") — an independently-built TWIN of local 753edb0 (identical message, same parent ba88f05, different content; the crashed session pushed its own variant). Local 753edb0 is the strict superset: it carries the remote twin's entire 5-file change set PLUS the root-relative matrix-path fix PLUS the batch-5 slices.
+- GROUND TRUTH via GitHub API (not commit messages): BOTH remote CI runs failed — 35433939987 (ba88f05) and 35435578780 (0a7ea62 itself): quality job died at "Stage 9 matrix" with sqlite3.OperationalError — the remote twin's ci.yml guess (file:./ci.db) left stage9_matrix.py still hardcoding DB=/home/z/my-project. Local's fix (ROOT-relative DB + DATABASE_URL=file:../db/custom.db matching db:push and the matrices) is the real one.
+- MERGE 96a3ded: origin/main merged; ort auto-resolved to the local tree EXACTLY (diff vs ff82ce8 empty — even the remote's package-lock.json ignore line was already local). Amended the merge message to document the twin divergence + why local won. Normalized a PNG mode artifact the merge checkout introduced.
+- 92c19e8: package.json version restored to 0.2.1 (the deliberate platform version; 753edb0's dependency hardening had silently reset it to the scaffold's 1.16.0 — visible by diffing the twins).
+- PUSH 1 (0a7ea62..92c19e8): run 35498966230 got PAST the stage9 sqlite connect (root-relative DB fix works) but failed at stage9_matrix.py:61 — subprocess cwd="/home/z/my-project" (FileNotFoundError). Second class of the same bug: restart cwd (stage9), hardcoded ROOT constants (auth_matrix.py, batch2_matrix.py), restart-dev.sh cd + absolute dev.log path.
+- 2bd73d9: purged every remaining /home/z/my-project from the CI-executed file set (4 files, 5 sites; same ROOT-derivation pattern as the already-fixed matrices). Verified: py_compile clean, bash -n clean, zero hardcodes left in stage2/stage9/batch0/auth/batch1/batch2 + restart-dev.sh, and restart-dev.sh proven portable live — run from /tmp: exit 0, dev server back, health 200.
+- PUSH 2 (92c19e8..2bd73d9): run 35499183258 → **GREEN — first green CI run in repo history** (9m32s). audit ✓; quality 18/18 steps: typecheck, lint, prisma db push, seed (ada/chidi — also proving seed-fixtures works on a fresh runner), stage2 ✓, stage9 ✓ (the historical killer), batch0 ✓, auth ✓, batch1 ✓, batch2 ✓.
+
+Stage Summary:
+- ALL updates now on GitHub: 83be3e3 (Google LIVE gate), ff82ce8 (worklog), 96a3ded (twin-reconciliation merge), 92c19e8 (version 0.2.1), 2bd73d9 (CI portability). Remote head 2bd73d9; history shows both twins with the merge explaining them.
+- CI END-TO-END GREEN: the long-standing "CI needs one real push to validate" caveat is CLOSED. All 349 matrix checks pass on a hosted runner with a cold-start DB.
+- Portability discipline: every file the quality job executes is now path-independent. Remaining /home/z/my-project holders (stage*_e2e.sh, qa_regression.sh) are sandbox-local tooling NOT executed by CI — left deliberately, documented here.
+- Local state: dev :3000 healthy (restarted by the /tmp portability test), fixtures intact (ada verified L1 + chidi), working tree clean before this worklog commit, cron 399595 active.
+- NEXT: (a) Batch 5 gate still owes: batch5_matrix run + standing local regression + worklogging the crashed-attempt slices (nudges/receiptsStats/channels/frontend cards); (b) optional: portability for the e2e .sh scripts (cosmetic); (c) deferred queue unchanged: username-change auditable flow, Google LIVE real exchange (then delete the sec-batch-B gate), G13/G14.
